@@ -1,26 +1,134 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8f6f1;
+  --foreground: #172733;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Avenir Next", "Segoe UI", Arial, sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
 }
 
 body {
+  margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+::selection {
+  background: #f2c968;
+  color: #102a38;
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1rem;
+  text-transform: uppercase;
+  color: #e4664f;
+}
+
+.button-primary,
+.button-secondary,
+.button-dark {
+  display: inline-flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.button-primary {
+  background: #e4664f;
+  color: white;
+  box-shadow: 0 10px 24px rgba(228, 102, 79, 0.24);
+}
+
+.button-secondary {
+  border: 1px solid rgba(23, 39, 51, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  color: #173f50;
+}
+
+.button-dark {
+  background: #173f50;
+  color: white;
+}
+
+.button-primary:hover,
+.button-secondary:hover,
+.button-dark:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(23, 39, 51, 0.18);
+}
+
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.button-dark:focus-visible,
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid #f2c968;
+  outline-offset: 3px;
+}
+
+.decorative-grid {
+  background-image: linear-gradient(rgba(23, 63, 80, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 63, 80, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to right, transparent, black, transparent);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #273b46;
+}
+
+.form-control {
+  width: 100%;
+  border: 1px solid #d5d9d7;
+  border-radius: 0.875rem;
+  background: white;
+  padding: 0.85rem 1rem;
+  color: #172733;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.form-control::placeholder {
+  color: #98a1a4;
+}
+
+.form-control:focus {
+  border-color: #e4664f;
+  box-shadow: 0 0 0 4px rgba(228, 102, 79, 0.1);
+  outline: none;
 }
