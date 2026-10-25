@@ -226,7 +226,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 tripId={trip.id}
               />
             ) : null}
-            {!candidatesAvailable && !itineraryReady ? <TripSketchCard basisKey={sketchBasis.key} dateLabel={sketchDateLabel} destination={trip.destination || "Your Group Trip"} groupReady={isGroupInputComplete(trip)} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} needsRedraw={sketchNeedsRedraw(trip)} origin={trip.origin} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
+            {!candidatesAvailable && !itineraryReady ? <TripSketchCard basisKey={sketchBasis.key} dateLabel={sketchDateLabel} destination={trip.destination || trip.sketch?.places[0]?.name || "Your Group Trip"} groupReady={isGroupInputComplete(trip)} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} needsRedraw={sketchNeedsRedraw(trip)} origin={trip.origin} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
           <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} feasibilityWarnings={feasibilityWarnings} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
         </div>
