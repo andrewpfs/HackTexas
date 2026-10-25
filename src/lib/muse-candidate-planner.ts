@@ -104,7 +104,7 @@ const systemPrompt = [
   "You are the consensus engine for a GROUP trip planner.",
   "Create exactly 3 candidate trip options for the whole group, not for one person.",
   "Rules:",
-  "- Follow the host's trip description in trip.prompt. If it names places (for example \"Tokyo and Osaka\"), every option should include them unless the dates or budgets make that impossible, and say so in considerations. trip.sketch, when present, is the first rough plan the group already saw: build on it, and let the three options differ in pace and emphasis.",
+  "- Follow the host's trip description in trip.prompt. If it names places (for example \"Tokyo and Osaka\"), every option should include them unless the dates or budgets make that impossible, and say so in considerations. Let the three options differ in pace and emphasis.",
   "- Use only dates listed in groupAvailability.sharedDates. A candidate's whole date range must be consecutive shared dates.",
   "- Each traveler departs from their own departureLocation. Consider all of them when choosing destinations.",
   "- Stay within the group's budgets. The lowest maximum budget is the binding constraint.",

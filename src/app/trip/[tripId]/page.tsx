@@ -11,10 +11,8 @@ import { CrewCard } from "./crew-card";
 import { TripTopBar } from "./trip-top-bar";
 import { LiveRefresh } from "./live-refresh";
 import { ProgressNav } from "./progress-nav";
-import { TripSketchCard } from "./trip-sketch-card";
 import { getVotingSummary } from "@/lib/voting";
 import { activeConfirmedDates, suggestTripDates } from "@/lib/date-suggestions";
-import { getSketchBasis, isGroupInputComplete, sketchNeedsRedraw } from "@/lib/trip-sketch";
 import { getTripFeasibility } from "@/lib/trip-feasibility";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { ConfirmDatesCard } from "./confirm-dates-card";
@@ -108,10 +106,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const confirmedDates = activeConfirmedDates(trip.confirmedDates, planningReadiness.sharedDates);
   // Checked before generating, so the group hears about an unrealistic plan first.
   const feasibilityWarnings = showDateConfirmation ? getTripFeasibility(trip, flightTimes) : [];
-  const sketchBasis = getSketchBasis(trip);
-  const sketchDateLabel = confirmedDates
-    ? `${formatCalendarDate(confirmedDates.startDate, false)} – ${formatCalendarDate(confirmedDates.endDate)}`
-    : travelWindow;
 
   const completedAvailabilityLabel =
     completedAvailabilityCount === trip.travelers.length
@@ -226,7 +220,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 tripId={trip.id}
               />
             ) : null}
-            {!candidatesAvailable && !itineraryReady ? <TripSketchCard basisKey={sketchBasis.key} dateLabel={sketchDateLabel} destination={trip.destination || trip.sketch?.places[0]?.name || "Your Group Trip"} groupReady={isGroupInputComplete(trip)} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} needsRedraw={sketchNeedsRedraw(trip)} origin={trip.origin} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
           <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} feasibilityWarnings={feasibilityWarnings} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
         </div>
