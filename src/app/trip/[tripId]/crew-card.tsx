@@ -6,6 +6,7 @@ import { formatCalendarDate, type DateWindow } from "@/lib/date-utils";
 import { GenerateCandidatesAction } from "./generate-candidates-action";
 import { ReadinessNotes } from "./readiness-notes";
 import type { FeasibilityWarning } from "@/lib/trip-feasibility";
+import { isGeneratingCandidates } from "@/lib/trip-updates";
 
 type CrewCardProps = {
   trip: Trip;
@@ -95,7 +96,7 @@ export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvail
           warnings={readiness.warnings}
         />
         <div className="pt-1">
-          <GenerateCandidatesAction candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} ready={ready} tripId={trip.id} warnings={feasibilityWarnings} />
+          <GenerateCandidatesAction autoRefresh={trip.optionsNeedRefresh === true} candidatesAvailable={candidatesAvailable} generatingElsewhere={isGeneratingCandidates(trip)} itineraryReady={itineraryReady} ready={ready} tripId={trip.id} warnings={feasibilityWarnings} />
         </div>
       </div>
     </aside>

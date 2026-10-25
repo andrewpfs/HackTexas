@@ -10,8 +10,8 @@ import { ProposalCard, type ChatState } from "./proposal-card";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { getChangedStopKeys, getStopKey, needsPlaceLookup } from "@/lib/itinerary-diff";
-import { estimateTravel, formatDistance, formatMinutes, travelModes, type TravelMode } from "@/lib/travel-time";
-import type { ChatMessage, GroupItinerary, ItineraryProposal, ItineraryActivity, PersonalOverride, PlaceSuggestion } from "@/lib/trip-types";
+import { estimateTravel, fastestMode, formatDistance, formatMinutes, travelModes, type TravelMode } from "@/lib/travel-time";
+import type { ChatMessage, GroupItinerary, ItineraryNote, ItineraryNoteKind, ItineraryProposal, ItineraryActivity, PersonalOverride, PlaceSuggestion } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
 type WorkspaceProps = {
@@ -24,12 +24,23 @@ type WorkspaceProps = {
   placesConfigured: boolean;
 };
 
-type Panel = "map" | "chat";
+type Panel = "map" | "notes" | "chat";
+
+const noteKindOptions: { kind: ItineraryNoteKind; label: string; icon: string; placeholder: string }[] = [
+  { kind: "note", label: "Note", icon: "📝", placeholder: "Anything the group should know" },
+  { kind: "getting-around", label: "Getting There", icon: "🚇", placeholder: "example: I'm taking the subway, meet at the north exit" },
+  { kind: "love", label: "Why I Love It", icon: "❤️", placeholder: "example: The view from the top floor at sunset is unreal" },
+];
 
 const directionFlags: Record<TravelMode, string> = { walk: "w", bike: "b", car: "d", transit: "r" };
 
 function hasCoordinates(place: PlaceSuggestion | undefined): place is PlaceSuggestion & { latitude: number; longitude: number } {
   return place !== undefined && typeof place.latitude === "number" && typeof place.longitude === "number";
+}
+
+// The fastest of walking, transit or driving, once both stops have real places.
+function defaultMode(from: PlaceSuggestion | undefined, to: PlaceSuggestion | undefined): TravelMode {
+  return hasCoordinates(from) && hasCoordinates(to) ? fastestMode(from, to) : "walk";
 }
 
 function getMapSource(
@@ -84,6 +95,11 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [isSending, setIsSending] = useState(false);
   const [askingMuse, setAskingMuse] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteKind, setNoteKind] = useState<ItineraryNoteKind>("note");
+  const [noteOnStop, setNoteOnStop] = useState(true);
+  const [noteBusy, setNoteBusy] = useState(false);
+  const [noteError, setNoteError] = useState("");
   const [placesError, setPlacesError] = useState(false);
   const [placesAttempt, setPlacesAttempt] = useState(0);
   const sendingRef = useRef(false);
@@ -138,6 +154,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         const same =
           data.itinerary.revision === current.revision &&
           data.itinerary.placesStatus === current.placesStatus &&
+          (data.itinerary.notes?.length ?? 0) === (current.notes?.length ?? 0) &&
           data.messages.length === messagesCountRef.current &&
           data.messages.at(-1)?.id === lastMessageIdRef.current;
 
@@ -238,14 +255,140 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
     const [legDay, legIndex] = legKey.split("-").map(Number);
     const legActivities = itinerary.days[legDay]?.activities;
     if (legActivities?.[legIndex] && legActivities[legIndex + 1]) {
-      activeLeg = { from: legActivities[legIndex], to: legActivities[legIndex + 1], mode: modes[legKey] ?? "walk" };
+      const from = legActivities[legIndex];
+      const to = legActivities[legIndex + 1];
+      activeLeg = { from, to, mode: modes[legKey] ?? defaultMode(from.place, to.place) };
     }
   }
 
   function selectStop(index: number) {
     setStopIndex(index);
     setLegKey(null);
-    setPanel("map");
+    // Stay on Notes when picking a stop there, so its notes show.
+    setPanel((current) => (current === "notes" ? "notes" : "map"));
+  }
+
+  const notes = itinerary.notes ?? [];
+  const notesForStop = (key: string) => notes.filter((note) => note.stopKey === key);
+
+  async function changeNote(body: Record<string, unknown>) {
+    if (!currentTraveler) return;
+    setNoteBusy(true);
+    setNoteError("");
+    try {
+      const response = await fetch(`/api/trips/${tripId}/itinerary/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ travelerId: currentTraveler.id, ...body }),
+      });
+      const data = (await response.json()) as Partial<ChatState> & { error?: string };
+      if (!response.ok || !data.itinerary) {
+        setNoteError(data.error || "We couldn't save that note.");
+        return false;
+      }
+      applyState(data.itinerary, data.messages ?? messages);
+      return true;
+    } catch {
+      setNoteError("We couldn't reach the server. Please try again.");
+      return false;
+    } finally {
+      setNoteBusy(false);
+    }
+  }
+
+  async function addNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = noteDraft.trim();
+    if (!text) return;
+    const onStop = noteOnStop && activity !== null;
+    const saved = await changeNote({
+      action: "add",
+      kind: noteKind,
+      text,
+      ...(onStop && activity ? { dayNumber: day.dayNumber, stopKey: getStopKey(day, activity), stopTitle: activity.place?.name ?? activity.title } : {}),
+    });
+    if (saved) setNoteDraft("");
+  }
+
+  function renderNote(note: ItineraryNote, showStop: boolean) {
+    const option = noteKindOptions.find((item) => item.kind === note.kind) ?? noteKindOptions[0];
+    const own = note.travelerId === travelerId;
+    return (
+      <li className="rounded-2xl bg-[#f7f7f3] p-3 text-sm" key={note.id}>
+        <p className="flex flex-wrap items-center gap-x-2 text-xs font-bold text-[#607179]">
+          <span aria-hidden="true">{option.icon}</span>
+          <span className="text-[#173f50]">{note.authorName}</span>
+          <span className="font-normal text-[#879196]">{option.label}</span>
+          {showStop && note.stopTitle ? <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-[#53666f]">Day {note.dayNumber} · {note.stopTitle}</span> : null}
+        </p>
+        <p className="mt-1 whitespace-pre-line leading-6 text-[#273b46]">{note.text}</p>
+        {own ? (
+          <button className="mt-1 text-xs font-bold text-[#a34532] hover:underline" disabled={noteBusy} onClick={() => changeNote({ action: "remove", noteId: note.id })} type="button">Remove</button>
+        ) : null}
+      </li>
+    );
+  }
+
+  function renderNotes() {
+    const stopKey = activity ? getStopKey(day, activity) : null;
+    const stopNotes = stopKey ? notesForStop(stopKey) : [];
+    const currentKeys = new Set(itinerary.days.flatMap((dayItem) => dayItem.activities.map((item) => getStopKey(dayItem, item))));
+    // Notes on stops that were since changed stay visible with the trip notes.
+    const tripNotes = notes.filter((note) => !note.stopKey || !currentKeys.has(note.stopKey));
+    const otherStopNotes = notes.filter((note) => note.stopKey && note.stopKey !== stopKey && currentKeys.has(note.stopKey));
+    const selectedOption = noteKindOptions.find((item) => item.kind === noteKind) ?? noteKindOptions[0];
+
+    return (
+      <div className="flex h-[40rem] max-h-[85dvh] flex-col">
+        <div className="flex-1 space-y-5 overflow-y-auto p-5">
+          <p className="text-sm leading-6 text-[#53666f]">Notes for the group: how you&apos;re getting around, what you love about a place, or anything to remember. Notes don&apos;t change the plan.</p>
+          {activity ? (
+            <section>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#e4664f]">This Stop · {activity.place?.name ?? activity.title}</p>
+              {stopNotes.length > 0 ? <ul className="mt-2 space-y-2">{stopNotes.map((note) => renderNote(note, false))}</ul> : <p className="mt-2 text-sm text-[#879196]">No notes on this stop yet.</p>}
+            </section>
+          ) : (
+            <p className="rounded-2xl bg-[#f7f7f3] p-3 text-sm text-[#718087]">Tap a stop on the left to see or add notes about it.</p>
+          )}
+          <section>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#879196]">Whole Trip</p>
+            {tripNotes.length > 0 ? <ul className="mt-2 space-y-2">{tripNotes.map((note) => renderNote(note, true))}</ul> : <p className="mt-2 text-sm text-[#879196]">No trip notes yet.</p>}
+          </section>
+          {otherStopNotes.length > 0 ? (
+            <section>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#879196]">Other Stops</p>
+              <ul className="mt-2 space-y-2">{otherStopNotes.map((note) => renderNote(note, true))}</ul>
+            </section>
+          ) : null}
+        </div>
+        <form className="border-t border-[#172733]/8 p-4" onSubmit={addNote}>
+          {!browserReady ? null : !currentTraveler ? (
+            <p className="text-sm text-[#718087]">Open this trip from your invite link on this device to add notes.</p>
+          ) : (
+            <>
+              <div className="mb-2 flex flex-wrap gap-1.5" role="radiogroup" aria-label="Kind of note">
+                {noteKindOptions.map((option) => (
+                  <button aria-checked={noteKind === option.kind} className={`rounded-full px-3 py-1 text-xs font-bold transition ${noteKind === option.kind ? "bg-[#173f50] text-white" : "bg-[#f2f0ea] text-[#53666f] hover:bg-[#e9e5da]"}`} key={option.kind} onClick={() => setNoteKind(option.kind)} role="radio" type="button">
+                    {option.icon} {option.label}
+                  </button>
+                ))}
+              </div>
+              {activity ? (
+                <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#607179]">
+                  <input checked={noteOnStop} className="h-4 w-4 accent-[#e4664f]" onChange={(event) => setNoteOnStop(event.target.checked)} type="checkbox" />
+                  About &ldquo;{activity.place?.name ?? activity.title}&rdquo; (uncheck for the whole trip)
+                </label>
+              ) : null}
+              <div className="flex gap-2">
+                <textarea aria-label="Note" className="form-control min-h-12 flex-1 resize-none !py-3" maxLength={400} onChange={(event) => setNoteDraft(event.target.value)} placeholder={selectedOption.placeholder} rows={2} value={noteDraft} />
+                <button className={`button-primary !min-h-12 !px-5 ${noteBusy || noteDraft.trim() === "" ? "cursor-not-allowed opacity-60" : ""}`} disabled={noteBusy || noteDraft.trim() === ""} type="submit">Add</button>
+              </div>
+              {noteError ? <p className="mt-2 text-sm font-semibold text-[#a34532]" role="alert">{noteError}</p> : null}
+            </>
+          )}
+        </form>
+      </div>
+    );
   }
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
@@ -500,9 +643,11 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
               const selected = stopIndex === index;
               const next = day.activities[index + 1];
               const connectorKey = `${dayIndex}-${index}`;
-              const mode = modes[connectorKey] ?? "walk";
               const fromPlace = item.place;
               const toPlace = next?.place;
+              const quickest = defaultMode(fromPlace, toPlace);
+              // The fastest way is the default; anyone can pick another mode for themselves.
+              const mode = modes[connectorKey] ?? quickest;
               const stopPlans = overridesFor(day.dayNumber, item);
               const myPlan = myPlanFor(day.dayNumber, item);
               const previous = day.activities[index - 1];
@@ -536,6 +681,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           <span aria-hidden="true">{activityIcon(item)}</span> {item.time || "Time not set"}
                           <span className="rounded-full bg-[#f2f0ea] px-2 py-0.5 text-[#607179]">{item.type}</span>
                           {isChanged ? <span className="rounded-full bg-[#f3c969] px-2 py-0.5 text-[#173f50]">Updated</span> : null}
+                          {notesForStop(key).length > 0 ? <span className="rounded-full bg-[#eef6ff] px-2 py-0.5 text-[#2f6699]">📝 {notesForStop(key).length}</span> : null}
                           {rejoinHere ? <span className="rounded-full bg-[#daf0ea] px-2 py-0.5 text-[#276655]">Rejoin the group here</span> : null}
                         </p>
                         {view === "mine" && myPlan ? (
@@ -588,6 +734,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           >
                             {travelModes.find((option) => option.mode === mode)?.icon} {formatMinutes(estimate.minutes)} {mode === "walk" ? "walk" : mode === "bike" ? "by bike" : mode === "transit" ? "by transit" : "by car"}
                           </button>
+                          {mode === quickest ? <span className="rounded-full bg-[#daf0ea] px-2 py-0.5 text-xs font-bold text-[#276655]">⚡ Fastest</span> : null}
                           <span className="text-xs text-[#879196]">{formatDistance(estimate.distanceKm)} · estimate</span>
                           <span className="flex gap-1" role="group" aria-label="Change how you get there">
                             {travelModes.map((option) => (
@@ -619,16 +766,17 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white shadow-[0_14px_38px_rgba(23,63,80,0.07)]">
             <div className="flex border-b border-[#172733]/8" role="tablist">
-              {([["map", "Map And Reviews"], ["chat", "Group Chat"]] as [Panel, string][]).map(([id, label]) => (
+              {([["map", "Map And Reviews"], ["notes", "Notes"], ["chat", "Group Chat"]] as [Panel, string][]).map(([id, label]) => (
                 <button
                   aria-selected={panel === id}
-                  className={`flex-1 px-4 py-3 text-sm font-bold transition ${panel === id ? "bg-white text-[#173f50] shadow-[inset_0_-3px_0_#e4664f]" : "bg-[#f7f7f3] text-[#879196] hover:text-[#173f50]"}`}
+                  className={`flex-1 px-2 py-3 text-sm font-bold transition sm:px-4 ${panel === id ? "bg-white text-[#173f50] shadow-[inset_0_-3px_0_#e4664f]" : "bg-[#f7f7f3] text-[#879196] hover:text-[#173f50]"}`}
                   key={id}
                   onClick={() => setPanel(id)}
                   role="tab"
                   type="button"
                 >
                   {label}
+                  {id === "notes" && notes.length > 0 ? <span className="ml-1.5 rounded-full bg-[#f2f0ea] px-1.5 text-xs text-[#53666f]">{notes.length}</span> : null}
                   {id === "chat" ? <span className="ml-2 text-xs text-[#7a5ea8]">✦ Muse</span> : null}
                 </button>
               ))}
@@ -658,6 +806,11 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           {placesLoading ? "Looking up the real place…" : "No real place was matched to this stop."}
                         </p>
                       )}
+                      {notesForStop(getStopKey(day, activity)).length > 0 ? (
+                        <button className="mt-4 text-sm font-bold text-[#173f50] underline decoration-[#e4664f]/40 underline-offset-4" onClick={() => setPanel("notes")} type="button">
+                          📝 {notesForStop(getStopKey(day, activity)).length} {notesForStop(getStopKey(day, activity)).length === 1 ? "note" : "notes"} from the group
+                        </button>
+                      ) : null}
                       {renderPersonalPlans(day.dayNumber, activity)}
                     </>
                   ) : (
@@ -665,6 +818,8 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                   )}
                 </div>
               </div>
+            ) : panel === "notes" ? (
+              renderNotes()
             ) : (
               <div className="flex h-[40rem] max-h-[85dvh] flex-col"><p className="border-b border-[#172733]/8 p-4 text-xs font-semibold text-[#53666f]">{travelers.map((traveler) => traveler.name).join(" · ")} · <span className="rounded-full bg-[#fff8dc] px-2 py-1 text-[#6f5a16]">✦ Muse AI</span></p>
                 {/* An open vote stays pinned above the messages so it never scrolls out of sight. */}

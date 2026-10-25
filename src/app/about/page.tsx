@@ -26,7 +26,11 @@ export default function AboutPage() {
         </article>
         <section className="mt-12" aria-labelledby="team-heading">
           <p className="eyebrow">The Team</p>
-          <h2 className="mt-3 text-2xl font-bold" id="team-heading">Built By Our HackTX 2026 Team</h2>
+          <h2 className="mt-3 text-2xl font-bold" id="team-heading">
+            Built By Our HackTX 2026 Team
+            <span aria-hidden="true" className="mx-3 font-normal text-[#c9c3b6]">|</span>
+            <a className="text-[#e4664f] underline decoration-[#e4664f]/40 underline-offset-4 hover:decoration-[#e4664f]" href="https://devpost.com/software/trip-sync-wqrhnl" rel="noopener noreferrer" target="_blank">Devpost</a>
+          </h2>
           <div className="mt-6">
             <TeamPhoto group name="The HackTX 2026 team together" initials="Team" src="/team/group.jpg" />
           </div>

@@ -9,6 +9,9 @@ import { validateCandidateOptions } from "@/lib/candidate-validation";
 import { getTripById } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
 import { getVotingSummary } from "@/lib/voting";
+import { isGeneratingCandidates } from "@/lib/trip-updates";
+import { calculatePlanningReadiness } from "@/lib/planning-context";
+import { GenerateCandidatesAction } from "../generate-candidates-action";
 import { CandidateVoting } from "./candidate-voting";
 import { OptionPhotosLoader } from "./option-photos-loader";
 import { LiveRefresh } from "../live-refresh";
@@ -49,16 +52,25 @@ export default async function TripOptionsPage(
   const candidateValidation = validateCandidateOptions(candidates);
 
   if (!candidateValidation.valid) {
+    const updating = trip.optionsNeedRefresh === true || isGeneratingCandidates(trip);
     return (
       <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
         <Header />
+        <LiveRefresh tripId={trip.id} />
         <div className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-8">
           <div className="rounded-[2rem] border border-[#172733]/8 bg-white p-8 shadow-[0_18px_45px_rgba(23,63,80,0.08)] sm:p-12">
             <p className="eyebrow">Trip Options</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight">No Options Have Been Generated Yet</h1>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">{updating ? "Muse Is Updating The Options" : "No Options Have Been Generated Yet"}</h1>
             <p className="mx-auto mt-4 max-w-xl leading-7 text-[#718087]">
-              Once every traveler completes preferences and availability, return to the trip dashboard to generate three shared options.
+              {updating
+                ? "Someone changed their preferences or dates, so Muse is planning new options that fit. They appear here once the group is ready again, usually within a minute. If the dates no longer work for everyone, the host may need to confirm them again."
+                : "Once every traveler completes preferences and availability, return to the trip dashboard to generate three shared options."}
             </p>
+            {updating ? (
+              <div className="mx-auto mt-6 max-w-md">
+                <GenerateCandidatesAction autoRefresh={trip.optionsNeedRefresh === true} candidatesAvailable={false} generatingElsewhere={isGeneratingCandidates(trip)} itineraryReady={false} ready={calculatePlanningReadiness(trip).readyForCandidateGeneration} tripId={trip.id} />
+              </div>
+            ) : null}
             <Link className="button-primary mt-7" href={`/trip/${trip.id}`}>
               Return to Trip Dashboard
             </Link>

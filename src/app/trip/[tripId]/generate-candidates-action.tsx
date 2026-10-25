@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FeasibilityWarning } from "@/lib/trip-feasibility";
 
 type GenerateCandidatesActionProps = {
@@ -12,6 +12,10 @@ type GenerateCandidatesActionProps = {
   itineraryReady: boolean;
   // Shown before generating so the group can fix an unrealistic plan first.
   warnings?: FeasibilityWarning[];
+  // Options existed before someone edited their answers: redo them without waiting for a click.
+  autoRefresh?: boolean;
+  // Another browser is already planning options.
+  generatingElsewhere?: boolean;
 };
 
 export function GenerateCandidatesAction({
@@ -20,11 +24,16 @@ export function GenerateCandidatesAction({
   candidatesAvailable,
   itineraryReady,
   warnings = [],
+  autoRefresh = false,
+  generatingElsewhere = false,
 }: GenerateCandidatesActionProps) {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isAuto, setIsAuto] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showWarnings, setShowWarnings] = useState(false);
+  const autoStarted = useRef(false);
+
 
   function handleClick() {
     if (warnings.length > 0 && !showWarnings) {
@@ -35,8 +44,9 @@ export function GenerateCandidatesAction({
     handleGenerate();
   }
 
-  async function handleGenerate() {
+  async function handleGenerate(auto = false) {
     setIsGenerating(true);
+    setIsAuto(auto);
     setErrorMessage("");
 
     try {
@@ -49,6 +59,11 @@ export function GenerateCandidatesAction({
         setErrorMessage(responseData.error || "We could not generate trip options.");
         return;
       }
+      // 202: someone else's browser is already planning; this page refreshes when it's done.
+      if (response.status === 202 || auto) {
+        router.refresh();
+        return;
+      }
 
       router.push(responseData.optionsPath || `/trip/${tripId}/options`);
       router.refresh();
@@ -58,6 +73,18 @@ export function GenerateCandidatesAction({
       setIsGenerating(false);
     }
   }
+
+  // The group already chose to plan once, so after an edit Muse redoes the options
+  // by itself. The server lets only one browser run it.
+  useEffect(() => {
+    if (!autoRefresh || !ready || candidatesAvailable || itineraryReady || generatingElsewhere || autoStarted.current) return;
+    const timer = setTimeout(() => {
+      if (autoStarted.current) return;
+      autoStarted.current = true;
+      handleGenerate(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  });
 
   if (itineraryReady) {
     return (
@@ -77,6 +104,15 @@ export function GenerateCandidatesAction({
       <Link className="button-primary" href={`/trip/${tripId}/options`}>
         View Options and Vote
       </Link>
+    );
+  }
+
+  if ((isGenerating && isAuto) || (generatingElsewhere && !isGenerating && !candidatesAvailable && !itineraryReady)) {
+    return (
+      <p className="flex items-center gap-2 rounded-2xl bg-[#eaf6f0] px-4 py-3 text-sm font-semibold text-[#276655]" role="status">
+        <span aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#276655]/30 border-t-[#276655]" />
+        Muse is updating the trip options with the latest changes…
+      </p>
     );
   }
 

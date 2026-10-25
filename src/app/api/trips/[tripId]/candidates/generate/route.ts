@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { optionsReadyText, textTravelers } from "@/lib/group-texts";
+import { notifyGroup, optionsReadyText } from "@/lib/group-texts";
 import { generateCandidateOptionsForTrip } from "@/lib/candidate-generation";
 import { validateCandidateOptions } from "@/lib/candidate-validation";
 import {
@@ -9,7 +9,7 @@ import {
 import { MockCandidatePlanner } from "@/lib/mock-candidate-planner";
 import { MusePlannerError } from "@/lib/muse-candidate-planner";
 import { addImagesToCandidates } from "@/lib/place-images";
-import { getTripById, saveCandidateOptions } from "@/lib/trip-repository";
+import { claimCandidateGeneration, getTripById, releaseCandidateGeneration, saveCandidateOptions } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
 
 export async function POST(
@@ -17,6 +17,7 @@ export async function POST(
   context: RouteContext<"/api/trips/[tripId]/candidates/generate">,
 ) {
   const { tripId } = await context.params;
+  let claimed = false;
 
   try {
     const trip = await getTripById(tripId);
@@ -35,6 +36,12 @@ export async function POST(
         });
       }
     }
+
+    // Someone else's browser may already be planning (for example an automatic refresh).
+    if ((await claimCandidateGeneration(trip.id)) === "busy") {
+      return NextResponse.json({ inProgress: true, optionsPath: `/trip/${trip.id}/options` }, { status: 202 });
+    }
+    claimed = true;
 
     const selection = selectCandidatePlanner();
     let plannerSource: PlannerSource = selection.source;
@@ -90,7 +97,7 @@ export async function POST(
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
     }
     const origin = new URL(request.url).origin;
-    after(() => textTravelers(saveResult.trip, optionsReadyText(saveResult.trip, origin)));
+    after(() => notifyGroup(saveResult.trip, optionsReadyText(saveResult.trip), origin));
 
     return NextResponse.json(
       {
@@ -108,5 +115,8 @@ export async function POST(
       { error: "We could not generate trip options. Please try again." },
       { status: 500 },
     );
+  } finally {
+    // Saving options already clears the lock; this covers errors and early returns.
+    if (claimed) await releaseCandidateGeneration(tripId).catch(() => undefined);
   }
 }
