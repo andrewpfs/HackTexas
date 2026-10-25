@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Header } from "../../components/header";
 import { getTripById } from "@/lib/trip-repository";
 import { CopyInviteLink } from "./copy-invite-link";
+import { MyPreferencesAction } from "./my-preferences-action";
 
 export const instant = false;
 
@@ -44,6 +45,12 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
     ? `${trip.travelers.length} travelers joined · ${trip.expectedTravelerCount} expected`
     : `${trip.travelers.length} joined`;
   const joinPath = `/join?trip=${trip.inviteCode}`;
+  let completedPreferencesCount = 0;
+  for (const traveler of trip.travelers) {
+    if (traveler.preferencesComplete) {
+      completedPreferencesCount += 1;
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
@@ -100,18 +107,27 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#173f50] text-sm font-bold text-white">{traveler.name.charAt(0).toUpperCase()}</span>
                     <span className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</span>
                     <span className={`ml-auto rounded-full px-3 py-1 text-xs font-bold ${traveler.preferencesComplete ? "bg-[#daf0ea] text-[#276655]" : "bg-[#f0efeb] text-[#778388]"}`}>
-                      {traveler.preferencesComplete ? "Completed" : "Preferences incomplete"}
+                      {traveler.preferencesComplete ? "Preferences complete" : "Preferences incomplete"}
                     </span>
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#718087]">Traveler questionnaires are coming in the next phase.</p>
+              <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm font-semibold leading-6 text-[#53666f]">
+                {completedPreferencesCount} of {trip.travelers.length} travelers completed preferences
+              </p>
+              <MyPreferencesAction
+                tripId={trip.id}
+                travelers={trip.travelers.map((traveler) => ({
+                  id: traveler.id,
+                  preferencesComplete: traveler.preferencesComplete,
+                }))}
+              />
             </section>
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
               <p className="eyebrow">Possible dates</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight" id="availability">Availability overlap</h2>
-              <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-5 text-sm leading-6 text-[#718087]">Availability will appear after travelers complete their preferences.</p>
+              <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-5 text-sm leading-6 text-[#718087]">Manual availability selection will be completed separately in the next step.</p>
             </section>
           </div>
 

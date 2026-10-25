@@ -2,10 +2,11 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { rememberTravelerId } from "@/lib/traveler-identity";
 
 type CreateTripResponse = {
   error?: string;
-  trip?: { id: string; inviteCode: string };
+  trip?: { id: string; inviteCode: string; hostTravelerId: string };
 };
 
 export function CreateTripForm() {
@@ -48,6 +49,7 @@ export function CreateTripForm() {
         return;
       }
 
+      rememberTravelerId(responseBody.trip.id, responseBody.trip.hostTravelerId);
       router.push(`/trip/${responseBody.trip.id}`);
     } catch {
       setErrorMessage("We could not reach the server. Please try again.");

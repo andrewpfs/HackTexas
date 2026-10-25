@@ -1,4 +1,15 @@
-import type { CreateTripInput } from "./trip-types";
+import {
+  activityInterestOptions,
+  groupLodgingPreferenceOptions,
+  lodgingAmenityOptions,
+  lodgingTypeOptions,
+  type ActivityInterest,
+  type CreateTripInput,
+  type GroupLodgingPreference,
+  type LodgingAmenity,
+  type LodgingType,
+  type TravelerPreferences,
+} from "./trip-types";
 
 export type TripValidationResult =
   | { valid: true; data: CreateTripInput }
@@ -8,7 +19,13 @@ export type JoinTripValidationResult =
   | { valid: true; data: { inviteCode: string; travelerName: string } }
   | { valid: false; error: string };
 
+export type PreferencesValidationResult =
+  | { valid: true; data: TravelerPreferences }
+  | { valid: false; errors: string[] };
+
 export const maximumTravelerNameLength = 80;
+export const maximumDestinationPreferencesLength = 500;
+export const maximumNotesLength = 1000;
 
 export function normalizeInviteCode(inviteCode: string) {
   return inviteCode.trim().toUpperCase();
@@ -139,4 +156,167 @@ export function validateJoinTripInput(body: unknown): JoinTripValidationResult {
   }
 
   return { valid: true, data: { inviteCode, travelerName } };
+}
+
+function readMoneyAmount(
+  value: unknown,
+  label: string,
+  required: boolean,
+  errors: string[],
+) {
+  if (value === undefined || value === null || value === "") {
+    if (required) {
+      errors.push(`${label} is required.`);
+    }
+    return undefined;
+  }
+
+  const numberValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) {
+    errors.push(`${label} must be a positive amount.`);
+    return undefined;
+  }
+
+  return numberValue;
+}
+
+function readSupportedValue<T extends string>(
+  value: unknown,
+  label: string,
+  options: readonly T[],
+  errors: string[],
+) {
+  if (typeof value !== "string" || !options.includes(value as T)) {
+    errors.push(`Please choose a supported ${label.toLowerCase()}.`);
+    return undefined;
+  }
+
+  return value as T;
+}
+
+function readSupportedValues<T extends string>(
+  value: unknown,
+  label: string,
+  options: readonly T[],
+  errors: string[],
+) {
+  if (!Array.isArray(value)) {
+    errors.push(`${label} must be a list.`);
+    return [];
+  }
+
+  const selectedValues: T[] = [];
+  for (const item of value) {
+    if (typeof item !== "string" || !options.includes(item as T)) {
+      errors.push(`${label} contains an unsupported choice.`);
+      return [];
+    }
+
+    if (!selectedValues.includes(item as T)) {
+      selectedValues.push(item as T);
+    }
+  }
+
+  return selectedValues;
+}
+
+function readLengthLimitedText(
+  value: unknown,
+  label: string,
+  maximumLength: number,
+  errors: string[],
+) {
+  const text = readOptionalText(value);
+  if (text && text.length > maximumLength) {
+    errors.push(`${label} must be ${maximumLength} characters or fewer.`);
+    return undefined;
+  }
+
+  return text;
+}
+
+export function validateTravelerPreferences(body: unknown): PreferencesValidationResult {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { valid: false, errors: ["Please provide valid preference details."] };
+  }
+
+  const values = body as Record<string, unknown>;
+  const errors: string[] = [];
+  const maximumBudget = readMoneyAmount(values.maximumBudget, "Maximum trip budget", true, errors);
+  const foodBudgetPerDay = readMoneyAmount(values.foodBudgetPerDay, "Food budget per day", false, errors);
+  const lodgingBudgetPerNight = readMoneyAmount(values.lodgingBudgetPerNight, "Lodging budget per night", false, errors);
+  const activitiesBudget = readMoneyAmount(values.activitiesBudget, "Activities budget", false, errors);
+  const preferredDurationDays = readOptionalInteger(values.preferredDurationDays, "Preferred duration", 365, errors);
+
+  if (preferredDurationDays === undefined && (values.preferredDurationDays === undefined || values.preferredDurationDays === null || values.preferredDurationDays === "")) {
+    errors.push("Preferred duration is required.");
+  }
+
+  const activityInterests = readSupportedValues<ActivityInterest>(
+    values.activityInterests,
+    "Activity interests",
+    activityInterestOptions,
+    errors,
+  );
+  if (activityInterests.length === 0) {
+    errors.push("Choose at least one activity interest.");
+  }
+
+  const lodgingType = readSupportedValue<LodgingType>(values.lodgingType, "lodging type", lodgingTypeOptions, errors);
+  const groupLodgingPreference = readSupportedValue<GroupLodgingPreference>(
+    values.groupLodgingPreference,
+    "group lodging preference",
+    groupLodgingPreferenceOptions,
+    errors,
+  );
+  let lodgingAmenities: LodgingAmenity[] = [];
+  if (values.lodgingAmenities !== undefined && values.lodgingAmenities !== null) {
+    lodgingAmenities = readSupportedValues<LodgingAmenity>(
+      values.lodgingAmenities,
+      "Lodging amenities",
+      lodgingAmenityOptions,
+      errors,
+    );
+  }
+
+  let hotelStars: number | undefined;
+  if (values.hotelStars !== undefined && values.hotelStars !== null && values.hotelStars !== "") {
+    const starValue = typeof values.hotelStars === "number" ? values.hotelStars : Number(values.hotelStars);
+    if (!Number.isInteger(starValue) || starValue < 1 || starValue > 5) {
+      errors.push("Hotel quality must be a whole number from 1 to 5.");
+    } else {
+      hotelStars = starValue;
+    }
+  }
+
+  const destinationPreferences = readLengthLimitedText(
+    values.destinationPreferences,
+    "Destination preferences",
+    maximumDestinationPreferencesLength,
+    errors,
+  );
+  const notes = readLengthLimitedText(values.notes, "Notes", maximumNotesLength, errors);
+
+  if (errors.length > 0 || maximumBudget === undefined || preferredDurationDays === undefined || !lodgingType || !groupLodgingPreference) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    data: {
+      currency: "USD",
+      maximumBudget,
+      foodBudgetPerDay,
+      lodgingBudgetPerNight,
+      activitiesBudget,
+      preferredDurationDays,
+      activityInterests,
+      lodgingType,
+      groupLodgingPreference,
+      hotelStars,
+      lodgingAmenities,
+      destinationPreferences,
+      notes,
+    },
+  };
 }

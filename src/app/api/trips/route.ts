@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     await saveTrip(trip);
 
     return NextResponse.json(
-      { trip: { id: trip.id, inviteCode: trip.inviteCode } },
+      { trip: { id: trip.id, inviteCode: trip.inviteCode, hostTravelerId: trip.travelers[0].id } },
       { status: 201 },
     );
   } catch (error) {

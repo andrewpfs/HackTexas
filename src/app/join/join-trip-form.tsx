@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { JoinTripPreview } from "@/lib/trip-types";
 import { maximumTravelerNameLength } from "@/lib/trip-validation";
+import { rememberTravelerId } from "@/lib/traveler-identity";
 
 type JoinTripFormProps = {
   initialCode: string;
@@ -12,7 +13,7 @@ type JoinTripFormProps = {
 };
 
 type PreviewResponse = { error?: string; trip?: JoinTripPreview };
-type JoinResponse = { error?: string; tripId?: string };
+type JoinResponse = { error?: string; tripId?: string; travelerId?: string };
 
 function formatDate(dateString: string) {
   const date = new Date(`${dateString}T00:00:00Z`);
@@ -87,11 +88,12 @@ export function JoinTripForm(props: JoinTripFormProps) {
       });
       const responseData = (await response.json()) as JoinResponse;
 
-      if (!response.ok || !responseData.tripId) {
+      if (!response.ok || !responseData.tripId || !responseData.travelerId) {
         setErrorMessage(responseData.error || "We could not join the trip. Please try again.");
         return;
       }
 
+      rememberTravelerId(responseData.tripId, responseData.travelerId);
       router.push(`/trip/${responseData.tripId}`);
     } catch {
       setErrorMessage("We could not join the trip. Please try again.");
