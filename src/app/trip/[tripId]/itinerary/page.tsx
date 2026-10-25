@@ -73,7 +73,7 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         </Link>
 
         <div className="mt-5 rounded-3xl border border-[#172733]/8 bg-white px-6 py-4">
-          <ProgressNav currentStep={3} itineraryReady optionsReady tripId={trip.id} />
+          <ProgressNav currentStep={Object.keys(trip.travel?.bookings ?? {}).length > 0 ? 4 : 3} itineraryReady optionsReady tripId={trip.id} />
         </div>
 
         <section className="mt-7 overflow-hidden rounded-[2rem] bg-[#173f50] text-white shadow-[0_20px_50px_rgba(23,63,80,0.14)]">
@@ -113,6 +113,14 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
             </ul>
           ) : null}
         </details>
+
+        <Link className="mt-6 flex flex-col gap-2 rounded-3xl bg-[#173f50] p-6 text-white transition hover:-translate-y-0.5 hover:shadow-lg sm:flex-row sm:items-center sm:justify-between" href={`/trip/${trip.id}/travel`}>
+          <span>
+            <span className="block text-xs font-bold uppercase tracking-[0.18em] text-[#f3c969]">Next Step</span>
+            <span className="mt-1 block text-xl font-bold">Find real hotels and everyone&apos;s flights</span>
+          </span>
+          <span className="rounded-full bg-[#f3c969] px-5 py-2.5 text-sm font-bold text-[#173f50]">Book Flights And Hotel →</span>
+        </Link>
 
         <ItineraryWorkspace
           initialItinerary={itinerary}

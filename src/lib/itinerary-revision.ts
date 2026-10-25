@@ -14,9 +14,19 @@ export type RevisionRequest = {
   message: { author: string; text: string; focus: string | null };
 };
 
+export type PersonalPlan = {
+  dayNumber: number;
+  stopTitle: string;
+  title: string;
+  location: string;
+  note: string;
+};
+
 export type RevisionResult = {
   reply: string;
   changes: string[];
+  // Set when only the sender wants something different: their own plan for one stop.
+  personal?: PersonalPlan | null;
   // The complete revised days, or null when the plan stays as it is.
   days: ItineraryDay[] | null;
 };

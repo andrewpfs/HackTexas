@@ -1,5 +1,15 @@
 # Implementation Plan
 
+## Status (October 2026)
+
+Phases 0 through 15 are built. Phase 16 items remain optional stretch work.
+
+- Phase 8-11: Muse Spark generates options, the compromise itinerary, and chat-based revisions.
+- Phase 12: personal plans per stop (by hand or through Muse), with joining, "My Plan" view, and rejoin points.
+- Phase 13: Google Maps places and reviews, Google Hotels, and per-traveler Google Flights through SerpApi.
+- Phase 14: a simulated booking checkout with demo confirmation codes.
+- Phase 15: Supabase storage, live updates, demo seeding (`npm run seed:demo`), and the README demo script.
+
 Each phase should leave the application runnable. Later phases should not block a stable demonstration of earlier MVP work.
 
 ## Phase 0 - Repository Foundation

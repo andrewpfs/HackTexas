@@ -1,3 +1,5 @@
+import type { AvatarLook } from "./avatar-look";
+
 export type TripStatus = "collecting_preferences";
 
 export const activityInterestOptions = [
@@ -68,6 +70,12 @@ export type Traveler = {
   preferences?: TravelerPreferences;
   availabilityComplete?: boolean;
   availableDates?: string[];
+  avatar?: AvatarLook;
+  // Set when the traveler saved this trip to their phone: a keyed hash, never the number itself.
+  phoneHash?: string;
+  phoneLast4?: string;
+  // Hash of the token a personal AI assistant uses to reach this traveler's bookings over MCP.
+  assistantTokenHash?: string;
 };
 
 export type CandidateActivity = {
@@ -179,6 +187,112 @@ export type GroupItinerary = {
   // Bumped each time chat feedback changes the plan.
   revision?: number;
   updatedAt?: string;
+  overrides?: PersonalOverride[];
+};
+
+export type HotelOption = {
+  token: string;
+  name: string;
+  kind: string;
+  pricePerNight: number | null;
+  totalPrice: number | null;
+  rating: number | null;
+  reviewCount: number | null;
+  hotelClass: string | null;
+  thumbnail: string | null;
+  amenities: string[];
+  latitude?: number;
+  longitude?: number;
+  link: string;
+};
+
+export type FlightOption = {
+  id: string;
+  airline: string;
+  airlineLogo: string | null;
+  flightNumbers: string[];
+  departAirport: string;
+  departTime: string;
+  arriveAirport: string;
+  arriveTime: string;
+  durationMinutes: number;
+  stops: number;
+  // Round-trip price per person in USD.
+  price: number;
+};
+
+// "pending" while a search runs, so two viewers never start the same paid search.
+export type SearchStatus = "pending" | "done" | "failed";
+
+export type HotelSearchResult = {
+  status: SearchStatus;
+  startedAt?: string;
+  options: HotelOption[];
+  checkIn: string;
+  checkOut: string;
+  selectedToken?: string;
+  selectedByTravelerId?: string;
+  error?: string;
+};
+
+export type FlightSearchResult = {
+  status: SearchStatus;
+  startedAt?: string;
+  from: string;
+  options: FlightOption[];
+  selectedId?: string;
+  error?: string;
+};
+
+export type BookingItem = {
+  kind: "flight" | "hotel";
+  label: string;
+  detail: string;
+  amount: number;
+  confirmationCode: string;
+  // "assistant" when a traveler's own connected AI assistant recorded a real booking.
+  source?: "demo" | "assistant";
+};
+
+// Simulated bookings: no payment is ever taken.
+export type Booking = {
+  travelerId: string;
+  items: BookingItem[];
+  total: number;
+  bookedAt: string;
+};
+
+export type TravelPlan = {
+  hotels?: HotelSearchResult;
+  flights?: Record<string, FlightSearchResult>;
+  bookings?: Record<string, Booking>;
+};
+
+// One traveler doing something else instead of a group stop.
+export type PersonalOverride = {
+  id: string;
+  travelerId: string;
+  dayNumber: number;
+  stopTime: string;
+  stopTitle: string;
+  title: string;
+  location: string;
+  note: string;
+  joinedBy: string[];
+  createdAt: string;
+};
+
+// A first rough plan drawn from the host's trip description, shown before anyone votes.
+export type TripSketch = {
+  status: SearchStatus;
+  startedAt?: string;
+  summary: string;
+  places: { name: string; why: string }[];
+  days: { dayNumber: number; title: string; plan: string }[];
+  suggestions: { name: string; why: string }[];
+  source?: PlannerSource;
+  generatedAt?: string;
+  error?: string;
 };
 
 export type ChatMessage = {
@@ -218,6 +332,8 @@ export type Trip = {
   votes?: CandidateVote[];
   itinerary?: GroupItinerary;
   chat?: ChatMessage[];
+  travel?: TravelPlan;
+  sketch?: TripSketch;
 };
 
 export type CreateTripInput = {

@@ -11,6 +11,7 @@ export function clearPlanningOutputs(trip: Trip) {
   trip.votes = undefined;
   trip.itinerary = undefined;
   trip.chat = undefined;
+  trip.travel = undefined;
 }
 
 export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
@@ -40,6 +41,8 @@ export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   trip.latestPossibleDate = input.latestPossibleDate;
   trip.preferredDurationDays = input.preferredDurationDays;
   trip.expectedTravelerCount = input.expectedTravelerCount;
+  // The sketch is drawn from these details, so it is redrawn after an edit.
+  trip.sketch = undefined;
   clearPlanningOutputs(trip);
 
   return affectedTravelerCount;

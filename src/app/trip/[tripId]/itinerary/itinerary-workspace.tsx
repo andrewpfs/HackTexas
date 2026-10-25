@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { getChangedStopKeys, getStopKey, needsPlaceLookup } from "@/lib/itinerary-diff";
 import { estimateTravel, formatDistance, formatMinutes, travelModes, type TravelMode } from "@/lib/travel-time";
-import type { ChatMessage, GroupItinerary, ItineraryActivity, PlaceSuggestion } from "@/lib/trip-types";
+import type { ChatMessage, GroupItinerary, ItineraryActivity, PersonalOverride, PlaceSuggestion } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
 type WorkspaceProps = {
@@ -60,6 +60,10 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [modes, setModes] = useState<Record<string, TravelMode>>({});
   const [legKey, setLegKey] = useState<string | null>(null);
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
+  const [view, setView] = useState<"group" | "mine">("group");
+  const [planDraft, setPlanDraft] = useState({ title: "", location: "", note: "" });
+  const [planBusy, setPlanBusy] = useState(false);
+  const [planError, setPlanError] = useState("");
   const [draft, setDraft] = useState("");
   const [aboutStop, setAboutStop] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -70,6 +74,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const lookingUpRef = useRef(false);
   const itineraryRef = useRef(itinerary);
   const messagesCountRef = useRef(messages.length);
+  const sendCounter = useRef(0);
   const messageListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -168,6 +173,37 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const activity = stopIndex !== null ? day.activities[stopIndex] ?? null : null;
   const placesLoading = placesConfigured && itinerary.placesStatus !== "added" && needsPlaceLookup(itinerary.days) && !placesError;
 
+  const nameOf = (id: string) => travelers.find((traveler) => traveler.id === id)?.name ?? "Someone";
+  const overridesFor = (dayNumber: number, stop: ItineraryActivity) =>
+    (itinerary.overrides ?? []).filter((item) => item.dayNumber === dayNumber && item.stopTime === stop.time && item.stopTitle === stop.title);
+  // The plan this traveler follows instead of a group stop: their own, or one they joined.
+  const myPlanFor = (dayNumber: number, stop: ItineraryActivity) =>
+    overridesFor(dayNumber, stop).find((item) => item.travelerId === travelerId || (travelerId !== null && item.joinedBy.includes(travelerId)));
+
+  async function changePlan(body: Record<string, unknown>) {
+    if (!currentTraveler) return;
+    setPlanBusy(true);
+    setPlanError("");
+    try {
+      const response = await fetch(`/api/trips/${tripId}/itinerary/overrides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ travelerId: currentTraveler.id, ...body }),
+      });
+      const data = (await response.json()) as { error?: string; itinerary?: GroupItinerary; messages?: ChatMessage[] };
+      if (!response.ok || !data.itinerary) {
+        setPlanError(data.error || "We couldn't save that plan.");
+        return;
+      }
+      applyState(data.itinerary, data.messages ?? messages);
+      setPlanDraft({ title: "", location: "", note: "" });
+    } catch {
+      setPlanError("We couldn't reach the server. Please try again.");
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
   let activeLeg: { from: ItineraryActivity; to: ItineraryActivity; mode: TravelMode } | null = null;
   if (legKey) {
     const [legDay, legIndex] = legKey.split("-").map(Number);
@@ -197,7 +233,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
     const focus = aboutStop && activity ? { dayNumber: day.dayNumber, title: activity.title } : undefined;
     const optimistic: ChatMessage = {
-      id: `sending-${Date.now()}`,
+      id: `sending-${(sendCounter.current += 1)}`,
       role: "traveler",
       travelerId: currentTraveler.id,
       authorName: currentTraveler.name,
@@ -276,11 +312,81 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
     );
   }
 
+  function renderPersonalPlans(dayNumber: number, stop: ItineraryActivity) {
+    const plans: PersonalOverride[] = overridesFor(dayNumber, stop);
+    const mine = plans.find((plan) => plan.travelerId === travelerId);
+
+    return (
+      <div className="mt-6 border-t border-dashed border-[#173f50]/15 pt-5">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#7a5ea8]">Doing Your Own Thing</p>
+        {plans.length === 0 ? <p className="mt-2 text-sm text-[#718087]">Everyone is doing this stop together.</p> : null}
+        <ul className="mt-3 space-y-2">
+          {plans.map((plan) => {
+            const joined = travelerId !== null && plan.joinedBy.includes(travelerId);
+            const own = plan.travelerId === travelerId;
+            return (
+              <li className="rounded-2xl bg-[#f4f1fb] p-3 text-sm" key={plan.id}>
+                <p className="font-bold text-[#4b3d8a]">{nameOf(plan.travelerId)}: {plan.title}</p>
+                {plan.location ? <p className="text-[#607179]">{plan.location}</p> : null}
+                {plan.note ? <p className="mt-1 text-[#718087]">{plan.note}</p> : null}
+                {plan.joinedBy.length > 0 ? <p className="mt-1 text-xs text-[#7a5ea8]">With {plan.joinedBy.map(nameOf).join(", ")}</p> : null}
+                {currentTraveler ? (
+                  <button
+                    className="mt-2 rounded-full border border-[#7a5ea8]/30 bg-white px-3 py-1 text-xs font-bold text-[#4b3d8a] hover:bg-[#ece7f8]"
+                    disabled={planBusy}
+                    onClick={() => changePlan(own ? { action: "remove", overrideId: plan.id } : { action: joined ? "leave" : "join", overrideId: plan.id })}
+                    type="button"
+                  >
+                    {own ? "Back To The Group Plan" : joined ? "Leave" : `Join ${nameOf(plan.travelerId)}`}
+                  </button>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+
+        {currentTraveler && !mine ? (
+          <form
+            className="mt-4 space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (planDraft.title.trim() === "") {
+                setPlanError("Say what you'd rather do.");
+                return;
+              }
+              changePlan({ action: "add", dayNumber, stopTime: stop.time, stopTitle: stop.title, ...planDraft });
+            }}
+          >
+            <input aria-label="What you'd rather do" className="form-control !py-2.5 text-sm" maxLength={120} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} placeholder="example: Arcade in Akihabara" value={planDraft.title} />
+            <input aria-label="Where" className="form-control !py-2.5 text-sm" maxLength={160} onChange={(event) => setPlanDraft({ ...planDraft, location: event.target.value })} placeholder="example: Akihabara, Tokyo" value={planDraft.location} />
+            <button className="w-full rounded-full bg-[#7a5ea8] px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-60" disabled={planBusy} type="submit">
+              {planBusy ? "Saving…" : "Do My Own Thing Here"}
+            </button>
+            <p className="text-xs text-[#879196]">The group plan stays the same for everyone else. You can rejoin anytime.</p>
+          </form>
+        ) : null}
+        {planError ? <p className="mt-2 text-sm font-semibold text-[#a34532]" role="alert">{planError}</p> : null}
+      </div>
+    );
+  }
+
   const dayPhoto = (dayItem: GroupItinerary["days"][number]) =>
     dayItem.activities.find((item) => item.place?.thumbnail)?.place?.thumbnail ?? null;
 
   return (
     <div className="mt-6">
+      {currentTraveler ? (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="inline-flex rounded-full border border-[#172733]/10 bg-white p-1" role="radiogroup" aria-label="Whose plan to show">
+            {([["group", "Group Plan"], ["mine", "My Plan"]] as const).map(([id, label]) => (
+              <button aria-checked={view === id} className={`rounded-full px-4 py-2 text-sm font-bold transition ${view === id ? "bg-[#173f50] text-white" : "text-[#607179]"}`} key={id} onClick={() => setView(id)} role="radio" type="button">
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-[#718087]">{view === "mine" ? "Your day, including any stops where you do your own thing." : "Everyone's shared plan. Pick a stop to do your own thing instead."}</p>
+        </div>
+      ) : null}
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2" role="tablist" aria-label="Days">
         {itinerary.days.map((dayItem, index) => {
           const photo = dayPhoto(dayItem);
@@ -332,8 +438,18 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
               const mode = modes[connectorKey] ?? "walk";
               const fromPlace = item.place;
               const toPlace = next?.place;
+              const stopPlans = overridesFor(day.dayNumber, item);
+              const myPlan = myPlanFor(day.dayNumber, item);
+              const previous = day.activities[index - 1];
+              // In "My Plan", the first group stop after doing your own thing is where you meet back up.
+              const rejoinHere = view === "mine" && !myPlan && previous !== undefined && myPlanFor(day.dayNumber, previous) !== undefined;
+              const awayIds = new Set(stopPlans.flatMap((plan) => [plan.travelerId, ...plan.joinedBy]));
+              const awayNames = travelers.filter((traveler) => awayIds.has(traveler.id)).map((traveler) => traveler.name);
+              const showingMyPlan = view === "mine" && myPlan !== undefined;
+              // Around your own plan the group's places don't apply, so no estimate is shown.
+              const nextIsMine = view === "mine" && next !== undefined && myPlanFor(day.dayNumber, next) !== undefined;
               const estimate =
-                hasCoordinates(fromPlace) && hasCoordinates(toPlace) ? estimateTravel(fromPlace, toPlace, mode) : null;
+                !showingMyPlan && !nextIsMine && hasCoordinates(fromPlace) && hasCoordinates(toPlace) ? estimateTravel(fromPlace, toPlace, mode) : null;
 
               return (
                 <li key={key}>
@@ -343,7 +459,9 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                     type="button"
                   >
                     <div className="flex items-start gap-4">
-                      {item.place?.thumbnail ? (
+                      {showingMyPlan ? (
+                        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#e7e2f5] text-xs font-bold text-[#4b3d8a]">{item.time}</span>
+                      ) : item.place?.thumbnail ? (
                         <Image alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" height={64} src={item.place.thumbnail} unoptimized width={64} />
                       ) : (
                         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#f2f0ea] text-xs font-bold text-[#607179]">{item.time}</span>
@@ -353,10 +471,34 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           {item.time}
                           <span className="rounded-full bg-[#f2f0ea] px-2 py-0.5 text-[#607179]">{item.type}</span>
                           {isChanged ? <span className="rounded-full bg-[#f3c969] px-2 py-0.5 text-[#173f50]">Updated by Muse</span> : null}
+                          {rejoinHere ? <span className="rounded-full bg-[#daf0ea] px-2 py-0.5 text-[#276655]">Rejoin the group here</span> : null}
                         </p>
-                        <p className="mt-1 font-bold text-[#173f50]">{item.place?.name ?? item.title}</p>
-                        {item.place ? <p className="text-sm text-[#52766c]">{item.title}</p> : <p className="text-sm text-[#52766c]">{item.location}</p>}
-                        {item.place?.rating != null ? (
+                        {view === "mine" && myPlan ? (
+                          <>
+                            <p className="mt-1 font-bold text-[#7a5ea8]">{myPlan.title} <span className="ml-1 rounded-full bg-[#e7e2f5] px-2 py-0.5 text-xs text-[#4b3d8a]">Your Plan</span></p>
+                            <p className="text-sm text-[#52766c]">{myPlan.location || "On your own"} · instead of {item.place?.name ?? item.title}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="mt-1 font-bold text-[#173f50]">{item.place?.name ?? item.title}</p>
+                            {item.place ? <p className="text-sm text-[#52766c]">{item.title}</p> : <p className="text-sm text-[#52766c]">{item.location}</p>}
+                          </>
+                        )}
+                        {stopPlans.length > 0 && !(view === "mine" && myPlan) ? (
+                          <span className="mt-1 block text-xs text-[#718087]">
+                            {awayNames.length >= travelers.length ? "Everyone has other plans" : `With the group: everyone except ${awayNames.join(", ")}`}
+                          </span>
+                        ) : null}
+                        {stopPlans.length > 0 ? (
+                          <span className="mt-2 flex flex-wrap gap-1.5">
+                            {stopPlans.map((plan) => (
+                              <span className="rounded-full bg-[#e7e2f5] px-2.5 py-0.5 text-xs font-bold text-[#4b3d8a]" key={plan.id}>
+                                {nameOf(plan.travelerId)}{plan.joinedBy.length ? ` +${plan.joinedBy.length}` : ""} → {plan.title}
+                              </span>
+                            ))}
+                          </span>
+                        ) : null}
+                        {item.place?.rating != null && !showingMyPlan ? (
                           <p className="mt-1 text-sm font-bold text-[#b0661c]">
                             ★ {item.place.rating.toFixed(1)}
                             {item.place.reviewCount !== null ? <span className="font-normal text-[#718087]"> · {item.place.reviewCount.toLocaleString()} reviews</span> : null}
@@ -396,7 +538,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           </span>
                         </div>
                       ) : (
-                        <span className="text-xs text-[#9aa4a7]">Travel time appears once both stops have a real place.</span>
+                        <span className="text-xs text-[#9aa4a7]">{showingMyPlan || nextIsMine ? "Travel time depends on your own plan." : "Travel time appears once both stops have a real place."}</span>
                       )}
                     </div>
                   ) : null}
@@ -447,6 +589,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                           {placesLoading ? "Looking up the real place…" : "No real place was matched to this stop."}
                         </p>
                       )}
+                      {renderPersonalPlans(day.dayNumber, activity)}
                     </>
                   ) : (
                     <p className="text-sm leading-6 text-[#718087]">Tap a stop to see it on the map with ratings and reviews.</p>

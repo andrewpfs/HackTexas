@@ -51,8 +51,13 @@ export async function PUT(
       return NextResponse.json({ error: "We couldn't find that trip." }, { status: 404 });
     }
 
+    // Never send phone or assistant-token hashes to the browser.
+    const publicTrip = {
+      ...result.trip,
+      travelers: result.trip.travelers.map((traveler) => ({ ...traveler, phoneHash: undefined, assistantTokenHash: undefined })),
+    };
     return NextResponse.json({
-      trip: result.trip,
+      trip: publicTrip,
       affectedTravelerCount: result.affectedTravelerCount,
     });
   } catch (error) {

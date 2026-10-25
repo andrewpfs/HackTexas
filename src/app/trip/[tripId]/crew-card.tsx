@@ -1,4 +1,5 @@
-import { Avatar } from "../../components/avatar";
+import { lookFromSeed } from "@/lib/avatar-look";
+import { AvatarPicker } from "./avatar-picker";
 import type { PlanningReadiness } from "@/lib/planning-context";
 import type { Trip } from "@/lib/trip-types";
 import { formatCalendarDate, type DateWindow } from "@/lib/date-utils";
@@ -42,7 +43,7 @@ export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvail
   const good = ready || candidatesAvailable || itineraryReady;
 
   return (
-    <aside className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white shadow-[0_14px_38px_rgba(23,63,80,0.09)] lg:sticky lg:top-24" aria-labelledby="crew-heading">
+    <aside className="rounded-3xl border border-[#172733]/8 bg-white shadow-[0_14px_38px_rgba(23,63,80,0.09)] md:sticky md:top-24" aria-labelledby="crew-heading">
       <div className="p-6 pb-4">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -62,11 +63,11 @@ export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvail
       <ul className="divide-y divide-[#172733]/8 px-3">
         {trip.travelers.map((traveler) => (
           <li className="flex items-center gap-3.5 px-3 py-3.5" key={traveler.id}>
-            <span className="shrink-0"><Avatar label={`${traveler.name}'s avatar`} seed={traveler.id} size={52} /></span>
+            <AvatarPicker look={traveler.avatar ?? lookFromSeed(traveler.id)} name={traveler.name} travelerId={traveler.id} tripId={trip.id} />
             <div className="min-w-0 flex-1">
               <p className="font-bold">
                 {traveler.name}
-                {traveler.isHost ? <span className="ml-2 rounded-full bg-[#f3c969] px-2 py-0.5 align-[1px] text-[0.65rem] font-extrabold uppercase tracking-wider text-[#173f50]">Host</span> : null}
+                {traveler.isHost ? <span className="ml-2.5 inline-block rounded-full bg-[#f3c969] px-2.5 py-0.5 align-[1px] text-[0.65rem] font-extrabold uppercase tracking-wider text-[#173f50]">Host</span> : null}
               </p>
               <p className="truncate text-xs text-[#718087]">Departing from {traveler.departureLocation || (traveler.isHost ? trip.origin : "Not added yet")}</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">

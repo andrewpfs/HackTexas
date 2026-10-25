@@ -11,6 +11,7 @@ import { CrewCard } from "./crew-card";
 import { TripTopBar } from "./trip-top-bar";
 import { LiveRefresh } from "./live-refresh";
 import { ProgressNav } from "./progress-nav";
+import { TripSketchCard } from "./trip-sketch-card";
 import { getVotingSummary } from "@/lib/voting";
 
 export const instant = false;
@@ -81,7 +82,10 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const votingSummary = getVotingSummary(trip);
   const itineraryReady = Boolean(trip.itinerary);
   // 0 Get Ready, 1 Compare Options, 2 Decide Together, 3 Shared Itinerary
-  const currentStep = itineraryReady
+  const bookedCount = Object.keys(trip.travel?.bookings ?? {}).length;
+  const currentStep = itineraryReady && bookedCount > 0
+    ? 4
+    : itineraryReady
     ? 3
     : candidatesAvailable && votingSummary.votedCount > 0
       ? 2
@@ -92,9 +96,10 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
     "First, hear from everyone.",
     "Compare the three options.",
     `Vote together: ${votingSummary.votedCount} of ${votingSummary.travelerCount} have voted.`,
-    "Your shared itinerary is ready.",
+    "Your shared itinerary is ready. Next, book flights and the hotel.",
+    `Booking: ${bookedCount} of ${trip.travelers.length} travelers have booked (demo).`,
   ];
-  const statusLabels = ["Collecting preferences", "Comparing options", "Voting", "Itinerary ready"];
+  const statusLabels = ["Collecting preferences", "Comparing options", "Voting", "Itinerary ready", "Booking"];
 
   const completedAvailabilityLabel =
     completedAvailabilityCount === trip.travelers.length
@@ -114,6 +119,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             departureLocation: traveler.departureLocation || (traveler.isHost ? trip.origin : ""),
             preferencesComplete: traveler.preferencesComplete,
             availabilityComplete: traveler.availabilityComplete === true,
+            phoneLast4: traveler.phoneLast4,
           }))}
           tripId={trip.id}
         />
@@ -136,7 +142,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 </div>
                 <div className="flex flex-1 items-center gap-2 text-[#e4664f]" aria-hidden="true">
                   <span className="h-px flex-1 border-t-2 border-dashed border-[#e4664f]/50" />
-                  <svg className="h-10 w-10 shrink-0 rotate-90" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" /></svg>
+                  <svg className="h-10 w-10 shrink-0" fill="currentColor" viewBox="0 0 24 24"><g transform="rotate(90 12 12)"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" /></g></svg>
                   <span className="h-px flex-1 border-t-2 border-dashed border-[#e4664f]/50" />
                 </div>
                 <div className="min-w-0 text-right">
@@ -174,15 +180,19 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
           </p>
         ) : null}
 
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_23.5rem]">
+        <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_21rem] lg:grid-cols-[minmax(0,1fr)_23.5rem]">
           <div className="min-w-0 space-y-5">
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6" aria-labelledby="planning-progress">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div><p className="eyebrow">Planning Progress</p><h2 className="mt-1 text-xl font-bold" id="planning-progress">{stepHeadings[currentStep]}</h2></div>
-                <p className="text-sm text-[#738087]">Step {currentStep + 1} of 4</p>
+                <p className="text-sm text-[#738087]">Step {currentStep + 1} of 5</p>
               </div>
               <div className="mt-5"><ProgressNav currentStep={currentStep} itineraryReady={itineraryReady} optionsReady={candidatesAvailable} tripId={trip.id} /></div>
             </section>
+
+            {!candidatesAvailable && !itineraryReady ? (
+              <TripSketchCard hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} />
+            ) : null}
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6" aria-labelledby="availability">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

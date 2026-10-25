@@ -11,6 +11,7 @@ export function Header() {
         <nav className="order-3 flex w-full items-center justify-between gap-1 border-t border-white/10 pt-2 sm:order-2 sm:w-auto sm:gap-2 sm:border-0 sm:pt-0" aria-label="Primary navigation">
           <Link className="nav-link" href="/">Home</Link>
           <Link className="nav-link" href="/join">Join a Trip</Link>
+          <Link className="nav-link" href="/my-trips">My Trips</Link>
           <Link className="nav-link" href="/about">About</Link>
           <Link className="rounded-full bg-[#f3c969] px-4 py-2 text-sm font-bold text-[#173f50] transition hover:bg-[#f7d77f]" href="/create">Plan a Trip</Link>
         </nav>

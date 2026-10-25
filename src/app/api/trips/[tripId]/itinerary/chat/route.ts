@@ -12,7 +12,7 @@ import {
 } from "@/lib/itinerary-revision";
 import { MusePlannerError } from "@/lib/muse-client";
 import { buildPlanningContext } from "@/lib/planning-context";
-import { appendChatMessage, getTripById, saveItineraryRevision } from "@/lib/trip-repository";
+import { appendChatMessage, changePersonalOverride, getTripById, saveItineraryRevision } from "@/lib/trip-repository";
 import type { Trip } from "@/lib/trip-types";
 
 const maximumAttempts = 2;
@@ -131,6 +131,26 @@ export async function POST(
         text: reply,
         changes: days ? changes : undefined,
       });
+
+      // Only the sender wants something different: give them their own plan for that stop.
+      if (!days && result.personal) {
+        const plan = result.personal;
+        const day = itinerary.days.find((item) => item.dayNumber === plan.dayNumber);
+        const stop = day?.activities.find((activity) => activity.title.trim().toLowerCase() === plan.stopTitle.toLowerCase());
+        if (day && stop) {
+          await changePersonalOverride(tripId, {
+            action: "add",
+            travelerId: traveler.id,
+            dayNumber: day.dayNumber,
+            stopTime: stop.time,
+            stopTitle: stop.title,
+            title: plan.title.slice(0, 120),
+            location: plan.location.slice(0, 160),
+            note: plan.note.slice(0, 300),
+          });
+          museMessage.changes = [`Personal plan for ${traveler.name}, Day ${day.dayNumber}: ${plan.title} instead of ${stop.title}`];
+        }
+      }
 
       if (!days) {
         const added = await appendChatMessage(tripId, museMessage);

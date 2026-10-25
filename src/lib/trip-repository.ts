@@ -1,7 +1,9 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import type { AvatarLook } from "./avatar-look";
 import type {
+  Booking,
   CandidateTripOption,
   CandidateVote,
   ChatMessage,
@@ -320,6 +322,9 @@ export async function saveItineraryRevision(
     }
 
     itinerary.days = days;
+    itinerary.overrides = (itinerary.overrides ?? []).filter((override) =>
+      days.some((day) => day.dayNumber === override.dayNumber && day.activities.some((activity) => activity.time === override.stopTime && activity.title === override.stopTitle)),
+    );
     itinerary.revision = expectedRevision + 1;
     itinerary.updatedAt = new Date().toISOString();
     // New stops still need their real place looked up.
@@ -387,4 +392,279 @@ export async function finishOptionPhotos(tripId: string, candidates: CandidateTr
   });
 
   return result ?? { status: "stale" as const };
+}
+
+// A traveler picks their own avatar. This is cosmetic, so it never clears the plan.
+export async function updateTravelerAvatar(tripId: string, travelerId: string, avatar: AvatarLook) {
+  const result = await getStore().update<{ status: "updated" } | { status: "traveler-not-found" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler) {
+      return { save: false, result: { status: "traveler-not-found" as const } };
+    }
+
+    traveler.avatar = avatar;
+    return { save: true, result: { status: "updated" as const } };
+  });
+
+  return result ?? { status: "trip-not-found" as const };
+}
+
+// ---------- travel: hotels, flights, demo bookings ----------
+
+const searchTimeoutMs = 2 * 60 * 1000;
+
+function isFreshPending(status: string | undefined, startedAt: string | undefined) {
+  return status === "pending" && startedAt !== undefined && Date.now() - Date.parse(startedAt) < searchTimeoutMs;
+}
+
+type ClaimResult<T> = { status: "claimed"; trip: Trip } | { status: "skip"; current: T | undefined } | { status: "no-itinerary" };
+
+// Marks the group hotel search as running. Returns "skip" when it already ran or is running.
+export async function claimHotelSearch(tripId: string, checkIn: string, checkOut: string, force = false) {
+  const result = await getStore().update<ClaimResult<NonNullable<Trip["travel"]>["hotels"]>>(tripId, (trip) => {
+    if (!trip.itinerary) {
+      return { save: false, result: { status: "no-itinerary" as const } };
+    }
+    const current = trip.travel?.hotels;
+    if (current && !force && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+      return { save: false, result: { status: "skip" as const, current } };
+    }
+
+    trip.travel = { ...trip.travel, hotels: { status: "pending", startedAt: new Date().toISOString(), options: [], checkIn, checkOut } };
+    return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
+  });
+  return result ?? { status: "no-itinerary" as const };
+}
+
+export async function finishHotelSearch(tripId: string, update: Partial<NonNullable<NonNullable<Trip["travel"]>["hotels"]>>) {
+  await getStore().update<null>(tripId, (trip) => {
+    const current = trip.travel?.hotels;
+    if (!current) {
+      return { save: false, result: null };
+    }
+    trip.travel = { ...trip.travel, hotels: { ...current, ...update, startedAt: undefined } };
+    return { save: true, result: null };
+  });
+}
+
+// The host picks the group's hotel. Picking it again un-picks it.
+export async function selectGroupHotel(tripId: string, travelerId: string, token: string) {
+  const result = await getStore().update<{ status: "updated" | "not-host" | "not-found" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler?.isHost) {
+      return { save: false, result: { status: "not-host" as const } };
+    }
+    const hotels = trip.travel?.hotels;
+    if (!hotels?.options.some((option) => option.token === token)) {
+      return { save: false, result: { status: "not-found" as const } };
+    }
+
+    const unpick = hotels.selectedToken === token;
+    trip.travel = {
+      ...trip.travel,
+      hotels: { ...hotels, selectedToken: unpick ? undefined : token, selectedByTravelerId: unpick ? undefined : travelerId },
+    };
+    return { save: true, result: { status: "updated" as const } };
+  });
+  return result ?? { status: "not-found" as const };
+}
+
+export async function claimFlightSearch(tripId: string, travelerId: string, from: string, force = false) {
+  const result = await getStore().update<ClaimResult<NonNullable<NonNullable<Trip["travel"]>["flights"]>[string]>>(tripId, (trip) => {
+    if (!trip.itinerary) {
+      return { save: false, result: { status: "no-itinerary" as const } };
+    }
+    const current = trip.travel?.flights?.[travelerId];
+    if (current && !force && current.from === from && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+      return { save: false, result: { status: "skip" as const, current } };
+    }
+
+    trip.travel = {
+      ...trip.travel,
+      flights: { ...trip.travel?.flights, [travelerId]: { status: "pending", startedAt: new Date().toISOString(), from, options: [] } },
+    };
+    return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
+  });
+  return result ?? { status: "no-itinerary" as const };
+}
+
+export async function finishFlightSearch(
+  tripId: string,
+  travelerId: string,
+  update: Partial<NonNullable<NonNullable<Trip["travel"]>["flights"]>[string]>,
+) {
+  await getStore().update<null>(tripId, (trip) => {
+    const current = trip.travel?.flights?.[travelerId];
+    if (!current) {
+      return { save: false, result: null };
+    }
+    trip.travel = { ...trip.travel, flights: { ...trip.travel?.flights, [travelerId]: { ...current, ...update, startedAt: undefined } } };
+    return { save: true, result: null };
+  });
+}
+
+// A traveler picks their own flight. Picking it again un-picks it.
+export async function selectFlight(tripId: string, travelerId: string, flightId: string) {
+  const result = await getStore().update<{ status: "updated" | "not-found" }>(tripId, (trip) => {
+    const search = trip.travel?.flights?.[travelerId];
+    if (!search?.options.some((option) => option.id === flightId)) {
+      return { save: false, result: { status: "not-found" as const } };
+    }
+    const unpick = search.selectedId === flightId;
+    trip.travel = { ...trip.travel, flights: { ...trip.travel?.flights, [travelerId]: { ...search, selectedId: unpick ? undefined : flightId } } };
+    return { save: true, result: { status: "updated" as const } };
+  });
+  return result ?? { status: "not-found" as const };
+}
+
+export async function saveBooking(tripId: string, booking: Booking) {
+  const result = await getStore().update<{ status: "saved" | "traveler-not-found" }>(tripId, (trip) => {
+    if (!trip.travelers.some((traveler) => traveler.id === booking.travelerId)) {
+      return { save: false, result: { status: "traveler-not-found" as const } };
+    }
+    trip.travel = { ...trip.travel, bookings: { ...trip.travel?.bookings, [booking.travelerId]: booking } };
+    return { save: true, result: { status: "saved" as const } };
+  });
+  return result ?? { status: "traveler-not-found" as const };
+}
+
+// ---------- personal overrides ----------
+
+export type OverrideAction =
+  | { action: "add"; travelerId: string; dayNumber: number; stopTime: string; stopTitle: string; title: string; location: string; note: string }
+  | { action: "remove" | "join" | "leave"; travelerId: string; overrideId: string };
+
+type OverrideResult = { status: "updated"; trip: Trip } | { status: "not-found" | "no-itinerary" | "not-allowed" };
+
+export async function changePersonalOverride(tripId: string, change: OverrideAction) {
+  const result = await getStore().update<OverrideResult>(tripId, (trip) => {
+    const itinerary = trip.itinerary;
+    if (!itinerary) {
+      return { save: false, result: { status: "no-itinerary" as const } };
+    }
+    if (!trip.travelers.some((traveler) => traveler.id === change.travelerId)) {
+      return { save: false, result: { status: "not-allowed" as const } };
+    }
+
+    const overrides = itinerary.overrides ?? [];
+
+    if (change.action === "add") {
+      const day = itinerary.days.find((item) => item.dayNumber === change.dayNumber);
+      const stopExists = day?.activities.some((activity) => activity.time === change.stopTime && activity.title === change.stopTitle);
+      if (!stopExists) {
+        return { save: false, result: { status: "not-found" as const } };
+      }
+
+      // One plan per person per stop: a new one replaces the old one, and they leave any plan they had joined.
+      const others = overrides
+        .filter((item) => !(item.travelerId === change.travelerId && item.dayNumber === change.dayNumber && item.stopTime === change.stopTime && item.stopTitle === change.stopTitle))
+        .map((item) =>
+          item.dayNumber === change.dayNumber && item.stopTime === change.stopTime && item.stopTitle === change.stopTitle
+            ? { ...item, joinedBy: item.joinedBy.filter((id) => id !== change.travelerId) }
+            : item,
+        );
+      itinerary.overrides = [
+        ...others,
+        {
+          id: randomUUID(),
+          travelerId: change.travelerId,
+          dayNumber: change.dayNumber,
+          stopTime: change.stopTime,
+          stopTitle: change.stopTitle,
+          title: change.title,
+          location: change.location,
+          note: change.note,
+          joinedBy: [],
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      return { save: true, result: { status: "updated" as const, trip } };
+    }
+
+    const target = overrides.find((item) => item.id === change.overrideId);
+    if (!target) {
+      return { save: false, result: { status: "not-found" as const } };
+    }
+
+    if (change.action === "remove") {
+      if (target.travelerId !== change.travelerId) {
+        return { save: false, result: { status: "not-allowed" as const } };
+      }
+      itinerary.overrides = overrides.filter((item) => item.id !== target.id);
+    } else if (change.action === "join") {
+      // Joining someone's plan means leaving any other plan for the same stop.
+      itinerary.overrides = overrides
+        .filter((item) => !(item.travelerId === change.travelerId && item.dayNumber === target.dayNumber && item.stopTime === target.stopTime && item.stopTitle === target.stopTitle))
+        .map((item) => {
+          const sameStop = item.dayNumber === target.dayNumber && item.stopTime === target.stopTime && item.stopTitle === target.stopTitle;
+          const joinedBy = item.joinedBy.filter((id) => id !== change.travelerId);
+          return { ...item, joinedBy: item.id === target.id && item.travelerId !== change.travelerId ? [...joinedBy, change.travelerId] : sameStop ? joinedBy : item.joinedBy };
+        });
+    } else {
+      itinerary.overrides = overrides.map((item) =>
+        item.id === target.id ? { ...item, joinedBy: item.joinedBy.filter((id) => id !== change.travelerId) } : item,
+      );
+    }
+
+    return { save: true, result: { status: "updated" as const, trip } };
+  });
+
+  return result ?? { status: "no-itinerary" as const };
+}
+
+// ---------- trip sketch ----------
+
+type SketchClaim = { status: "claimed"; trip: Trip } | { status: "skip" | "not-found" };
+
+// Marks the sketch as being drawn so only one viewer starts it. Hosts can ask for a fresh one.
+export async function claimTripSketch(tripId: string, force: boolean) {
+  const result = await getStore().update<SketchClaim>(tripId, (trip) => {
+    const current = trip.sketch;
+    if (current && !force && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+      return { save: false, result: { status: "skip" as const } };
+    }
+    trip.sketch = { status: "pending", startedAt: new Date().toISOString(), summary: "", places: [], days: [], suggestions: [] };
+    return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
+  });
+  return result ?? { status: "not-found" as const };
+}
+
+export async function finishTripSketch(tripId: string, sketch: Trip["sketch"]) {
+  await getStore().update<null>(tripId, (trip) => {
+    trip.sketch = sketch;
+    return { save: true, result: null };
+  });
+}
+
+// ---------- phone and assistant links ----------
+
+export async function findTripsByPhone(phoneHash: string) {
+  return getStore().findByTraveler({ phoneHash });
+}
+
+export async function findTripsByAssistantToken(assistantTokenHash: string) {
+  return getStore().findByTraveler({ assistantTokenHash });
+}
+
+// Saves a trip to a phone. A traveler already saved to a different phone can't be taken over.
+export async function linkTravelerPhone(tripId: string, travelerId: string, phoneHash: string, last4: string) {
+  const result = await getStore().update<{ status: "linked" | "taken" | "traveler-not-found" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler) return { save: false, result: { status: "traveler-not-found" as const } };
+    if (traveler.phoneHash && traveler.phoneHash !== phoneHash) return { save: false, result: { status: "taken" as const } };
+    traveler.phoneHash = phoneHash;
+    traveler.phoneLast4 = last4;
+    return { save: true, result: { status: "linked" as const } };
+  });
+  return result ?? { status: "traveler-not-found" as const };
+}
+
+export async function setAssistantToken(tripId: string, travelerId: string, tokenHash: string | undefined) {
+  const result = await getStore().update<{ status: "saved" | "traveler-not-found" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler) return { save: false, result: { status: "traveler-not-found" as const } };
+    traveler.assistantTokenHash = tokenHash;
+    return { save: true, result: { status: "saved" as const } };
+  });
+  return result ?? { status: "traveler-not-found" as const };
 }

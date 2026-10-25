@@ -29,6 +29,12 @@
     "src/lib/place-images.ts",
     "src/lib/travel-time.ts",
     "src/lib/city-search.ts",
+    "src/lib/avatar-look.ts",
+    "src/lib/travel-search.ts",
+    "src/lib/travel-planning.ts",
+    "src/lib/trip-sketch.ts",
+    "src/lib/phone-auth.ts",
+    "src/lib/assistant-connector.ts",
     "src/lib/trip-validation.ts",
     "src/lib/planning-context.ts",
     "src/lib/trip-types.ts",
@@ -40,6 +46,9 @@
     "tests/voting-itinerary.test.ts",
     "tests/serpapi-places.test.ts",
     "tests/revision.test.ts",
-    "tests/preferences-and-dates.test.ts"
+    "tests/preferences-and-dates.test.ts",
+    "tests/avatar.test.ts",
+    "tests/travel.test.ts",
+    "tests/sketch-phone-mcp.test.ts"
   ]
 }

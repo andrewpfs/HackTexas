@@ -7,6 +7,7 @@ import { MuseCandidatePlanner } from "./muse-candidate-planner";
 import type { MuseConfig } from "./muse-client";
 import { MuseItineraryPlanner } from "./muse-itinerary-planner";
 import { MuseItineraryReviser } from "./muse-itinerary-reviser";
+import { MockSketchPlanner, MuseSketchPlanner, type SketchPlanner } from "./trip-sketch";
 
 export type PlannerSelection = {
   planner: CandidatePlanner;
@@ -61,6 +62,11 @@ export function selectItineraryReviser(): { reviser: ItineraryReviser; source: "
   }
 
   return { reviser: new MuseItineraryReviser(config), source: "muse" };
+}
+
+export function selectSketchPlanner(): { planner: SketchPlanner; source: "muse" | "mock" } {
+  const config = getMuseConfig();
+  return config ? { planner: new MuseSketchPlanner(config), source: "muse" } : { planner: new MockSketchPlanner(), source: "mock" };
 }
 
 export function isMockFallbackEnabled() {

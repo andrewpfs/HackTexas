@@ -13,6 +13,7 @@ export interface TripStore {
   getByInviteCode(inviteCode: string): Promise<Trip | null>;
   insert(trip: Trip): Promise<void>;
   update<Result>(tripId: string, mutate: TripMutation<Result>): Promise<Result | null>;
+  findByTraveler(match: { phoneHash?: string; assistantTokenHash?: string }): Promise<Trip[]>;
 }
 
 const dataDirectory = path.join(process.cwd(), "data");
@@ -53,6 +54,16 @@ export const jsonTripStore: TripStore = {
     const trips = await readTrips();
     trips.push(trip);
     await writeTrips(trips);
+  },
+
+  async findByTraveler(match) {
+    const trips = await readTrips();
+    return trips.filter((trip) =>
+      trip.travelers.some((traveler) =>
+        (match.phoneHash !== undefined && traveler.phoneHash === match.phoneHash) ||
+        (match.assistantTokenHash !== undefined && traveler.assistantTokenHash === match.assistantTokenHash),
+      ),
+    );
   },
 
   async update(tripId, mutate) {

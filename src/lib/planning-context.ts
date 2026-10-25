@@ -88,6 +88,8 @@ export type PlanningContext = {
     hostPreferredDurationDays: number | null;
     expectedTravelerCount: number | null;
     joinedTravelerCount: number;
+    // The first rough plan drawn from the host's description, when there is one.
+    sketch?: { summary: string; places: string[]; days: string[] };
   };
   groupAvailability: {
     sharedDates: string[];
@@ -425,6 +427,15 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
         hostPreferredDurationDays: trip.preferredDurationDays || null,
         expectedTravelerCount: trip.expectedTravelerCount || null,
         joinedTravelerCount: trip.travelers.length,
+        ...(trip.sketch?.status === "done"
+          ? {
+              sketch: {
+                summary: trip.sketch.summary,
+                places: trip.sketch.places.map((place) => place.name),
+                days: trip.sketch.days.map((day) => `Day ${day.dayNumber}: ${day.title}`),
+              },
+            }
+          : {}),
       },
       groupAvailability: {
         sharedDates: [...readiness.sharedDates],

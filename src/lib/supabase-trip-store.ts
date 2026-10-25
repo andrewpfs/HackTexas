@@ -30,17 +30,29 @@ function getClient() {
   return cachedClient;
 }
 
+// A request cancelled mid-flight (a refresh, a dev-server restart, a brief network blip) is worth one more try.
+function isTransient(message: string) {
+  return /abort|fetch failed|network|timeout|ECONNRESET|ETIMEDOUT/i.test(message);
+}
+
+async function withRetry<T extends { error: { message: string } | null }>(run: () => PromiseLike<T>): Promise<T> {
+  const first = await run();
+  if (first.error && isTransient(first.error.message)) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    return run();
+  }
+  return first;
+}
+
 function fail(action: string, message: string): never {
   throw new Error(`Supabase could not ${action}: ${message}`);
 }
 
 function createSupabaseTripStore(client: SupabaseClient): TripStore {
   async function readRow(tripId: string) {
-    const { data, error } = await client
-      .from(tableName)
-      .select("id, data, version")
-      .eq("id", tripId)
-      .maybeSingle<TripRow>();
+    const { data, error } = await withRetry(() =>
+      client.from(tableName).select("id, data, version").eq("id", tripId).maybeSingle<TripRow>(),
+    );
 
     if (error) {
       fail("load the trip", error.message);
@@ -54,16 +66,24 @@ function createSupabaseTripStore(client: SupabaseClient): TripStore {
     },
 
     async getByInviteCode(inviteCode) {
-      const { data, error } = await client
-        .from(tableName)
-        .select("data")
-        .eq("invite_code", inviteCode.toUpperCase())
-        .maybeSingle<{ data: Trip }>();
+      const { data, error } = await withRetry(() =>
+        client.from(tableName).select("data").eq("invite_code", inviteCode.toUpperCase()).maybeSingle<{ data: Trip }>(),
+      );
 
       if (error) {
         fail("look up the invite code", error.message);
       }
       return data?.data ?? null;
+    },
+
+    // Uses Postgres JSON containment, so it finds the trip without loading every trip.
+    async findByTraveler(match) {
+      const traveler = match.phoneHash !== undefined ? { phoneHash: match.phoneHash } : { assistantTokenHash: match.assistantTokenHash };
+      const { data, error } = await client.from(tableName).select("data").contains("data", { travelers: [traveler] });
+      if (error) {
+        fail("look up your trips", error.message);
+      }
+      return (data ?? []).map((row: { data: Trip }) => row.data);
     },
 
     async insert(trip) {
