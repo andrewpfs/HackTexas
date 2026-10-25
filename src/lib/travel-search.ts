@@ -7,21 +7,57 @@ const userAgent = "HackTXTripPlanner/1.0 (student hackathon project)";
 
 export type TravelSearchConfig = { apiKey: string; fetchImpl?: typeof fetch };
 
+// When several phones search at once, SerpApi and Wikidata sometimes throttle or
+// time out. Those are retried with a short random pause so the phones don't retry
+// in lockstep. Anything else fails right away.
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const jitter = (attempt: number) => (400 + Math.random() * 600) * (attempt + 1);
+
+function isTemporary(status: number) {
+  return status === 429 || status >= 500;
+}
+
+export async function fetchWithRetry(fetchImpl: typeof fetch, url: URL, init?: RequestInit, tries = 3): Promise<Response> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const response = await fetchImpl(url, init);
+      if (!isTemporary(response.status) || attempt >= tries - 1) return response;
+    } catch (error) {
+      if (attempt >= tries - 1) throw error;
+    }
+    await wait(jitter(attempt));
+  }
+}
+
+// Google sometimes answers "no results" for a burst of searches that do have results,
+// so that one is tried twice more. If it's still empty, it's treated as no results.
+const noResults = /hasn't returned any results/i;
+
 async function serpGet(config: TravelSearchConfig, params: Record<string, string>) {
   const url = new URL(serpApiUrl);
   for (const [key, value] of Object.entries({ ...params, api_key: config.apiKey })) {
     url.searchParams.set(key, value);
   }
 
-  const response = await (config.fetchImpl ?? fetch)(url);
-  if (!response.ok) {
-    throw new Error(`SerpApi returned HTTP ${response.status}.`);
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetchWithRetry(config.fetchImpl ?? fetch, url);
+    if (!response.ok) {
+      throw new Error(`SerpApi returned HTTP ${response.status}.`);
+    }
+    const body = (await response.json()) as Record<string, unknown>;
+    if (typeof body.error === "string") {
+      if (noResults.test(body.error)) {
+        // Spread the retries out: during a burst Google can say "no results" twice in a row.
+        if (attempt < 2) {
+          await wait(1500 * (attempt + 1) + Math.random() * 1500);
+          continue;
+        }
+        return {};
+      }
+      throw new Error(`SerpApi error: ${body.error}`);
+    }
+    return body;
   }
-  const body = (await response.json()) as Record<string, unknown>;
-  if (typeof body.error === "string") {
-    throw new Error(`SerpApi error: ${body.error}`);
-  }
-  return body;
 }
 
 // ---------- hotels ----------
@@ -105,7 +141,22 @@ type WikidataEntities = { entities?: Record<string, { claims?: Record<string, { 
 
 // Google Flights accepts a city's Freebase id (like /m/0vzm for Austin) and then
 // searches every airport in that city. Wikidata knows those ids.
-export async function findCityFlightId(city: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+// Every traveler's flight search looks up the same destination, often at the same
+// moment, so lookups are shared and remembered (per server instance).
+const cityFlightIds = new Map<string, Promise<string | null>>();
+
+export function findCityFlightId(city: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  const key = city.trim().toLowerCase();
+  const known = cityFlightIds.get(key);
+  if (known) return known;
+  const lookup = lookupCityFlightId(city, fetchImpl);
+  cityFlightIds.set(key, lookup);
+  // A failed lookup is forgotten so the next search tries again.
+  lookup.then((id) => { if (!id) cityFlightIds.delete(key); }, () => cityFlightIds.delete(key));
+  return lookup;
+}
+
+async function lookupCityFlightId(city: string, fetchImpl: typeof fetch): Promise<string | null> {
   const [name, ...rest] = city.split(",").map((part) => part.trim()).filter(Boolean);
   if (!name) {
     return null;
@@ -115,7 +166,7 @@ export async function findCityFlightId(city: string, fetchImpl: typeof fetch = f
   searchUrl.search = new URLSearchParams({
     action: "wbsearchentities", search: name, language: "en", type: "item", limit: "6", format: "json",
   }).toString();
-  const searchResponse = await fetchImpl(searchUrl, { headers: { "User-Agent": userAgent } });
+  const searchResponse = await fetchWithRetry(fetchImpl, searchUrl, { headers: { "User-Agent": userAgent } });
   if (!searchResponse.ok) {
     return null;
   }
@@ -135,7 +186,7 @@ export async function findCityFlightId(city: string, fetchImpl: typeof fetch = f
 
   const entitiesUrl = new URL(wikidataApi);
   entitiesUrl.search = new URLSearchParams({ action: "wbgetentities", ids: ids.join("|"), props: "claims", format: "json" }).toString();
-  const entitiesResponse = await fetchImpl(entitiesUrl, { headers: { "User-Agent": userAgent } });
+  const entitiesResponse = await fetchWithRetry(fetchImpl, entitiesUrl, { headers: { "User-Agent": userAgent } });
   if (!entitiesResponse.ok) {
     return null;
   }
@@ -177,7 +228,7 @@ export async function findNearbyAirports(point: { latitude: number; longitude: n
   try {
     const url = new URL(wikidataSparql);
     url.search = new URLSearchParams({ query, format: "json" }).toString();
-    const response = await fetchImpl(url, { headers: { "User-Agent": userAgent, Accept: "application/sparql-results+json" }, signal: AbortSignal.timeout(15000) });
+    const response = await fetchWithRetry(fetchImpl, url, { headers: { "User-Agent": userAgent, Accept: "application/sparql-results+json" }, signal: AbortSignal.timeout(15000) });
     if (!response.ok) return [];
     const rows = ((await response.json()) as SparqlResponse).results?.bindings ?? [];
     const airports: NearbyAirport[] = [];

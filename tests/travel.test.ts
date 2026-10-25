@@ -160,3 +160,19 @@ test("travelers sharing the group hotel can't confirm until the host picks every
   const result = buildBooking(trip, "henry");
   assert.ok("error" in result && /host to pick the group hotel in Tokyo/.test(result.error));
 });
+
+test("busy-moment hiccups from SerpApi are retried, and a real empty result is just empty", async () => {
+  const flight = { price: 900, total_duration: 800, flights: [{ airline: "ANA", flight_number: "NH 1", departure_airport: { id: "DFW", time: "2026-12-17 10:00" }, arrival_airport: { id: "HND", time: "2026-12-18 15:00" } }] };
+  const replies = [new Response("busy", { status: 429 }), Response.json({ error: "Google Flights hasn't returned any results for this query." }), Response.json({ error: "Google Flights hasn't returned any results for this query." }), Response.json({ best_flights: [flight] })];
+  let calls = 0;
+  const flaky = (async () => replies[calls++]) as typeof fetch;
+  const options = await searchFlights({ apiKey: "k", fetchImpl: flaky }, { fromId: "DFW", toId: "HND", outboundDate: "2026-12-17" });
+  assert.equal(calls, 4);
+  assert.equal(options.length, 1);
+
+  const empty = (async () => Response.json({ error: "Google Flights hasn't returned any results for this query." })) as typeof fetch;
+  assert.deepEqual(await searchFlights({ apiKey: "k", fetchImpl: empty }, { fromId: "DFW", toId: "XYZ", outboundDate: "2026-12-17" }), []);
+
+  const broken = (async () => Response.json({ error: "Invalid API key." })) as typeof fetch;
+  await assert.rejects(searchFlights({ apiKey: "k", fetchImpl: broken }, { fromId: "DFW", toId: "HND", outboundDate: "2026-12-17" }), /Invalid API key/);
+});

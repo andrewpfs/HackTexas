@@ -92,7 +92,14 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
   useEffect(() => {
     if (!props.searchConfigured || !me || (myFlights && !outdated) || startedFlights.current) return;
     startedFlights.current = true;
-    post(`/api/trips/${tripId}/travel/flights`, "POST", { travelerId: me.id }).finally(() => router.refresh());
+    // When the whole group opens this page together, wait a random moment first so
+    // the flight searches don't all hit Google Flights in the same instant.
+    // Not cancelled on cleanup: startedFlights already blocks a second start, so the
+    // one delayed search must always go out.
+    const travelerId = me.id;
+    setTimeout(() => {
+      post(`/api/trips/${tripId}/travel/flights`, "POST", { travelerId }).finally(() => router.refresh());
+    }, Math.random() * 2500);
   }, [props.searchConfigured, me, myFlights, outdated, tripId, router]);
 
   async function act(key: string, url: string, method: string, body: unknown) {

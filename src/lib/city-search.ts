@@ -1,3 +1,4 @@
+import { fetchWithRetry } from "./travel-search";
 const photonUrl = "https://photon.komoot.io/api/";
 const userAgent = "HackTXTripPlanner/1.0 (student hackathon project)";
 
@@ -6,7 +7,7 @@ export async function lookupDestinationArea(destination: string, fetchImpl: type
   try {
     const url = new URL(photonUrl);
     url.search = new URLSearchParams({ q: destination, limit: "1", lang: "en" }).toString();
-    const response = await fetchImpl(url, { headers: { "User-Agent": userAgent }, signal: AbortSignal.timeout(5000) });
+    const response = await fetchWithRetry(fetchImpl, url, { headers: { "User-Agent": userAgent }, signal: AbortSignal.timeout(5000) });
     if (!response.ok) return undefined;
     const body = await response.json();
     const feature = body.features?.[0];

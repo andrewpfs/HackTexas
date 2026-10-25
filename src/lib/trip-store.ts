@@ -1,6 +1,6 @@
 import "server-only";
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Trip } from "./trip-types";
 
@@ -46,9 +46,13 @@ async function readTrips(): Promise<Trip[]> {
   }
 }
 
+// Write to a temporary file and then swap it in, so a phone reading the trip at the
+// same moment never sees a half-written file.
 async function writeTrips(trips: Trip[]) {
   await mkdir(dataDirectory, { recursive: true });
-  await writeFile(dataFilePath, JSON.stringify({ trips }, null, 2), "utf8");
+  const temporaryPath = `${dataFilePath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporaryPath, JSON.stringify({ trips }, null, 2), "utf8");
+  await rename(temporaryPath, dataFilePath);
 }
 
 // Local file store for development without Supabase credentials.
