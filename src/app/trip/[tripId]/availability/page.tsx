@@ -35,9 +35,9 @@ export default async function AvailabilityPage(
         </Link>
 
         <div className="mt-7">
-          <p className="eyebrow">My availability</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
-            Which dates could you travel?
+          
+          <h1 className="mt-1 max-w-3xl font-extrabold leading-[1.02] tracking-[-0.045em] text-[#e4664f] text-5xl sm:text-6xl">
+            Which Dates Could You Travel?
           </h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[#66757d]">
             Your group is considering travel between {formattedStart} and {formattedEnd}. Select every date that could work for you; the dates do not need to be consecutive.

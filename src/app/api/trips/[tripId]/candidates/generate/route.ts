@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { generateCandidateOptionsForTrip } from "@/lib/candidate-generation";
 import { validateCandidateOptions } from "@/lib/candidate-validation";
+import {
+  isMockFallbackEnabled,
+  selectCandidatePlanner,
+} from "@/lib/candidate-planner-factory";
 import { MockCandidatePlanner } from "@/lib/mock-candidate-planner";
+import { MusePlannerError } from "@/lib/muse-candidate-planner";
+import { addImagesToCandidates } from "@/lib/place-images";
 import { getTripById, saveCandidateOptions } from "@/lib/trip-repository";
+import type { PlannerSource } from "@/lib/trip-types";
 
 export async function POST(
   _request: Request,
@@ -28,8 +35,32 @@ export async function POST(
       }
     }
 
-    const planner = new MockCandidatePlanner();
-    const generationResult = await generateCandidateOptionsForTrip(trip, planner);
+    const selection = selectCandidatePlanner();
+    let plannerSource: PlannerSource = selection.source;
+    let generationResult;
+
+    try {
+      generationResult = await generateCandidateOptionsForTrip(trip, selection.planner);
+    } catch (error) {
+      if (!(error instanceof MusePlannerError)) {
+        throw error;
+      }
+
+      console.error("Muse planner failed:", error.message);
+
+      if (!isMockFallbackEnabled()) {
+        return NextResponse.json(
+          { error: "Muse could not create trip options right now. Please try again." },
+          { status: 502 },
+        );
+      }
+
+      plannerSource = "mock-fallback";
+      generationResult = await generateCandidateOptionsForTrip(
+        trip,
+        new MockCandidatePlanner(),
+      );
+    }
 
     if (!generationResult.success && generationResult.reason === "not-ready") {
       return NextResponse.json(
@@ -49,7 +80,11 @@ export async function POST(
       );
     }
 
-    const saveResult = await saveCandidateOptions(trip.id, generationResult.candidates);
+    const saveResult = await saveCandidateOptions(
+      trip.id,
+      await addImagesToCandidates(generationResult.candidates),
+      plannerSource,
+    );
     if (saveResult.status === "trip-not-found") {
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
     }
@@ -60,6 +95,7 @@ export async function POST(
         candidateCount: generationResult.candidates.length,
         optionsPath: `/trip/${trip.id}/options`,
         alreadyGenerated: false,
+        planner: plannerSource,
       },
       { status: 201 },
     );

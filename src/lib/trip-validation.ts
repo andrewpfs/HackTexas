@@ -36,6 +36,12 @@ export type UpdateTripValidationResult =
 export const maximumTravelerNameLength = 80;
 export const maximumDestinationPreferencesLength = 500;
 export const maximumNotesLength = 1000;
+export const maximumActivityDetailsLength = 300;
+
+// Yesterday in UTC, so travelers in any time zone can still choose "today".
+export function getEarliestAllowedDate(now = new Date()) {
+  return new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 export function normalizeInviteCode(inviteCode: string) {
   return inviteCode.trim().toUpperCase();
@@ -106,6 +112,10 @@ export function validateCreateTripInput(body: unknown): TripValidationResult {
     latestPossibleDate < earliestPossibleDate
   ) {
     errors.push("Latest date cannot be before earliest date.");
+  }
+
+  if (isValidISODate(earliestPossibleDate) && earliestPossibleDate < getEarliestAllowedDate()) {
+    errors.push("Earliest date has already passed. Pick a date from today on.");
   }
 
   const preferredDurationDays = readOptionalInteger(values.preferredDurationDays, "Preferred duration", 365, errors);
@@ -191,6 +201,9 @@ export function validateUpdateTripInput(body: unknown): UpdateTripValidationResu
   }
   if (isValidISODate(earliestPossibleDate) && isValidISODate(latestPossibleDate) && latestPossibleDate < earliestPossibleDate) {
     errors.push("Latest date cannot be before earliest date.");
+  }
+  if (isValidISODate(latestPossibleDate) && latestPossibleDate < getEarliestAllowedDate()) {
+    errors.push("Latest date has already passed. Pick a window that has not ended.");
   }
 
   const preferredDurationDays = readOptionalInteger(values.preferredDurationDays, "Preferred duration", 365, errors);
@@ -319,12 +332,16 @@ export function validateTravelerPreferences(body: unknown): PreferencesValidatio
   }
 
   const lodgingType = readSupportedValue<LodgingType>(values.lodgingType, "lodging type", lodgingTypeOptions, errors);
-  const groupLodgingPreference = readSupportedValue<GroupLodgingPreference>(
-    values.groupLodgingPreference,
-    "group lodging preference",
-    groupLodgingPreferenceOptions,
-    errors,
-  );
+  // Travelers who need no lodging are not asked the follow-up lodging questions.
+  const needsNoLodging = lodgingType === "No need";
+  const groupLodgingPreference = needsNoLodging
+    ? ("No preference" as GroupLodgingPreference)
+    : readSupportedValue<GroupLodgingPreference>(
+        values.groupLodgingPreference,
+        "group lodging preference",
+        groupLodgingPreferenceOptions,
+        errors,
+      );
   let lodgingAmenities: LodgingAmenity[] = [];
   if (values.lodgingAmenities !== undefined && values.lodgingAmenities !== null) {
     lodgingAmenities = readSupportedValues<LodgingAmenity>(
@@ -336,10 +353,10 @@ export function validateTravelerPreferences(body: unknown): PreferencesValidatio
   }
 
   let hotelStars: number | undefined;
-  if (values.hotelStars !== undefined && values.hotelStars !== null && values.hotelStars !== "") {
+  if (!needsNoLodging && values.hotelStars !== undefined && values.hotelStars !== null && values.hotelStars !== "") {
     const starValue = typeof values.hotelStars === "number" ? values.hotelStars : Number(values.hotelStars);
-    if (!Number.isInteger(starValue) || starValue < 1 || starValue > 5) {
-      errors.push("Hotel quality must be a whole number from 1 to 5.");
+    if (!Number.isInteger(starValue) || starValue < 1 || starValue > 4) {
+      errors.push("Lodging price level must be from $ to $$$$.");
     } else {
       hotelStars = starValue;
     }
@@ -352,6 +369,12 @@ export function validateTravelerPreferences(body: unknown): PreferencesValidatio
     errors,
   );
   const notes = readLengthLimitedText(values.notes, "Notes", maximumNotesLength, errors);
+  const activityDetails = readLengthLimitedText(
+    values.activityDetails,
+    "Activity details",
+    maximumActivityDetailsLength,
+    errors,
+  );
 
   if (errors.length > 0 || maximumBudget === undefined || preferredDurationDays === undefined || !lodgingType || !groupLodgingPreference) {
     return { valid: false, errors };
@@ -370,7 +393,8 @@ export function validateTravelerPreferences(body: unknown): PreferencesValidatio
       lodgingType,
       groupLodgingPreference,
       hotelStars,
-      lodgingAmenities,
+      lodgingAmenities: needsNoLodging ? [] : lodgingAmenities,
+      activityDetails,
       destinationPreferences,
       notes,
     },
@@ -411,6 +435,11 @@ export function validateTravelerAvailability(
 
     if (value < earliestPossibleDate || value > latestPossibleDate) {
       errors.push("Every available date must be inside the trip planning window.");
+      break;
+    }
+
+    if (value < getEarliestAllowedDate()) {
+      errors.push("Dates that have already passed cannot be chosen.");
       break;
     }
 

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Header } from "./components/header";
 
@@ -17,9 +18,9 @@ const groupNeeds = [
 ];
 
 const exampleTravelers = [
-  { name: "Ryan", icon: "🍜", interests: "Food · Museums", budget: "$1,200 USD" },
-  { name: "Tin", icon: "🛍️", interests: "Shopping · Nightlife", budget: "$1,500 USD" },
-  { name: "Jordan", icon: "🥾", interests: "Outdoors · Sightseeing", budget: "$1,000 USD" },
+  { name: "Ryan", icon: "🧑🏽", interests: "Food · Museums", budget: "$1,200 USD" },
+  { name: "Tin", icon: "👩🏻", interests: "Shopping · Nightlife", budget: "$1,500 USD" },
+  { name: "Jay", icon: "👨🏼", interests: "Outdoors · Sightseeing", budget: "$1,000 USD" },
 ];
 
 export default function Home() {
@@ -27,18 +28,19 @@ export default function Home() {
     <main className="min-h-screen overflow-hidden bg-[#f8f6f1] text-[#172733]">
       <Header />
 
-      <section className="relative border-b border-[#172733]/10">
-        <div className="decorative-grid absolute inset-0 opacity-40" />
+      <section className="relative isolate border-b border-[#172733]/10">
+        <Image alt="" className="-z-20 object-cover" fill priority sizes="100vw" src="/images/hero-mountains.jpg" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b2230]/85 via-[#0b2230]/55 to-[#0b2230]/20" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.05fr_0.95fr] lg:px-10 lg:py-28">
           <div className="max-w-3xl">
-            <p className="eyebrow">Built for the whole group</p>
-            <h1 className="mt-6 text-5xl font-semibold leading-[0.98] tracking-[-0.055em] text-[#102a38] sm:text-6xl lg:text-7xl">
+            <p className="eyebrow !text-[#f3c969]">Built for the whole group</p>
+            <h1 className="mt-6 text-5xl font-semibold leading-[0.98] tracking-[-0.055em] text-white sm:text-6xl lg:text-7xl">
               Less group chat.
-              <span className="block font-serif font-normal italic text-[#e4664f]">
+              <span className="block font-serif font-normal italic text-[#f3c969]">
                 More common ground.
               </span>
             </h1>
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-[#53636c] sm:text-xl">
+            <p className="mt-7 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
               Bring everyone’s schedules, budgets, and travel styles together.
               HackTX Trip Planner helps your group agree on one trip that
               actually works.
@@ -49,7 +51,7 @@ export default function Home() {
               </Link>
               <Link className="button-secondary" href="/join">Join a Trip</Link>
             </div>
-            <p className="mt-5 text-sm text-[#738087]">No accounts needed for the demo · Everyone gets a say</p>
+            <p className="mt-5 text-sm text-white/70">No accounts needed for the demo · Everyone gets a say</p>
           </div>
 
           <div className="relative mx-auto w-full max-w-xl lg:ml-auto">
@@ -109,7 +111,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center"><p className="eyebrow">Different travelers, one shared plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See the common ground clearly.</h2></div>
           <div className="mt-9 grid gap-4 md:grid-cols-3">
-            {exampleTravelers.map((traveler) => <article className="ticket-card p-5" key={traveler.name}><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#edf5f2] text-xl" aria-hidden="true">{traveler.icon}</span><div><h3 className="font-bold">{traveler.name}</h3><p className="text-sm text-[#66757d]">{traveler.interests}</p></div></div><p className="mt-4 border-t border-dashed border-[#173f50]/20 pt-3 text-sm font-bold text-[#173f50]">Budget: {traveler.budget}</p></article>)}
+            {exampleTravelers.map((traveler) => <article className="ticket-card p-5" key={traveler.name}><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span><div><h3 className="font-bold">{traveler.name}</h3><p className="text-sm text-[#66757d]">{traveler.interests}</p></div></div><p className="mt-4 border-t border-dashed border-[#173f50]/20 pt-3 text-sm font-bold text-[#173f50]">Budget: {traveler.budget}</p></article>)}
           </div>
           <div className="mt-6 flex flex-col items-center justify-center gap-2 text-center text-sm font-bold text-[#53666f] sm:flex-row sm:gap-4"><span>Different people</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span>Different schedules &amp; preferences</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span className="rounded-full bg-[#daf0ea] px-4 py-2 text-[#276655]">One trip everyone can enjoy</span></div>
         </div>

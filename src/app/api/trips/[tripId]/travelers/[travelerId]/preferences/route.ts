@@ -1,3 +1,4 @@
+import { verifyCity } from "@/lib/city-search";
 import { NextResponse } from "next/server";
 import { getTripById, updateTravelerPreferences } from "@/lib/trip-repository";
 import { validateTravelerPreferences } from "@/lib/trip-validation";
@@ -69,6 +70,13 @@ export async function PUT(
     );
   }
 
+  if ((await verifyCity(values.departureLocation.trim())) === "invalid") {
+    return NextResponse.json(
+      { error: "Pick a real city.", errors: ["Pick a real city for where you are traveling from."] },
+      { status: 400 },
+    );
+  }
+
   try {
     const result = await updateTravelerPreferences(
       tripId,
@@ -86,6 +94,7 @@ export async function PUT(
         name: result.traveler.name,
         isHost: result.traveler.isHost,
         preferencesComplete: result.traveler.preferencesComplete,
+        availabilityComplete: result.traveler.availabilityComplete === true,
         departureLocation: result.traveler.departureLocation,
         preferences: result.traveler.preferences,
       },

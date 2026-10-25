@@ -8,12 +8,14 @@ type GenerateCandidatesActionProps = {
   tripId: string;
   ready: boolean;
   candidatesAvailable: boolean;
+  itineraryReady: boolean;
 };
 
 export function GenerateCandidatesAction({
   tripId,
   ready,
   candidatesAvailable,
+  itineraryReady,
 }: GenerateCandidatesActionProps) {
   const router = useRouter();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -43,10 +45,23 @@ export function GenerateCandidatesAction({
     }
   }
 
+  if (itineraryReady) {
+    return (
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Link className="button-primary" href={`/trip/${tripId}/itinerary`}>
+          View Shared Itinerary
+        </Link>
+        <Link className="button-secondary" href={`/trip/${tripId}/options`}>
+          See Options and Votes
+        </Link>
+      </div>
+    );
+  }
+
   if (candidatesAvailable) {
     return (
       <Link className="button-primary" href={`/trip/${tripId}/options`}>
-        View Trip Options
+        View Options and Vote
       </Link>
     );
   }

@@ -1,3 +1,4 @@
+import { verifyCity } from "@/lib/city-search";
 import { NextResponse } from "next/server";
 import { addTravelerToTrip, getTripByInviteCode } from "@/lib/trip-repository";
 import type { JoinTripPreview, Trip } from "@/lib/trip-types";
@@ -52,6 +53,10 @@ export async function POST(request: Request) {
   const validationResult = validateJoinTripInput(requestBody);
   if (!validationResult.valid) {
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
+  }
+
+  if ((await verifyCity(validationResult.data.departureLocation)) === "invalid") {
+    return NextResponse.json({ error: "Pick a real city for where you are traveling from." }, { status: 400 });
   }
 
   try {

@@ -2,23 +2,23 @@ import Link from "next/link";
 import { Header } from "./header";
 
 type PageShellProps = {
-  eyebrow: string;
   title: string;
   description: string;
   children: React.ReactNode;
 };
 
-export function PageShell({ eyebrow, title, description, children }: PageShellProps) {
+export function PageShell({ title, description, children }: PageShellProps) {
   return (
     <main className="min-h-screen bg-[#f8f6f1] text-[#172733]">
       <Header />
-      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[0.72fr_1.28fr] lg:px-10 lg:py-20">
-        <section className="lg:pt-8">
-          <Link className="text-sm font-semibold text-[#607179] hover:text-[#e4664f]" href="/">
-            ← Back home
-          </Link>
-          <p className="eyebrow mt-10">{eyebrow}</p>
-          <h1 className="mt-4 max-w-lg text-4xl font-semibold leading-tight tracking-[-0.045em] text-[#102a38] sm:text-5xl">
+      <div className="mx-auto max-w-7xl px-5 pt-4 sm:px-8 lg:px-10">
+        <Link className="inline-flex items-center gap-1 text-sm font-semibold text-[#607179] hover:text-[#e4664f]" href="/">
+          ← Back home
+        </Link>
+      </div>
+      <div className="mx-auto grid max-w-7xl gap-10 px-5 py-8 sm:px-8 sm:py-10 lg:grid-cols-[0.72fr_1.28fr] lg:px-10 lg:py-12">
+        <section className="lg:pt-4">
+          <h1 className="max-w-lg text-5xl font-extrabold leading-[1.02] tracking-[-0.045em] text-[#e4664f] sm:text-6xl lg:text-[4rem]">
             {title}
           </h1>
           <p className="mt-5 max-w-md text-lg leading-8 text-[#66757d]">{description}</p>

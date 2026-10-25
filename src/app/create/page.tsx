@@ -9,8 +9,7 @@ export const metadata: Metadata = {
 export default function CreateTripPage() {
   return (
     <PageShell
-      eyebrow="Host a new trip"
-      title="Give your group a place to start."
+      title="Give Your Group A Place To Start."
       description="Share the broad idea now. Everyone can add their own constraints and preferences after they join."
     >
       <CreateTripForm />

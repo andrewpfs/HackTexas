@@ -1,5 +1,18 @@
 import type { Trip, UpdateTripInput } from "./trip-types";
 
+// Candidates, votes, and the shared itinerary all depend on planning inputs, so
+// they are cleared together whenever trip details or traveler answers change.
+export function clearPlanningOutputs(trip: Trip) {
+  trip.candidateOptions = undefined;
+  trip.candidatesGeneratedAt = undefined;
+  trip.candidatesSource = undefined;
+  trip.optionPhotosStatus = undefined;
+  trip.optionPhotosStartedAt = undefined;
+  trip.votes = undefined;
+  trip.itinerary = undefined;
+  trip.chat = undefined;
+}
+
 export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   let affectedTravelerCount = 0;
 
@@ -27,8 +40,7 @@ export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   trip.latestPossibleDate = input.latestPossibleDate;
   trip.preferredDurationDays = input.preferredDurationDays;
   trip.expectedTravelerCount = input.expectedTravelerCount;
-  trip.candidateOptions = undefined;
-  trip.candidatesGeneratedAt = undefined;
+  clearPlanningOutputs(trip);
 
   return affectedTravelerCount;
 }

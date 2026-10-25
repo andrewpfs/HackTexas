@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CityInput } from "../components/city-input";
 import type { JoinTripPreview } from "@/lib/trip-types";
 import { maximumTravelerNameLength } from "@/lib/trip-validation";
 import { rememberTravelerId } from "@/lib/traveler-identity";
@@ -28,6 +29,7 @@ function formatDate(dateString: string) {
 export function JoinTripForm(props: JoinTripFormProps) {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState(props.initialCode);
+  const [departureCity, setDepartureCity] = useState("");
   const [preview, setPreview] = useState<JoinTripPreview | null>(props.initialPreview);
   const [errorMessage, setErrorMessage] = useState(props.initialError);
   const [isFinding, setIsFinding] = useState(false);
@@ -116,7 +118,7 @@ export function JoinTripForm(props: JoinTripFormProps) {
       <div>
         <label className="form-label" htmlFor="inviteCode">Invite code</label>
         <div className="flex flex-col gap-3 sm:flex-row">
-          <input className="form-control font-mono uppercase tracking-[0.12em]" id="inviteCode" maxLength={20} name="inviteCode" onChange={(event) => handleCodeChange(event.target.value)} placeholder="ABC123" type="text" value={inviteCode} />
+          <input className="form-control font-mono uppercase tracking-[0.12em]" id="inviteCode" maxLength={20} name="inviteCode" onChange={(event) => handleCodeChange(event.target.value)} placeholder="example: ABC123" type="text" value={inviteCode} />
           <button className="button-secondary shrink-0" disabled={isFinding || isSubmitting} onClick={findTrip} type="button">
             {isFinding ? "Checking..." : "Find trip"}
           </button>
@@ -142,11 +144,11 @@ export function JoinTripForm(props: JoinTripFormProps) {
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div>
             <label className="form-label" htmlFor="travelerName">Your name</label>
-            <input className="form-control" disabled={isSubmitting} id="travelerName" maxLength={maximumTravelerNameLength} name="travelerName" placeholder="How the group knows you" required type="text" />
+            <input className="form-control" disabled={isSubmitting} id="travelerName" maxLength={maximumTravelerNameLength} name="travelerName" placeholder="example: How the group knows you" required type="text" />
           </div>
           <div>
             <label className="form-label" htmlFor="departureLocation">Where are you traveling from?</label>
-            <input className="form-control" disabled={isSubmitting} id="departureLocation" name="departureLocation" placeholder="Houston, Texas" required type="text" />
+            <CityInput id="departureLocation" name="departureLocation" onChange={setDepartureCity} placeholder="example: Houston, Texas" required value={departureCity} />
           </div>
         </div>
       ) : null}

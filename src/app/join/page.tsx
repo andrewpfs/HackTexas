@@ -39,8 +39,7 @@ export default async function JoinTripPage(props: PageProps<"/join">) {
 
   return (
     <PageShell
-      eyebrow="You've been invited"
-      title="Join the plan. Bring your preferences."
+      title="Join The Plan. Bring Your Preferences."
       description="Enter the invite your host shared, then add your name to the group."
     >
       <div className="mb-8 flex items-center gap-4 rounded-2xl bg-[#edf5f2] p-4">

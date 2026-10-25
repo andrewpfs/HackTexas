@@ -56,7 +56,8 @@ export type PlanningTraveler = {
   activityInterests: ActivityInterest[];
   lodgingType: LodgingType;
   groupLodgingPreference: GroupLodgingPreference;
-  hotelStarPreference: number | null;
+  lodgingPriceLevel: number | null;
+  activityDetails: string;
   lodgingAmenities: LodgingAmenity[];
   destinationPreferences: string;
   notes: string;
@@ -318,7 +319,8 @@ function normalizeTraveler(
     ),
     lodgingType: preferences.lodgingType,
     groupLodgingPreference: preferences.groupLodgingPreference,
-    hotelStarPreference: preferences.hotelStars || null,
+    lodgingPriceLevel: preferences.hotelStars ? Math.min(4, preferences.hotelStars) : null,
+    activityDetails: preferences.activityDetails || "",
     lodgingAmenities: [...preferences.lodgingAmenities].sort(),
     destinationPreferences: preferences.destinationPreferences || "",
     notes: preferences.notes || "",

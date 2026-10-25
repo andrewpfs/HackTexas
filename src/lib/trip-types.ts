@@ -18,6 +18,7 @@ export const lodgingTypeOptions = [
   "Hostel",
   "Resort",
   "No preference",
+  "No need",
 ] as const;
 
 export const groupLodgingPreferenceOptions = [
@@ -50,7 +51,9 @@ export type TravelerPreferences = {
   activityInterests: ActivityInterest[];
   lodgingType: LodgingType;
   groupLodgingPreference: GroupLodgingPreference;
+  // Lodging price level from 1 ($) to 4 ($$$$). Kept under the old field name for stored trips.
   hotelStars?: number;
+  activityDetails?: string;
   lodgingAmenities: LodgingAmenity[];
   destinationPreferences?: string;
   notes?: string;
@@ -71,6 +74,9 @@ export type CandidateActivity = {
   timeOfDay: "Morning" | "Afternoon" | "Evening";
   title: string;
   description: string;
+  // The specific landmark or venue for this stop, as titled on Wikipedia; used to find a photo.
+  placeName?: string;
+  imageUrl?: string;
 };
 
 export type CandidateDay = {
@@ -93,6 +99,99 @@ export type CandidateTripOption = {
   considerations: string[];
   days: CandidateDay[];
   generatedAt: string;
+  // The option's best-known attraction and a photo of it, used as the card backdrop.
+  heroPlace?: string;
+  imageUrl?: string;
+};
+
+export type PlannerSource = "muse" | "mock" | "mock-fallback";
+
+export type CandidateVote = {
+  travelerId: string;
+  candidateId: string;
+  feedback?: string;
+  votedAt: string;
+};
+
+export const itineraryActivityTypes = [
+  ...activityInterestOptions,
+  "Travel",
+  "Free time",
+] as const;
+
+export type ItineraryActivityType = (typeof itineraryActivityTypes)[number];
+
+export type PlaceReview = {
+  author: string;
+  rating: number | null;
+  snippet: string;
+  date: string;
+};
+
+// A real place found through SerpApi (Google Maps) for one itinerary activity.
+export type PlaceSuggestion = {
+  name: string;
+  rating: number | null;
+  reviewCount: number | null;
+  price: string | null;
+  category: string | null;
+  address: string | null;
+  thumbnail: string | null;
+  latitude?: number;
+  longitude?: number;
+  mapsUrl: string;
+  reviews: PlaceReview[];
+};
+
+export type ItineraryActivity = {
+  time: string;
+  title: string;
+  type: ItineraryActivityType;
+  location: string;
+  description: string;
+  placeSearchQuery?: string;
+  place?: PlaceSuggestion;
+};
+
+export type ItineraryDay = {
+  dayNumber: number;
+  date: string;
+  title: string;
+  activities: ItineraryActivity[];
+};
+
+export type GroupItinerary = {
+  id: string;
+  basedOnCandidateId: string;
+  title: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  summary: string;
+  compromiseExplanation: string;
+  compromises: string[];
+  days: ItineraryDay[];
+  source: PlannerSource;
+  generatedAt: string;
+  // "pending" while a lookup is running, so two viewers don't both spend credits.
+  placesStatus?: "pending" | "added";
+  placesStartedAt?: string;
+  // Bumped each time chat feedback changes the plan.
+  revision?: number;
+  updatedAt?: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "traveler" | "muse";
+  travelerId?: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+  // What Muse changed in the plan, for Muse messages that edited it.
+  changes?: string[];
+  // The stop the traveler was looking at when they wrote the message.
+  focus?: { dayNumber: number; title: string };
 };
 
 export type Trip = {
@@ -112,6 +211,13 @@ export type Trip = {
   travelers: Traveler[];
   candidateOptions?: CandidateTripOption[];
   candidatesGeneratedAt?: string;
+  candidatesSource?: PlannerSource;
+  // "pending" while stop photos are being looked up, so two viewers do not both spend credits.
+  optionPhotosStatus?: "pending" | "added";
+  optionPhotosStartedAt?: string;
+  votes?: CandidateVote[];
+  itinerary?: GroupItinerary;
+  chat?: ChatMessage[];
 };
 
 export type CreateTripInput = {

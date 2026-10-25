@@ -32,9 +32,9 @@ export default async function PreferencesPage(
         </Link>
 
         <div className="mt-7">
-          <p className="eyebrow">My preferences</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">
-            Tell the group what works for you.
+          
+          <h1 className="mt-1 max-w-3xl font-extrabold leading-[1.02] tracking-[-0.045em] text-[#e4664f] text-5xl sm:text-6xl">
+            Tell The Group What Works For You.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[#66757d]">
             Your answers will help the group compare options later. Availability is saved separately and can be completed in either order.

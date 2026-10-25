@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { verifyCity } from "@/lib/city-search";
 import { inviteCodeExists, saveTrip } from "@/lib/trip-repository";
 import type { Trip } from "@/lib/trip-types";
 import { validateCreateTripInput } from "@/lib/trip-validation";
@@ -45,6 +46,10 @@ export async function POST(request: Request) {
       { error: validationResult.errors[0], errors: validationResult.errors },
       { status: 400 },
     );
+  }
+
+  if ((await verifyCity(validationResult.data.origin)) === "invalid") {
+    return NextResponse.json({ error: "Pick a real city for where you are traveling from." }, { status: 400 });
   }
 
   try {

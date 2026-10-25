@@ -127,8 +127,11 @@ select:focus-visible {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
-.form-control::placeholder {
+.form-control::placeholder,
+.money-control input::placeholder,
+.unit-control input::placeholder {
   color: #98a1a4;
+  font-style: italic;
 }
 
 .form-control:focus {
@@ -194,7 +197,34 @@ select:focus-visible {
   outline: none;
 }
 
-.money-control:focus-within {
+.unit-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d5d9d7;
+  border-radius: 0.875rem;
+  background: white;
+  color: #53666f;
+}
+
+.unit-control span {
+  padding: 0 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.unit-control input {
+  min-width: 0;
+  border: 0;
+  border-inline-end: 1px solid #e3e5e2;
+  padding: 0.85rem 0.9rem;
+  color: #172733;
+  outline: none;
+}
+
+.money-control:focus-within,
+.unit-control:focus-within {
   border-color: #e4664f;
   box-shadow: 0 0 0 4px rgba(228, 102, 79, 0.1);
 }

@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { rememberTravelerId } from "@/lib/traveler-identity";
+import { CityInput } from "../components/city-input";
+import { DateRangePicker } from "../components/date-range-picker";
 
 type CreateTripResponse = {
   error?: string;
@@ -13,6 +15,7 @@ export function CreateTripForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [origin, setOrigin] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,51 +65,41 @@ export function CreateTripForm() {
     <form onSubmit={handleSubmit}>
       <div>
         <label className="form-label" htmlFor="host-name">Your name</label>
-        <input className="form-control" id="host-name" name="hostName" placeholder="Jay" required type="text" />
+        <input className="form-control" id="host-name" name="hostName" placeholder="example: Jay" required type="text" />
       </div>
       <div className="mt-7">
         <label className="form-label" htmlFor="trip-name">Trip name <span className="font-normal text-[#879196]">(optional)</span></label>
-        <input className="form-control" id="trip-name" name="name" placeholder="Tin&apos;tastic Tokyo Trip" type="text" />
+        <input className="form-control" id="trip-name" name="name" placeholder="example: Tin&apos;tastic Tokyo Trip" type="text" />
         <p className="mt-2 text-sm text-[#7a878d]">Leave blank and we will use the destination or “Group Trip.”</p>
       </div>
       <div className="mt-7">
         <label className="form-label" htmlFor="trip-idea">Trip idea</label>
-        <textarea className="form-control min-h-32 resize-y" id="trip-idea" name="prompt" placeholder="Four friends from Austin want to travel somewhere during winter break for about five days." required />
+        <textarea className="form-control min-h-32 resize-y" id="trip-idea" name="prompt" placeholder="example: Four friends from Austin want to travel somewhere during winter break for about five days." required />
         <p className="mt-2 text-sm text-[#7a878d]">A sentence or two is plenty.</p>
       </div>
       <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <div>
           <label className="form-label" htmlFor="origin">Where are you traveling from?</label>
-          <input className="form-control" id="origin" name="origin" placeholder="Austin, Texas" required type="text" />
+          <CityInput id="origin" name="origin" onChange={setOrigin} placeholder="example: Austin, Texas" required value={origin} />
         </div>
         <div>
           <label className="form-label" htmlFor="destination">Destination <span className="font-normal text-[#879196]">(optional)</span></label>
-          <input className="form-control" id="destination" name="destination" placeholder="Tokyo, Japan" type="text" />
+          <input className="form-control" id="destination" name="destination" placeholder="example: Tokyo, Japan" type="text" />
         </div>
       </div>
       <fieldset className="ticket-card mt-7 p-5 sm:p-6">
-        <legend className="px-2 text-sm font-bold uppercase tracking-[0.14em] text-[#173f50]">📅 Trip Window</legend>
-        <p className="mt-1 text-sm text-[#66757d]">Choose the earliest and latest dates the group could consider.</p>
-        <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
-          <div>
-            <label className="form-label" htmlFor="earliest-date">Earliest date</label>
-            <input className="form-control" id="earliest-date" name="earliestPossibleDate" required type="date" />
-          </div>
-          <span className="hidden pb-3 text-xl text-[#e4664f] sm:block" aria-hidden="true">→</span>
-          <div>
-            <label className="form-label" htmlFor="latest-date">Latest date</label>
-            <input className="form-control" id="latest-date" name="latestPossibleDate" required type="date" />
-          </div>
-        </div>
+        <legend className="px-2 text-sm font-bold uppercase tracking-[0.14em] text-[#173f50]">Trip Window</legend>
+        <p className="mt-1 mb-4 text-sm text-[#66757d]">Pick the earliest and latest days the group could travel.</p>
+        <DateRangePicker endName="latestPossibleDate" startName="earliestPossibleDate" />
       </fieldset>
       <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <div>
-          <label className="form-label" htmlFor="duration">Preferred duration <span className="font-normal text-[#879196]">(optional)</span></label>
-          <input className="form-control" id="duration" max="365" min="1" name="preferredDurationDays" placeholder="5" type="number" />
+          <label className="form-label" htmlFor="duration">Preferred duration, in days <span className="font-normal text-[#879196]">(optional)</span></label>
+          <div className="unit-control"><input id="duration" max="365" min="1" name="preferredDurationDays" placeholder="example: 4" type="number" /><span>days</span></div>
         </div>
         <div>
-          <label className="form-label" htmlFor="travelers">Expected travelers <span className="font-normal text-[#879196]">(optional)</span></label>
-          <input className="form-control" id="travelers" max="100" min="1" name="expectedTravelerCount" placeholder="4" type="number" />
+          <label className="form-label" htmlFor="travelers">Expected number of travelers <span className="font-normal text-[#879196]">(optional)</span></label>
+          <div className="unit-control"><input id="travelers" max="100" min="1" name="expectedTravelerCount" placeholder="example: 4" type="number" /><span>people</span></div>
         </div>
       </div>
       <div className="mt-9 border-t border-[#172733]/10 pt-7">
@@ -115,7 +108,7 @@ export function CreateTripForm() {
           {isSubmitting ? "Creating trip..." : "Create Trip"}
           {!isSubmitting && <span aria-hidden="true">→</span>}
         </button>
-        <p className="mt-3 text-xs text-[#889398]">Your trip will be saved locally and you will receive a shareable invite code.</p>
+        <p className="mt-3 text-xs text-[#889398]">You will get a shareable invite code as soon as the trip is created.</p>
       </div>
     </form>
   );

@@ -8,6 +8,7 @@ import {
   getCalendarMonths,
   getDatesInRange,
 } from "@/lib/date-utils";
+import { useToday } from "@/lib/use-today";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
 type AvailabilityCalendarProps = {
@@ -49,8 +50,10 @@ export function AvailabilityCalendar({
   const [storedTravelerMissing, setStoredTravelerMissing] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
+  const today = useToday();
   const months = getCalendarMonths(earliestPossibleDate, latestPossibleDate);
-  const allSelectableDates = getDatesInRange(earliestPossibleDate, latestPossibleDate);
+  // Days that have already passed cannot be chosen.
+  const allSelectableDates = getDatesInRange(earliestPossibleDate, latestPossibleDate).filter((date) => !today || date >= today);
 
   useEffect(() => {
     if (!travelerId) {
@@ -208,7 +211,7 @@ export function AvailabilityCalendar({
                 <div aria-hidden="true" key={`blank-${index}`} />
               ))}
               {month.dates.map((date) => {
-                const selectable = date >= earliestPossibleDate && date <= latestPossibleDate;
+                const selectable = date >= earliestPossibleDate && date <= latestPossibleDate && (!today || date >= today);
                 const selected = selectedDates.includes(date);
                 const dayNumber = Number(date.slice(8, 10));
 
