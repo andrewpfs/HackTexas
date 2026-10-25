@@ -13,7 +13,7 @@ const groupNeeds = [
 const exampleTravelers = [
   { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "5 days", request: "I really want one free afternoon.", hotel: "" },
   { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife", "Sightseeing"], budget: "$1,500", available: "6 days", request: "I want to stay near public transit.", hotel: "4★ hotel" },
-  { name: "Jordan", icon: "👨🏼", interests: ["Outdoors"], budget: "$900", available: "3 days", request: "No super early mornings.", hotel: "" },
+  { name: "Jay", icon: "👨🏼", interests: ["Outdoors"], budget: "$900", available: "3 days", request: "No super early mornings.", hotel: "" },
 ];
 
 const interestColors: Record<string, string> = {
@@ -34,9 +34,9 @@ export default function Home() {
           <div className="max-w-3xl">
             <p className="eyebrow !text-[#f3c969]">Built For The Whole Group</p>
             <h1 className="mt-6 text-5xl font-semibold leading-[0.98] tracking-[-0.055em] text-white sm:text-6xl lg:text-7xl">
-              Less Group Chat.
+              Less Fuss.
               <span className="block font-serif font-normal italic text-[#f3c969]">
-                More Common Ground.
+                More Group Traveling.
               </span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
@@ -59,11 +59,11 @@ export default function Home() {
               <div className="flex items-start justify-between border-b border-[#172733]/10 pb-5">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#e4664f]">Group trip preview</p>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight">Japan Winter Trip</h2>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight">2027 Japan Snowventure</h2>
                   <p className="mt-1 text-sm text-[#66757d]">Four departure cities · Meeting in Tokyo</p>
                 </div>
                 <div className="flex -space-x-2" aria-label="Four travelers">
-                  {["J", "H", "A", "M"].map((initial, index) => (
+                  {["J", "H", "A", "R"].map((initial, index) => (
                     <span
                       className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#173f50] text-xs font-bold text-white"
                       key={initial}
@@ -108,7 +108,7 @@ export default function Home() {
 
       <div className="px-5 sm:px-8"><ReturningTraveler /></div>
 
-      <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
+      <section className="px-5 pb-16 pt-10 sm:px-8 sm:pb-20 sm:pt-12 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <div className="text-center"><p className="eyebrow">Different Travelers, One Shared Plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See The Common Ground Clearly.</h2></div>
           <div className="mx-auto mt-9 grid max-w-6xl gap-4 lg:grid-cols-3">
@@ -160,7 +160,6 @@ export default function Home() {
           <details className="py-5"><summary className="cursor-pointer font-bold">Does everyone need an account?</summary><p className="mt-3 leading-7 text-[#66757d]">No. For the current hackathon experience, travelers join from a shared link and this browser remembers their traveler identity.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">How does the group choose a trip?</summary><p className="mt-3 leading-7 text-[#66757d]">Travelers share preferences and availability, compare generated options, decide together, and create one shared itinerary.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">Does it book trips automatically?</summary><p className="mt-3 leading-7 text-[#66757d]">No. This demo does not make payments, reservations, or real bookings.</p></details>
-          <details className="py-5"><summary className="cursor-pointer font-bold">Can I connect my calendar?</summary><p className="mt-3 leading-7 text-[#66757d]">Manual availability is supported now. Calendar connection is a future stretch capability.</p></details>
         </div></div>
       </section>
 

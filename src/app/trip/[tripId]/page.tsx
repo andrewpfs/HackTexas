@@ -124,7 +124,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             <span>✦ Boarding pass · Group trip</span>
             <span className="rounded-full bg-[#f3c969] px-3 py-1 tracking-[0.12em] text-[#173f50]">{statusLabels[currentStep]}</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_15rem]">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_19rem]">
             <div className="space-y-6 p-6 sm:p-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Trip</p>
@@ -154,8 +154,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               </dl>
             </div>
             <div className="relative flex flex-col justify-center border-t-2 border-dashed border-[#173f50]/25 bg-[#fffaf1] p-6 md:border-l-2 md:border-t-0">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Invite Code</p>
-              <p className="mt-2 text-xs leading-5 text-[#718087]">Share this code so friends can board.</p>
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#53666f]">Invite Code</p>
               <CopyInviteLink className="button-secondary mt-2 !min-h-10 !px-4 !text-sm" joinPath={joinPath} showCode />
             </div>
           </div>
