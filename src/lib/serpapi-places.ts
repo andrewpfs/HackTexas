@@ -186,25 +186,25 @@ export async function addPlacesToItinerary(
 
 type PhotoStops = {
   destination: string;
-  days: { activities: { title: string; placeName?: string; imageUrl?: string }[] }[];
+  heroPlace?: string;
+  imageUrl?: string;
+  days: { imageUrl?: string; activities: { title: string; placeName?: string; imageUrl?: string }[] }[];
 };
 
-// Gives a Google Maps photo to every stop that still has none. One search per
-// distinct place; a stop whose search fails is left without a photo.
+// Fill missing candidate and day headers only, caching repeated queries.
 export async function addSerpPhotosToCandidates<T extends PhotoStops>(
   candidates: T[],
   config: SerpApiConfig,
   parallel = 4,
 ): Promise<{ candidates: T[]; searched: number }> {
-  const jobs: { query: string; activity: PhotoStops["days"][number]["activities"][number]; candidate: T }[] = [];
+  const jobs: { query: string; target: { imageUrl?: string } }[] = [];
   for (const candidate of candidates) {
+    if (!candidate.imageUrl) jobs.push({ query: candidate.heroPlace || candidate.destination, target: candidate });
     for (const day of candidate.days) {
-      for (const activity of day.activities) {
-        const name = (activity.placeName || activity.title).trim();
-        if (!activity.imageUrl && name !== "") {
-          jobs.push({ query: `${name} ${candidate.destination}`, activity, candidate });
-        }
-      }
+      if (day.imageUrl) continue;
+      const representative = day.activities.find((activity) => activity.placeName) ?? day.activities[0];
+      const name = representative?.placeName || representative?.title || candidate.destination;
+      jobs.push({ query: name + " " + candidate.destination, target: day });
     }
   }
 
@@ -220,7 +220,7 @@ export async function addSerpPhotosToCandidates<T extends PhotoStops>(
       }
       const photo = await cache.get(key)!;
       if (photo) {
-        job.activity.imageUrl = photo;
+        job.target.imageUrl = photo;
       }
     }
   }

@@ -19,6 +19,18 @@ export interface TripStore {
 const dataDirectory = path.join(process.cwd(), "data");
 const dataFilePath = path.join(dataDirectory, "trips.json");
 
+// Keep local JSON writes in order. Two simultaneous votes must not overwrite
+// one another when the demo runs without Supabase.
+let pendingWrite = Promise.resolve();
+async function withWriteLock<Result>(operation: () => Promise<Result>) {
+  const previous = pendingWrite;
+  let release = () => {};
+  pendingWrite = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  try { return await operation(); }
+  finally { release(); }
+}
+
 async function readTrips(): Promise<Trip[]> {
   try {
     const parsedData: unknown = JSON.parse(await readFile(dataFilePath, "utf8"));
@@ -51,9 +63,11 @@ export const jsonTripStore: TripStore = {
   },
 
   async insert(trip) {
-    const trips = await readTrips();
-    trips.push(trip);
-    await writeTrips(trips);
+    await withWriteLock(async () => {
+      const trips = await readTrips();
+      trips.push(trip);
+      await writeTrips(trips);
+    });
   },
 
   async findByTraveler(match) {
@@ -67,16 +81,18 @@ export const jsonTripStore: TripStore = {
   },
 
   async update(tripId, mutate) {
-    const trips = await readTrips();
-    const trip = trips.find((item) => item.id === tripId);
-    if (!trip) {
-      return null;
-    }
+    return withWriteLock(async () => {
+      const trips = await readTrips();
+      const trip = trips.find((item) => item.id === tripId);
+      if (!trip) {
+        return null;
+      }
 
-    const { save, result } = mutate(trip);
-    if (save) {
-      await writeTrips(trips);
-    }
-    return result;
+      const { save, result } = mutate(trip);
+      if (save) {
+        await writeTrips(trips);
+      }
+      return result;
+    });
   },
 };

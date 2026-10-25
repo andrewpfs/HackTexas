@@ -64,5 +64,13 @@ export function validateItineraryDraft(
     }
   }
 
+  if (draft.days.length !== tripDates.length) errors.push("The itinerary needs exactly one entry for every trip date.");
+  for (let index = 0; index < tripDates.length; index += 1) {
+    if (draft.days[index]?.date !== tripDates[index] || draft.days[index]?.dayNumber !== index + 1) {
+      errors.push("Itinerary days must follow the calendar in order.");
+      break;
+    }
+  }
+
   return { valid: errors.length === 0, errors };
 }

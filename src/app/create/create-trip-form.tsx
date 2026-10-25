@@ -15,6 +15,7 @@ export function CreateTripForm() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [destination, setDestination] = useState("");
   const [origin, setOrigin] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -64,7 +65,7 @@ export function CreateTripForm() {
   return (
     <form onSubmit={handleSubmit}>
       <div>
-        <label className="form-label" htmlFor="host-name">Your name</label>
+        <label className="form-label" htmlFor="host-name">Your Name</label>
         <input className="form-control" id="host-name" name="hostName" placeholder="example: Jay" required type="text" />
       </div>
       <div className="mt-7">
@@ -73,18 +74,18 @@ export function CreateTripForm() {
         <p className="mt-2 text-sm text-[#7a878d]">Leave blank and we will use the destination or “Group Trip.”</p>
       </div>
       <div className="mt-7">
-        <label className="form-label" htmlFor="trip-idea">Trip idea</label>
+        <label className="form-label" htmlFor="trip-idea">Trip Idea</label>
         <textarea className="form-control min-h-32 resize-y" id="trip-idea" name="prompt" placeholder="example: Four friends from Austin want to travel somewhere during winter break for about five days." required />
         <p className="mt-2 text-sm text-[#7a878d]">A sentence or two is plenty.</p>
       </div>
       <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <div>
-          <label className="form-label" htmlFor="origin">Where are you traveling from?</label>
+          <label className="form-label" htmlFor="origin">Where Are You Traveling From?</label>
           <CityInput id="origin" name="origin" onChange={setOrigin} placeholder="example: Austin, Texas" required value={origin} />
         </div>
         <div>
           <label className="form-label" htmlFor="destination">Destination <span className="font-normal text-[#879196]">(optional)</span></label>
-          <input className="form-control" id="destination" name="destination" placeholder="example: Tokyo, Japan" type="text" />
+          <CityInput id="destination" name="destination" onChange={setDestination} placeholder="example: Tokyo, Japan" value={destination} />
         </div>
       </div>
       <fieldset className="ticket-card mt-7 p-5 sm:p-6">

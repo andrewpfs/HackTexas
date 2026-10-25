@@ -26,7 +26,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
     return NextResponse.json({ error: result.error }, { status: 409 });
   }
 
-  const saved = await saveBooking(tripId, result.booking);
+  const saved = await saveBooking(tripId, result.booking, { id: trip.itinerary.id, revision: trip.itinerary.revision ?? 0 });
   if (saved.status !== "saved") {
     return NextResponse.json({ error: "We couldn't find you on this trip." }, { status: 404 });
   }

@@ -95,49 +95,22 @@ export async function addImagesToCandidates<T extends { destination: string; her
   );
 }
 
-type StopsOfCandidate = { destination: string; days: { activities: { title: string; placeName?: string; imageUrl?: string }[] }[] };
+type DaysOfCandidate = { destination: string; days: { imageUrl?: string; activities: { title: string; placeName?: string; imageUrl?: string }[] }[] };
 
-// Adds a photo to each stop in each option, a few lookups at a time. Duplicate
-// photos within an option are dropped. Failures are ignored.
-export async function addImagesToActivities<T extends StopsOfCandidate>(
-  candidates: T[],
-  fetchImpl: typeof fetch = fetch,
-  parallel = 4,
-): Promise<T[]> {
-  const jobs: { destination: string; activity: { title: string; placeName?: string; imageUrl?: string }; candidate: T }[] = [];
+// One representative photo per day, never a lookup for each individual stop.
+export async function addImagesToCandidateDays<T extends DaysOfCandidate>(candidates: T[], fetchImpl: typeof fetch = fetch): Promise<T[]> {
   for (const candidate of candidates) {
     for (const day of candidate.days) {
-      for (const activity of day.activities) {
-        jobs.push({ destination: candidate.destination, activity, candidate });
+      if (day.imageUrl) continue;
+      const saved = day.activities.find((activity) => activity.imageUrl);
+      if (saved?.imageUrl) {
+        day.imageUrl = saved.imageUrl;
+        continue;
       }
+      const representative = day.activities.find((activity) => activity.placeName) ?? day.activities[0];
+      const query = representative?.placeName || representative?.title || candidate.destination;
+      day.imageUrl = (await findPlaceImage(query + " " + candidate.destination, fetchImpl)) ?? undefined;
     }
   }
-
-  let next = 0;
-  async function worker() {
-    while (next < jobs.length) {
-      const job = jobs[next];
-      next += 1;
-      const image = await findActivityImage(job.activity.title, job.destination, fetchImpl, job.activity.placeName);
-      if (image) {
-        job.activity.imageUrl = image;
-      }
-    }
-  }
-  await Promise.all(Array.from({ length: parallel }, worker));
-
-  for (const candidate of candidates) {
-    const seen = new Set<string>();
-    for (const day of candidate.days) {
-      for (const activity of day.activities) {
-        if (activity.imageUrl && seen.has(activity.imageUrl)) {
-          activity.imageUrl = undefined;
-        } else if (activity.imageUrl) {
-          seen.add(activity.imageUrl);
-        }
-      }
-    }
-  }
-
   return candidates;
 }

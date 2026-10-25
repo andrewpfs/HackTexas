@@ -81,25 +81,10 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
 
   const votingSummary = getVotingSummary(trip);
   const itineraryReady = Boolean(trip.itinerary);
-  // 0 Get Ready, 1 Compare Options, 2 Decide Together, 3 Shared Itinerary
   const bookedCount = Object.keys(trip.travel?.bookings ?? {}).length;
-  const currentStep = itineraryReady && bookedCount > 0
-    ? 4
-    : itineraryReady
-    ? 3
-    : candidatesAvailable && votingSummary.votedCount > 0
-      ? 2
-      : candidatesAvailable
-        ? 1
-        : 0;
-  const stepHeadings = [
-    "First, hear from everyone.",
-    "Compare the three options.",
-    `Vote together: ${votingSummary.votedCount} of ${votingSummary.travelerCount} have voted.`,
-    "Your shared itinerary is ready. Next, book flights and the hotel.",
-    `Booking: ${bookedCount} of ${trip.travelers.length} travelers have booked (demo).`,
-  ];
-  const statusLabels = ["Collecting preferences", "Comparing options", "Voting", "Itinerary ready", "Booking"];
+  const currentStep = itineraryReady ? (bookedCount > 0 ? 3 : 2) : candidatesAvailable ? 1 : 0;
+  const stepHeadings = ["Get Ready", "Itinerary Options & Vote", "Shared Itinerary Ready", "Book Travel"];
+  const statusLabels = ["Collecting Preferences", "Itinerary Options & Vote", "Itinerary Ready", "Booking"];
 
   const completedAvailabilityLabel =
     completedAvailabilityCount === trip.travelers.length
@@ -185,51 +170,26 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6" aria-labelledby="planning-progress">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div><p className="eyebrow">Planning Progress</p><h2 className="mt-1 text-xl font-bold" id="planning-progress">{stepHeadings[currentStep]}</h2></div>
-                <p className="text-sm text-[#738087]">Step {currentStep + 1} of 5</p>
+                <p className="text-sm text-[#738087]">Step {currentStep + 1} of 4</p>
               </div>
               <div className="mt-5"><ProgressNav currentStep={currentStep} itineraryReady={itineraryReady} optionsReady={candidatesAvailable} tripId={trip.id} /></div>
             </section>
 
-            {!candidatesAvailable && !itineraryReady ? (
-              <TripSketchCard hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} />
-            ) : null}
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6" aria-labelledby="availability">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div><p className="eyebrow">Possible Dates</p><h2 className="mt-1 text-xl font-bold" id="availability">Availability Overlap</h2></div>
                 <p className="text-sm text-[#738087]">{completedAvailabilityLabel}</p>
               </div>
-              <div className="mt-5">
-                <AvailabilityHeatmap
-                  earliestPossibleDate={trip.earliestPossibleDate}
-                  latestPossibleDate={trip.latestPossibleDate}
-                  travelers={trip.travelers.map((traveler) => ({
-                    name: traveler.name,
-                    availabilityComplete: traveler.availabilityComplete === true,
-                    availableDates: traveler.availableDates || [],
-                  }))}
-                />
-              </div>
+              <div className="mt-5"><AvailabilityHeatmap earliestPossibleDate={trip.earliestPossibleDate} latestPossibleDate={trip.latestPossibleDate} travelers={trip.travelers.map((traveler) => ({ name: traveler.name, availabilityComplete: traveler.availabilityComplete === true, availableDates: traveler.availableDates || [] }))} /></div>
               <div className="mt-5 flex flex-wrap items-baseline justify-between gap-2 rounded-2xl bg-[#f7f7f3] px-4 py-3">
                 <span className="text-xs font-bold uppercase tracking-[0.14em] text-[#879196]">Best Shared Window</span>
-                <span className="font-bold text-[#173f50]">
-                  {longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}
-                  {longestSharedWindow && preferredDurationDays !== undefined && longestSharedWindow.dayCount < preferredDurationDays ? (
-                    <span className="ml-2 text-sm font-normal text-[#718087]">shorter than the preferred {preferredDurationDays} days</span>
-                  ) : null}
-                </span>
+                <span className="font-bold text-[#173f50]">{longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}{longestSharedWindow && preferredDurationDays !== undefined && longestSharedWindow.dayCount < preferredDurationDays ? <span className="ml-2 text-sm font-normal text-[#718087]">shorter than the preferred {preferredDurationDays} days</span> : null}</span>
               </div>
             </section>
+            {!candidatesAvailable && !itineraryReady ? <TripSketchCard hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
-
-          <CrewCard
-            candidatesAvailable={candidatesAvailable}
-            itineraryReady={itineraryReady}
-            longestSharedWindow={longestSharedWindow}
-            readiness={planningReadiness}
-            trip={trip}
-            votedCount={votingSummary.votedCount}
-          />
+          <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
         </div>
       </div>
     </main>

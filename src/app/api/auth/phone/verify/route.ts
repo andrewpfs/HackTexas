@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { summarizeTripsForPhone } from "@/lib/my-trips";
 import { checkCode, createSessionValue, hashPhone, lastFour, normalizePhone, sessionCookieName, sessionMaxAgeSeconds } from "@/lib/phone-auth";
-import { findTripsByPhone, linkTravelerPhone } from "@/lib/trip-repository";
+import { findTripsByPhone, getTripById, linkTravelerPhone } from "@/lib/trip-repository";
+import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 
 // Checks the code, signs the phone in, and optionally saves the current trip to it.
 export async function POST(request: Request) {
@@ -24,7 +26,13 @@ export async function POST(request: Request) {
   const phoneHash = hashPhone(phone);
   const link = body.link as { tripId?: unknown; travelerId?: unknown } | undefined;
   if (link && typeof link.tripId === "string" && typeof link.travelerId === "string") {
-    const linked = await linkTravelerPhone(link.tripId, link.travelerId, phoneHash, lastFour(phone));
+    const trip = await getTripById(link.tripId);
+    const proof = (await cookies()).get(travelerCookieName(link.tripId))?.value;
+    // Preserve the existing phone save/restore flow for old unsigned travelers,
+    // while phone verification alone cannot grant a new voting identity.
+    const verifiedPhone = { phoneHash, last4: lastFour(phone), expiresAt: Date.now() + 1000 };
+    const votingProof = trip ? canActAsTraveler(trip, link.travelerId, proof, verifiedPhone) : false;
+    const linked = await linkTravelerPhone(link.tripId, link.travelerId, phoneHash, lastFour(phone), votingProof);
     if (linked.status === "taken") {
       return NextResponse.json({ error: "This traveler is already saved to a different phone." }, { status: 409 });
     }

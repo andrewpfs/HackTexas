@@ -1,8 +1,9 @@
-export type TravelMode = "walk" | "bike" | "car";
+export type TravelMode = "walk" | "bike" | "car" | "transit";
 
 export const travelModes: { mode: TravelMode; label: string; icon: string }[] = [
   { mode: "walk", label: "Walk", icon: "🚶" },
   { mode: "bike", label: "Bike", icon: "🚲" },
+  { mode: "transit", label: "Transit", icon: "🚇" },
   { mode: "car", label: "Car", icon: "🚗" },
 ];
 
@@ -10,7 +11,7 @@ type Point = { latitude: number; longitude: number };
 
 // Streets are longer than a straight line, so distances are scaled up a bit.
 const routeFactor = 1.3;
-const speedsKmPerHour: Record<TravelMode, number> = { walk: 4.8, bike: 14, car: 24 };
+const speedsKmPerHour: Record<TravelMode, number> = { walk: 4.8, bike: 14, car: 24, transit: 28 };
 // Finding parking and getting in and out of the car.
 const carOverheadMinutes = 4;
 
@@ -29,7 +30,7 @@ export function getStraightLineKm(from: Point, to: Point) {
 // Rough trip estimate between two stops; real routing is a Google Maps tap away.
 export function estimateTravel(from: Point, to: Point, mode: TravelMode) {
   const distanceKm = getStraightLineKm(from, to) * routeFactor;
-  const driving = (distanceKm / speedsKmPerHour[mode]) * 60 + (mode === "car" ? carOverheadMinutes : 0);
+  const driving = (distanceKm / speedsKmPerHour[mode]) * 60 + (mode === "car" ? carOverheadMinutes : mode === "transit" ? 8 : 0);
 
   return { distanceKm, minutes: Math.max(1, Math.round(driving)) };
 }

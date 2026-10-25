@@ -74,6 +74,9 @@ export type Traveler = {
   // Set when the traveler saved this trip to their phone: a keyed hash, never the number itself.
   phoneHash?: string;
   phoneLast4?: string;
+  // False when an older unsigned identity first saves a phone. Saving/restoring
+  // still works, but cannot create proof for a major-change vote by itself.
+  phoneVotingVerified?: boolean;
   // Hash of the token a personal AI assistant uses to reach this traveler's bookings over MCP.
   assistantTokenHash?: string;
 };
@@ -91,6 +94,7 @@ export type CandidateDay = {
   dayNumber: number;
   date: string;
   title: string;
+  imageUrl?: string;
   activities: CandidateActivity[];
 };
 
@@ -260,6 +264,7 @@ export type Booking = {
   items: BookingItem[];
   total: number;
   bookedAt: string;
+  hotelShare?: { bookerName: string; hotelName: string; amount: number; confirmationCode?: string };
 };
 
 export type TravelPlan = {
@@ -308,6 +313,24 @@ export type ChatMessage = {
   focus?: { dayNumber: number; title: string };
 };
 
+export type ItineraryProposal = {
+  id: string;
+  createdAt: string;
+  requestedByTravelerId: string;
+  requestedByName: string;
+  baseItineraryId: string;
+  baseRevision: number;
+  previousDestination: string;
+  summary: string;
+  changes: string[];
+  proposedDestination: string;
+  proposedTripName?: string;
+  proposedDays: ItineraryDay[];
+  votes: { travelerId: string; choice: "approve" | "reject"; votedAt: string }[];
+  status: "pending" | "approved" | "rejected" | "stale";
+  decidedAt?: string;
+};
+
 export type Trip = {
   id: string;
   inviteCode: string;
@@ -334,6 +357,8 @@ export type Trip = {
   chat?: ChatMessage[];
   travel?: TravelPlan;
   sketch?: TripSketch;
+  pendingItineraryProposal?: ItineraryProposal;
+  lastApprovedItineraryProposal?: ItineraryProposal;
 };
 
 export type CreateTripInput = {

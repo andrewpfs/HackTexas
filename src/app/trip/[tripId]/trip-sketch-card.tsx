@@ -29,11 +29,11 @@ export function TripSketchCard({ tripId, sketch, hostId }: { tripId: string; ske
   const pending = !sketch || sketch.status === "pending" || busy;
 
   return (
-    <section className="rounded-3xl border border-[#172733]/8 bg-white p-6" aria-labelledby="sketch-heading">
+    <section className="overflow-hidden rounded-3xl border border-[#397bb3]/20 bg-gradient-to-br from-white via-white to-[#eaf3fb] p-6 shadow-sm" aria-labelledby="sketch-heading">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">First Draft</p>
-          <h2 className="mt-1 text-xl font-bold" id="sketch-heading">Trip Sketch</h2>
+          <h2 className="mt-1 text-xl font-bold" id="sketch-heading">✦ Trip Sketch</h2>
         </div>
         <p className="text-sm text-[#738087]">
           {sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
@@ -56,23 +56,23 @@ export function TripSketchCard({ tripId, sketch, hostId }: { tripId: string; ske
         </div>
       ) : (
         <>
-          <p className="mt-4 leading-7 text-[#53666f]">{sketch.summary}</p>
+          <p className="mt-5 rounded-2xl bg-[#173f50] p-5 text-lg leading-7 text-white">{sketch.summary}</p>
 
           {sketch.places.length > 0 ? (
             <ol className="mt-4 flex flex-wrap items-center gap-2">
               {sketch.places.map((place, index) => (
                 <li className="flex items-center gap-2" key={place.name}>
-                  <span className="rounded-full bg-[#173f50] px-3.5 py-1.5 text-sm font-bold text-white" title={place.why}>{place.name}</span>
+                  <span className="rounded-full bg-[#173f50] px-3.5 py-1.5 text-sm font-bold text-white" title={place.why}>📍 {place.name}</span>
                   {index < sketch.places.length - 1 ? <span aria-hidden="true" className="text-[#e4664f]">→</span> : null}
                 </li>
               ))}
             </ol>
           ) : null}
 
-          <ol className="mt-5 grid gap-2 sm:grid-cols-2">
+          <ol className="mt-6 grid gap-3 sm:grid-cols-2">
             {sketch.days.map((day) => (
-              <li className="rounded-2xl bg-[#f7f7f3] p-4" key={day.dayNumber}>
-                <p className="text-xs font-bold uppercase tracking-wide text-[#e4664f]">Day {day.dayNumber}</p>
+              <li className="rounded-2xl border border-[#397bb3]/15 bg-white p-5 shadow-sm" key={day.dayNumber}>
+                <p className="text-xs font-bold uppercase tracking-wide text-[#397bb3]">🗓 Day {day.dayNumber}</p>
                 <p className="mt-0.5 font-bold text-[#173f50]">{day.title}</p>
                 <p className="mt-1 text-sm leading-6 text-[#718087]">{day.plan}</p>
               </li>

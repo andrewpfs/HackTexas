@@ -23,6 +23,9 @@ export type PersonalPlan = {
 };
 
 export type RevisionResult = {
+  kind?: "reply_only" | "personal" | "shared_minor" | "shared_major";
+  proposedDestination?: string;
+  proposedTripName?: string;
   reply: string;
   changes: string[];
   // Set when only the sender wants something different: their own plan for one stop.
@@ -30,6 +33,10 @@ export type RevisionResult = {
   // The complete revised days, or null when the plan stays as it is.
   days: ItineraryDay[] | null;
 };
+
+export function mentionsMuse(text: string) {
+  return text.trim().toLowerCase().startsWith("@muse");
+}
 
 export interface ItineraryReviser {
   revise(request: RevisionRequest): Promise<RevisionResult>;
@@ -73,8 +80,8 @@ export function buildRevisionRequest(
   };
 }
 
-function activityKey(title: string, query: string | undefined) {
-  return `${title.trim().toLowerCase()}|${(query ?? "").trim().toLowerCase()}`;
+function activityKey(title: string, query: string | undefined, location: string) {
+  return `${title.trim().toLowerCase()}|${(query ?? "").trim().toLowerCase()}|${location.trim().toLowerCase()}`;
 }
 
 // Stops that are unchanged keep the real place that was already found for them.
@@ -83,7 +90,7 @@ export function carryOverPlaces(oldDays: ItineraryDay[], newDays: ItineraryDay[]
   for (const day of oldDays) {
     for (const activity of day.activities) {
       if (activity.place) {
-        known.set(activityKey(activity.title, activity.placeSearchQuery), activity.place);
+        known.set(activityKey(activity.title, activity.placeSearchQuery, activity.location), activity.place);
       }
     }
   }
@@ -91,7 +98,7 @@ export function carryOverPlaces(oldDays: ItineraryDay[], newDays: ItineraryDay[]
   return newDays.map((day) => ({
     ...day,
     activities: day.activities.map((activity) => {
-      const place = known.get(activityKey(activity.title, activity.placeSearchQuery));
+      const place = known.get(activityKey(activity.title, activity.placeSearchQuery, activity.location));
       return place ? { ...activity, place } : { ...activity, place: undefined };
     }),
   }));
@@ -103,6 +110,9 @@ export function validateRevisedDays(
   sharedDates: string[],
   basedOnCandidateId: string,
 ) {
+  if (!Array.isArray(days) || days.some((day) => !day || !Array.isArray(day.activities) || day.activities.some((activity) => !activity || typeof activity.title !== "string" || typeof activity.time !== "string"))) {
+    return { valid: false, errors: ["Muse returned malformed itinerary days."] };
+  }
   const draft: ItineraryDraft = {
     basedOnCandidateId,
     title: itinerary.title,
@@ -121,6 +131,28 @@ export function validateRevisedDays(
   const originalDates = itinerary.days.map((day) => day.date).join(",");
   if (days.map((day) => day.date).join(",") !== originalDates) {
     errors.push("The revised plan must keep the same days.");
+  }
+
+  for (let index = 0; index < days.length; index += 1) {
+    const day = days[index];
+    if (day.dayNumber !== itinerary.days[index]?.dayNumber || !day.title?.trim()) {
+      errors.push("The revised plan must keep its day numbers and titles.");
+    }
+    let previousMinutes = -1;
+    for (const activity of day.activities ?? []) {
+      const clock = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(activity.time ?? "");
+      if (!clock || Number(clock[1]) < 1 || Number(clock[1]) > 12 || Number(clock[2]) > 59) {
+        errors.push("Use valid clock times for every stop.");
+        continue;
+      }
+      let minutes = (Number(clock[1]) % 12) * 60 + Number(clock[2]);
+      if (clock[3].toUpperCase() === "PM") minutes += 720;
+      if (minutes <= previousMinutes) errors.push("Stops must be in chronological order.");
+      previousMinutes = minutes;
+      if (typeof activity.location !== "string" || typeof activity.description !== "string") {
+        errors.push("Every stop needs a location and description.");
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors };

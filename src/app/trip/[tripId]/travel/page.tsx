@@ -53,7 +53,7 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
         <Link className="text-sm font-semibold text-[#607179] hover:text-[#e4664f]" href={`/trip/${trip.id}/itinerary`}>← Back to the itinerary</Link>
 
         <div className="mt-4 rounded-3xl border border-[#172733]/8 bg-white px-6 py-4">
-          <ProgressNav currentStep={Object.keys(bookings).length > 0 ? 4 : 3} itineraryReady optionsReady tripId={trip.id} />
+          <ProgressNav currentStep={3} itineraryReady optionsReady tripId={trip.id} />
         </div>
 
         <div className="mt-6">
@@ -64,7 +64,9 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
         </div>
 
         <TravelWorkspace
+          key={`${itinerary.id}-${itinerary.revision ?? 0}`}
           bookings={bookings}
+          tripName={trip.name || `${itinerary.destination} Trip`}
           destination={itinerary.destination}
           flights={trip.travel?.flights ?? {}}
           hotels={trip.travel?.hotels ?? null}
@@ -76,6 +78,7 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
             id: traveler.id,
             name: traveler.name,
             isHost: traveler.isHost,
+            needsLodging: traveler.preferences?.lodgingType !== "No need",
             departure: getDepartureCity(trip, traveler.id) ?? "",
           }))}
           tripId={trip.id}

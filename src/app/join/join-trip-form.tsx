@@ -116,7 +116,7 @@ export function JoinTripForm(props: JoinTripFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <div>
-        <label className="form-label" htmlFor="inviteCode">Invite code</label>
+        <label className="form-label" htmlFor="inviteCode">Invite Code</label>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input className="form-control font-mono uppercase tracking-[0.12em]" id="inviteCode" maxLength={20} name="inviteCode" onChange={(event) => handleCodeChange(event.target.value)} placeholder="example: ABC123" type="text" value={inviteCode} />
           <button className="button-secondary shrink-0" disabled={isFinding || isSubmitting} onClick={findTrip} type="button">
@@ -127,7 +127,7 @@ export function JoinTripForm(props: JoinTripFormProps) {
 
       {preview ? (
         <section className="mt-6 rounded-2xl border border-[#173f50]/10 bg-[#f7f7f3] p-5" aria-labelledby="trip-preview-title">
-          <p className="eyebrow">Your invitation</p>
+          <p className="eyebrow">Your Invitation</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight" id="trip-preview-title">{preview.displayName}</h2>
           <p className="mt-2 text-sm leading-6 text-[#66757d]">{preview.prompt}</p>
           <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
@@ -143,11 +143,11 @@ export function JoinTripForm(props: JoinTripFormProps) {
       {preview ? (
         <div className="mt-6 grid gap-5 sm:grid-cols-2">
           <div>
-            <label className="form-label" htmlFor="travelerName">Your name</label>
+            <label className="form-label" htmlFor="travelerName">Your Name</label>
             <input className="form-control" disabled={isSubmitting} id="travelerName" maxLength={maximumTravelerNameLength} name="travelerName" placeholder="example: How the group knows you" required type="text" />
           </div>
           <div>
-            <label className="form-label" htmlFor="departureLocation">Where are you traveling from?</label>
+            <label className="form-label" htmlFor="departureLocation">Where Are You Traveling From?</label>
             <CityInput id="departureLocation" name="departureLocation" onChange={setDepartureCity} placeholder="example: Houston, Texas" required value={departureCity} />
           </div>
         </div>

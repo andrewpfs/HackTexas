@@ -111,12 +111,13 @@ test("addPlacesToItinerary counts failures without throwing", async () => {
   assert.equal(result.failedCount, 2);
 });
 
-test("Google Maps photos fill only the stops that have none, one search per place", async () => {
+test("Google Maps photos fill one day header without looking up individual stops", async () => {
   const { impl, calls } = fakeSerpApi(() => ({ local_results: [{ ...ichiran, thumbnail: "https://img.example/shop.jpg" }] }));
   const candidate = {
     destination: "Tokyo",
+    imageUrl: "https://img.example/hero.jpg",
     days: [
-      { activities: [
+      { imageUrl: undefined as string | undefined, activities: [
         { title: "Ramen lunch", placeName: "Ichiran Shinjuku", imageUrl: undefined as string | undefined },
         { title: "Ramen dinner", placeName: "Ichiran Shinjuku", imageUrl: undefined as string | undefined },
         { title: "Temple", placeName: "Senso-ji", imageUrl: "https://img.example/temple.jpg" as string | undefined },
@@ -126,8 +127,9 @@ test("Google Maps photos fill only the stops that have none, one search per plac
 
   const result = await addSerpPhotosToCandidates([candidate], { apiKey: "k", fetchImpl: impl });
   const stops = result.candidates[0].days[0].activities;
-  assert.equal(stops[0].imageUrl, "https://img.example/shop.jpg");
-  assert.equal(stops[1].imageUrl, "https://img.example/shop.jpg");
+  assert.equal(result.candidates[0].days[0].imageUrl, "https://img.example/shop.jpg");
+  assert.equal(stops[0].imageUrl, undefined);
+  assert.equal(stops[1].imageUrl, undefined);
   assert.equal(stops[2].imageUrl, "https://img.example/temple.jpg");
   assert.equal(calls.length, 1);
   assert.equal(calls[0].get("engine"), "google_maps");

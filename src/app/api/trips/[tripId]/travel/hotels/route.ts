@@ -33,12 +33,12 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   }
 
   try {
-    const options = await searchHotels({ apiKey }, inputs);
-    await finishHotelSearch(tripId, { status: "done", options });
+    const options = await searchHotels({ apiKey }, getHotelSearchInputs(claim.trip)!);
+    await finishHotelSearch(tripId, { status: "done", options }, claim.trip.travel?.hotels?.startedAt);
     return NextResponse.json({ status: "done", count: options.length });
   } catch (error) {
     console.error("Hotel search failed:", error);
-    await finishHotelSearch(tripId, { status: "failed", error: "We couldn't load hotels right now." });
+    await finishHotelSearch(tripId, { status: "failed", error: "We couldn't load hotels right now." }, claim.trip.travel?.hotels?.startedAt);
     return NextResponse.json({ error: "We couldn't load hotels right now." }, { status: 502 });
   }
 }

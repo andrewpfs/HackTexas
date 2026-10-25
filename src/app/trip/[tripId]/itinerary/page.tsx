@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Header } from "../../../components/header";
 import { formatCalendarDate } from "@/lib/date-utils";
@@ -46,8 +47,8 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         <Header />
         <div className="mx-auto max-w-3xl px-5 py-16 text-center sm:px-8">
           <div className="rounded-[2rem] border border-[#172733]/8 bg-white p-8 shadow-[0_18px_45px_rgba(23,63,80,0.08)] sm:p-12">
-            <p className="eyebrow">Shared itinerary</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight">No shared itinerary yet</h1>
+            <p className="eyebrow">Shared Itinerary</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight">No Shared Itinerary Yet</h1>
             <p className="mx-auto mt-4 max-w-xl leading-7 text-[#718087]">
               After everyone votes on the trip options, the host can create one shared plan for the group.
             </p>
@@ -64,6 +65,10 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
     (candidate) => candidate.id === itinerary.basedOnCandidateId,
   );
 
+  const base = (trip.candidateOptions || [])[baseIndex];
+  const heroImage = base?.destination === itinerary.destination ? base.imageUrl : undefined;
+  const hero = heroImage || itinerary.days.flatMap((day) => day.activities).find((stop) => stop.place?.thumbnail)?.place?.thumbnail;
+
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
       <Header />
@@ -73,10 +78,11 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         </Link>
 
         <div className="mt-5 rounded-3xl border border-[#172733]/8 bg-white px-6 py-4">
-          <ProgressNav currentStep={Object.keys(trip.travel?.bookings ?? {}).length > 0 ? 4 : 3} itineraryReady optionsReady tripId={trip.id} />
+          <ProgressNav currentStep={2} itineraryReady optionsReady tripId={trip.id} />
         </div>
 
-        <section className="mt-7 overflow-hidden rounded-[2rem] bg-[#173f50] text-white shadow-[0_20px_50px_rgba(23,63,80,0.14)]">
+        <section className="relative isolate mt-7 overflow-hidden rounded-[2rem] bg-[#173f50] text-white shadow-[0_20px_50px_rgba(23,63,80,0.14)]">
+          {hero ? <><Image alt="" className="-z-20 object-cover" fill sizes="100vw" src={hero} unoptimized /><div className="absolute inset-0 -z-10 bg-[#0b2230]/80" /></> : null}
           <div className="p-7 sm:p-10">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-[#f3c969] px-3 py-1 text-xs font-bold text-[#173f50]">Shared itinerary</span>
@@ -96,7 +102,7 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         <details className="group mt-6 rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
             <span>
-              <span className="eyebrow block">How the group got here</span>
+              <span className="eyebrow block">How The Group Got Here</span>
               <span className="mt-2 block text-xl font-bold tracking-tight">The compromise</span>
             </span>
             <span className="text-[#879196] transition group-open:rotate-180" aria-hidden="true">⌄</span>
@@ -125,6 +131,8 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         <ItineraryWorkspace
           initialItinerary={itinerary}
           initialMessages={trip.chat || []}
+          initialProposal={trip.pendingItineraryProposal ?? null}
+          initialApprovedProposal={trip.lastApprovedItineraryProposal ?? null}
           placesConfigured={getSerpApiKey() !== null}
           travelers={trip.travelers.map((traveler) => ({ id: traveler.id, name: traveler.name }))}
           tripId={trip.id}

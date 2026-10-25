@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { Booking, BookingItem, Trip } from "./trip-types";
 import { addDaysToDate, type HotelSearch } from "./travel-search";
+import { hotelShareForTraveler } from "./travel-display";
 
 // Travelers who need a bed. People who chose "No need" are staying elsewhere.
 export function travelersNeedingLodging(trip: Trip) {
@@ -100,6 +101,7 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
       items,
       total: items.reduce((sum, item) => sum + item.amount, 0),
       bookedAt: new Date().toISOString(),
+      hotelShare: hotelShareForTraveler(trip, travelerId),
     },
   };
 }

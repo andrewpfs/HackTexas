@@ -49,6 +49,7 @@
     "tests/preferences-and-dates.test.ts",
     "tests/avatar.test.ts",
     "tests/travel.test.ts",
-    "tests/sketch-phone-mcp.test.ts"
+    "tests/sketch-phone-mcp.test.ts",
+    "tests/improvements.test.ts"
   ]
 }

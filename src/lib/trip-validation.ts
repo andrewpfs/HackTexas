@@ -35,7 +35,7 @@ export type UpdateTripValidationResult =
 
 export const maximumTravelerNameLength = 80;
 export const maximumDestinationPreferencesLength = 500;
-export const maximumNotesLength = 1000;
+export const maximumNotesLength = 1502;
 export const maximumActivityDetailsLength = 300;
 
 // Yesterday in UTC, so travelers in any time zone can still choose "today".

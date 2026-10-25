@@ -1,31 +1,24 @@
+import { PlanningStory } from "./components/planning-story";
+import { ReturningTraveler } from "./components/returning-traveler";
 import Image from "next/image";
 import Link from "next/link";
 import { Header } from "./components/header";
 
-const planningSteps = [
-  ["01", "Start a trip", "Share the rough idea, timing, and starting point."],
-  ["02", "Invite your group", "Send one link. No accounts or passwords needed."],
-  ["03", "Share preferences", "Everyone adds dates, budget, and must-do activities."],
-  ["04", "Find common ground", "AI turns the group’s constraints into clear options."],
-  ["05", "Vote and refine", "Compare the best fits and make one focused revision."],
-  ["06", "Travel together", "Keep one shared itinerary everyone can follow."],
-];
-
 const groupNeeds = [
-  { label: "Schedules", detail: "Dec 15–23", color: "bg-[#daf0ea]" },
-  { label: "Budgets", detail: "$1.5k–$2.4k", color: "bg-[#fbe4d9]" },
-  { label: "Interests", detail: "Food, art, nightlife", color: "bg-[#e7e2f5]" },
+  { icon: "◷", label: "Schedules", detail: "Dec 15–23", color: "bg-[#daf0ea]" },
+  { icon: "$", label: "Budgets", detail: "$1.5k–$2.4k", color: "bg-[#fbe4d9]" },
+  { icon: "✦", label: "Interests", detail: "Food, art, nightlife", color: "bg-[#e7e2f5]" },
 ];
 
 const exampleTravelers = [
-  { name: "Ryan", icon: "🧑🏽", interests: "Food · Museums", budget: "$1,200 USD" },
-  { name: "Tin", icon: "👩🏻", interests: "Shopping · Nightlife", budget: "$1,500 USD" },
-  { name: "Jay", icon: "👨🏼", interests: "Outdoors · Sightseeing", budget: "$1,000 USD" },
+  { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "Dec 17–21" },
+  { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife"], budget: "$1,500", available: "Dec 18–23" },
+  { name: "Jay", icon: "👨🏼", interests: ["Outdoors", "Sightseeing"], budget: "$1,000", available: "Dec 19–22" },
 ];
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f8f6f1] text-[#172733]">
+    <main className="min-h-screen overflow-x-clip bg-[#f8f6f1] text-[#172733]">
       <Header />
 
       <section className="relative isolate border-b border-[#172733]/10">
@@ -33,11 +26,11 @@ export default function Home() {
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b2230]/85 via-[#0b2230]/55 to-[#0b2230]/20" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.05fr_0.95fr] lg:px-10 lg:py-28">
           <div className="max-w-3xl">
-            <p className="eyebrow !text-[#f3c969]">Built for the whole group</p>
+            <p className="eyebrow !text-[#f3c969]">Built For The Whole Group</p>
             <h1 className="mt-6 text-5xl font-semibold leading-[0.98] tracking-[-0.055em] text-white sm:text-6xl lg:text-7xl">
-              Less group chat.
+              Less Group Chat.
               <span className="block font-serif font-normal italic text-[#f3c969]">
-                More common ground.
+                More Common Ground.
               </span>
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
@@ -84,7 +77,7 @@ export default function Home() {
                 <div className="mt-5 grid grid-cols-9 gap-1.5" aria-label="Availability overlap preview">
                   {[1, 2, 3, 2, 4, 4, 3, 1, 1].map((value, index) => (
                     <div className="text-center" key={index}>
-                      <div className={`mx-auto h-12 w-full rounded-md ${value === 4 ? "bg-[#e4664f]" : value === 3 ? "bg-[#f1a690]" : "bg-[#e8eceb]"}`} />
+                      <div className={`mx-auto h-12 w-full rounded-md ${value === 4 ? "bg-[#276655]" : value === 3 ? "bg-[#9ed7b8]" : "bg-[#e8eceb]"}`} />
                       <span className="mt-1.5 block text-[10px] text-[#819097]">{15 + index}</span>
                     </div>
                   ))}
@@ -107,11 +100,13 @@ export default function Home() {
         </div>
       </section>
 
+      <div className="px-5 sm:px-8"><ReturningTraveler /></div>
+
       <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
         <div className="mx-auto max-w-6xl">
-          <div className="text-center"><p className="eyebrow">Different travelers, one shared plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See the common ground clearly.</h2></div>
+          <div className="text-center"><p className="eyebrow">Different Travelers, One Shared Plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See The Common Ground Clearly.</h2></div>
           <div className="mt-9 grid gap-4 md:grid-cols-3">
-            {exampleTravelers.map((traveler) => <article className="ticket-card p-5" key={traveler.name}><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span><div><h3 className="font-bold">{traveler.name}</h3><p className="text-sm text-[#66757d]">{traveler.interests}</p></div></div><p className="mt-4 border-t border-dashed border-[#173f50]/20 pt-3 text-sm font-bold text-[#173f50]">Budget: {traveler.budget}</p></article>)}
+            {exampleTravelers.map((traveler) => <article className="ticket-card p-5" key={traveler.name}><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span><div><h3 className="font-bold">{traveler.name}</h3><div className="mt-2 flex flex-wrap gap-1.5">{traveler.interests.map((interest, index) => <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${index === 0 ? "bg-[#daf0ea] text-[#276655]" : "bg-[#e7e2f5] text-[#4b3d8a]"}`} key={interest}>{interest}</span>)}</div></div></div><p className="mt-4 border-t border-dashed border-[#173f50]/20 pt-3 text-sm font-bold text-[#173f50]">Budget: {traveler.budget}</p><p className="mt-1 text-sm text-[#66757d]">Available: {traveler.available}</p></article>)}
           </div>
           <div className="mt-6 flex flex-col items-center justify-center gap-2 text-center text-sm font-bold text-[#53666f] sm:flex-row sm:gap-4"><span>Different people</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span>Different schedules &amp; preferences</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span className="rounded-full bg-[#daf0ea] px-4 py-2 text-[#276655]">One trip everyone can enjoy</span></div>
         </div>
@@ -120,15 +115,15 @@ export default function Home() {
       <section className="bg-[#173f50] px-5 py-16 text-white sm:px-8 sm:py-20 lg:px-10">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div>
-            <p className="eyebrow text-[#f3c969]">One group, many opinions</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Planning gets messy before the trip even starts.</h2>
+            <p className="eyebrow text-[#f3c969]">One Group, Many Opinions</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.035em] sm:text-4xl">Planning Gets Messy Before The Trip Even Starts.</h2>
             <p className="mt-4 max-w-lg leading-7 text-white/70">Stop stitching together polls, spreadsheets, and hundreds of messages. Put every traveler’s constraints in one place.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
             <div className="space-y-3">
               {groupNeeds.map((need) => (
                 <div className={`${need.color} rounded-2xl p-4 text-[#172733]`} key={need.label}>
-                  <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-60">{need.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] opacity-60"><span aria-hidden="true" className="mr-2 inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/70 text-base">{need.icon}</span>{need.label}</p>
                   <p className="mt-1 font-semibold">{need.detail}</p>
                 </div>
               ))}
@@ -136,48 +131,21 @@ export default function Home() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-xl"><span aria-hidden="true">→</span></div>
             <div className="rounded-[1.75rem] bg-white p-6 text-[#172733]">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f3c969] text-lg" aria-hidden="true">✦</span>
-              <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-[#e4664f]">Shared plan</p>
-              <p className="mt-2 text-2xl font-semibold tracking-tight">One trip everyone helped shape.</p>
+              <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-[#e4664f]">Group Consensus</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight">One Trip Everyone Helped Shape.</p>
               <p className="mt-3 text-sm leading-6 text-[#66757d]">Clear options, a focused vote, and one itinerary for the group.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="px-5 py-20 sm:px-8 sm:py-24 lg:px-10">
-        <div className="mx-auto max-w-7xl">
-          <div className="max-w-2xl">
-            <p className="eyebrow">From idea to takeoff</p>
-            <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-[#102a38] sm:text-5xl">A clear path through the chaos.</h2>
-          </div>
-          <ol className="mt-12 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
-            {planningSteps.map((step) => (
-              <li className="border-t border-[#172733]/20 pt-5" key={step[0]}>
-                <div className="flex items-start gap-4">
-                  <span className="font-mono text-xs font-bold text-[#e4664f]">{step[0]}</span>
-                  <div>
-                    <h3 className="text-lg font-semibold">{step[1]}</h3>
-                    <p className="mt-2 leading-6 text-[#66757d]">{step[2]}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-16 flex flex-col items-start justify-between gap-6 rounded-[2rem] bg-[#f2c968] p-7 sm:flex-row sm:items-center sm:p-10">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-[#173f50]/65">Your group chat will thank you</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[#102a38]">Ready to get everyone on the same page?</h2>
-            </div>
-            <Link className="button-dark shrink-0" href="/create">Start planning <span aria-hidden="true">→</span></Link>
-          </div>
-        </div>
-      </section>
+      <PlanningStory />
 
       <section className="border-t border-[#172733]/10 bg-white px-5 py-16 sm:px-8 lg:px-10">
-        <div className="mx-auto max-w-3xl"><p className="eyebrow">Quick answers</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Frequently Asked Questions</h2><div className="mt-7 divide-y divide-[#172733]/10 rounded-3xl border border-[#172733]/10 px-5 sm:px-7">
+        <div className="mx-auto max-w-3xl"><p className="eyebrow">Quick Answers</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Frequently Asked Questions</h2><div className="mt-7 divide-y divide-[#172733]/10 rounded-3xl border border-[#172733]/10 px-5 sm:px-7">
           <details className="py-5"><summary className="cursor-pointer font-bold">What does this planner do?</summary><p className="mt-3 leading-7 text-[#66757d]">It gathers each traveler&apos;s timing, budget, interests, and lodging preferences so the group can compare practical trip options.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">Does everyone need an account?</summary><p className="mt-3 leading-7 text-[#66757d]">No. For the current hackathon experience, travelers join from a shared link and this browser remembers their traveler identity.</p></details>
-          <details className="py-5"><summary className="cursor-pointer font-bold">How does the group choose a trip?</summary><p className="mt-3 leading-7 text-[#66757d]">Travelers share preferences and availability, compare generated options, decide together, and will eventually create one shared itinerary.</p></details>
+          <details className="py-5"><summary className="cursor-pointer font-bold">How does the group choose a trip?</summary><p className="mt-3 leading-7 text-[#66757d]">Travelers share preferences and availability, compare generated options, decide together, and create one shared itinerary.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">Does it book trips automatically?</summary><p className="mt-3 leading-7 text-[#66757d]">No. This demo does not make payments, reservations, or real bookings.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">Can I connect my calendar?</summary><p className="mt-3 leading-7 text-[#66757d]">Manual availability is supported now. Calendar connection is a future stretch capability.</p></details>
         </div></div>

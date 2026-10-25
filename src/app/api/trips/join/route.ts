@@ -1,3 +1,4 @@
+import { createTravelerProof, travelerCookieName, travelerCookieOptions } from "@/lib/trip-browser-identity";
 import { verifyCity } from "@/lib/city-search";
 import { NextResponse } from "next/server";
 import { addTravelerToTrip, getTripByInviteCode } from "@/lib/trip-repository";
@@ -80,10 +81,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json(
-      { tripId: result.tripId, travelerId: result.travelerId },
-      { status: 201 },
-    );
+    const response = NextResponse.json({ tripId: result.tripId, travelerId: result.travelerId }, { status: 201 });
+    response.cookies.set(travelerCookieName(result.tripId), createTravelerProof(result.tripId, result.travelerId), travelerCookieOptions);
+    return response;
   } catch (error) {
     console.error("Failed to join trip:", error);
     return NextResponse.json(

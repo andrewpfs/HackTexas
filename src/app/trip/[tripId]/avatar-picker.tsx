@@ -61,6 +61,11 @@ export function AvatarPicker({ tripId, travelerId, name, look: savedLook }: Avat
   const [lastSaved, setLastSaved] = useState(JSON.stringify(savedLook));
   const [error, setError] = useState("");
   const wrapper = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (open) dialog.current?.showModal();
+  }, [open]);
 
   // When the saved look changes (here or on another device), drop any unsaved override.
   if (lastSaved !== JSON.stringify(savedLook)) {
@@ -142,7 +147,7 @@ export function AvatarPicker({ tripId, travelerId, name, look: savedLook }: Avat
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-full z-40 mt-3 w-[19rem] rounded-3xl border border-[#172733]/10 bg-white p-5 shadow-[0_22px_60px_rgba(23,63,80,0.22)]" role="dialog" aria-label="Customize your avatar">
+        <dialog ref={dialog} className="fixed inset-0 m-auto max-h-[85dvh] w-[22rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-3xl border border-[#172733]/10 bg-white p-5 text-[#172733] shadow-2xl backdrop:bg-[#0b2230]/45" onCancel={() => setOpen(false)} onClick={(event) => { const bounds = event.currentTarget.getBoundingClientRect(); if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setOpen(false); }} aria-label="Customize Your Avatar">
           <div className="flex items-center gap-4">
             <Avatar idPrefix={`${travelerId}-preview`} look={look} size={72} />
             <div className="flex-1">
@@ -199,7 +204,7 @@ export function AvatarPicker({ tripId, travelerId, name, look: savedLook }: Avat
 
           {error ? <p className="mt-3 text-xs font-semibold text-[#a34532]" role="alert">{error}</p> : null}
           <button className="button-dark mt-5 !min-h-10 w-full !text-sm" onClick={() => setOpen(false)} type="button">Done</button>
-        </div>
+        </dialog>
       ) : null}
     </div>
   );

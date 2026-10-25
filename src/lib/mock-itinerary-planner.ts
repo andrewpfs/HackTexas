@@ -1,13 +1,8 @@
 import type { CompromiseContext, ItineraryDraft, ItineraryPlanner } from "./itinerary-planner";
-import type { CandidateActivity, CandidateTripOption, ItineraryActivityType } from "./trip-types";
-
-const timeOfDayClock: Record<CandidateActivity["timeOfDay"], string> = {
-  Morning: "9:00 AM",
-  Afternoon: "2:00 PM",
-  Evening: "7:00 PM",
-};
+import type { CandidateActivity, CandidateTripOption, ItineraryActivity, ItineraryActivityType } from "./trip-types";
 
 const typeKeywords: [ItineraryActivityType, string[]][] = [
+  ["Free time", ["free time", "buffer", "flexible", "check-in", "check-out"]],
   ["Food", ["food", "dinner", "lunch", "breakfast", "market", "ramen", "cafe", "eat"]],
   ["Museums & Culture", ["museum", "temple", "shrine", "gallery", "history", "culture"]],
   ["Outdoors", ["hike", "park", "garden", "beach", "trail", "mountain"]],
@@ -25,6 +20,33 @@ function guessActivityType(activity: CandidateActivity): ItineraryActivityType {
     }
   }
   return "Sightseeing";
+}
+
+function makeDayActivities(activities: CandidateActivity[], destination: string) {
+  const stops: ItineraryActivity[] = [];
+  const periods: CandidateActivity["timeOfDay"][] = ["Morning", "Afternoon", "Evening"];
+  const times: Record<CandidateActivity["timeOfDay"], string[]> = {
+    Morning: ["9:00 AM", "10:00 AM", "11:00 AM"],
+    Afternoon: ["2:00 PM", "3:00 PM", "4:00 PM"],
+    Evening: ["7:00 PM", "8:00 PM", "9:00 PM"],
+  };
+  for (const period of periods) {
+    let count = 0;
+    for (const activity of activities) {
+      if (activity.timeOfDay !== period || count >= 3) continue;
+      const type = guessActivityType(activity);
+      stops.push({ time: times[period][count], title: activity.title, type, location: destination, description: activity.description, placeSearchQuery: type === "Travel" || type === "Free time" ? "" : `${activity.title} ${destination}` });
+      count += 1;
+    }
+    // Add ordinary travel-life space only between already scheduled periods.
+    if (period === "Morning" && count > 0 && activities.some((activity) => activity.timeOfDay !== "Morning")) {
+      stops.push({ time: "12:00 PM", title: "Lunch And Travel Buffer", type: "Food", location: destination, description: "An unhurried meal and time to reach the next neighborhood.", placeSearchQuery: "" });
+    }
+    if (period === "Afternoon" && count > 0 && activities.some((activity) => activity.timeOfDay === "Evening")) {
+      stops.push({ time: "5:00 PM", title: "Rest Or Explore Freely", type: "Free time", location: destination, description: "Leave room for rest, wandering, or a flexible break before dinner.", placeSearchQuery: "" });
+    }
+  }
+  return stops;
 }
 
 // Deterministic stand-in for Muse: keeps the leading option as-is and records
@@ -64,17 +86,7 @@ export class MockItineraryPlanner implements ItineraryPlanner {
         dayNumber: day.dayNumber,
         date: day.date,
         title: day.title,
-        activities: day.activities.map((activity) => {
-          const type = guessActivityType(activity);
-          return {
-            time: timeOfDayClock[activity.timeOfDay],
-            title: activity.title,
-            type,
-            location: base.destination,
-            description: activity.description,
-            placeSearchQuery: type === "Travel" ? "" : `${activity.title} ${base.destination}`,
-          };
-        }),
+        activities: makeDayActivities(day.activities, base.destination),
       })),
     };
   }

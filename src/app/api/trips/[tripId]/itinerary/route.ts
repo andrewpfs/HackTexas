@@ -16,5 +16,5 @@ export async function GET(
     return NextResponse.json({ error: "This trip has no shared itinerary yet." }, { status: 404 });
   }
 
-  return NextResponse.json({ itinerary: trip.itinerary, messages: trip.chat || [] });
+  return NextResponse.json({ itinerary: trip.itinerary, messages: trip.chat || [], proposal: trip.pendingItineraryProposal ?? null, approvedProposal: trip.lastApprovedItineraryProposal ?? null }, { headers: { "Cache-Control": "no-store" } });
 }

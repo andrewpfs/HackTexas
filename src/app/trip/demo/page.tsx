@@ -1,3 +1,4 @@
+import { ProgressNav } from "../[tripId]/progress-nav";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "../../components/header";
@@ -21,7 +22,6 @@ const interests = [
   { name: "Museums", count: 2, color: "bg-[#dcebf2] text-[#3a6476]" },
 ];
 
-const progressSteps = ["Get Ready", "Compare Options", "Decide Together", "Shared Itinerary"];
 
 export default function DemoTripPage() {
   return (
@@ -51,24 +51,17 @@ export default function DemoTripPage() {
 
         <section className="mt-6 rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="planning-progress">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div><p className="eyebrow">Planning progress</p><h2 className="mt-2 text-xl font-bold" id="planning-progress">First, hear from everyone.</h2></div>
+            <div><p className="eyebrow">Planning Progress</p><h2 className="mt-2 text-xl font-bold" id="planning-progress">First, Hear From Everyone.</h2></div>
             <p className="text-sm text-[#738087]">Step 1 of 4</p>
           </div>
-          <ol className="mt-7 grid grid-cols-4 gap-2">
-            {progressSteps.map((step, index) => (
-              <li key={step}>
-                <div className={`h-1.5 rounded-full ${index === 0 ? "bg-[#e4664f]" : "bg-[#dfe3e1]"}`} />
-                <p className={`mt-2 text-xs font-bold sm:text-sm ${index === 0 ? "text-[#e4664f]" : "text-[#8a9599]"}`}>{step}</p>
-              </li>
-            ))}
-          </ol>
+          <div className="mt-7"><ProgressNav currentStep={0} itineraryReady={false} optionsReady={false} tripId="demo" /></div>
         </section>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
           <div className="space-y-6">
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="group-progress">
               <div className="flex items-center justify-between">
-                <div><p className="eyebrow">The crew</p><h2 className="mt-2 text-2xl font-bold tracking-tight" id="group-progress">Group progress</h2></div>
+                <div><p className="eyebrow">The Crew</p><h2 className="mt-2 text-2xl font-bold tracking-tight" id="group-progress">Group Progress</h2></div>
                 <p className="text-sm font-bold text-[#52766c]">2 of 4 ready</p>
               </div>
               <ul className="mt-6 divide-y divide-[#172733]/8">
@@ -88,10 +81,10 @@ export default function DemoTripPage() {
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div><p className="eyebrow">Possible dates</p><h2 className="mt-2 text-2xl font-bold tracking-tight" id="availability">Availability overlap</h2></div>
+                <div><p className="eyebrow">Possible Dates</p><h2 className="mt-2 text-2xl font-bold tracking-tight" id="availability">Availability Overlap</h2></div>
                 <div className="flex items-center gap-4 text-xs text-[#758288]">
                   <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#e8eceb]" /> Some</span>
-                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#e4664f]" /> Everyone</span>
+                  <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#276655]" /> Everyone</span>
                 </div>
               </div>
               <details className="mt-5 rounded-2xl bg-[#f7f7f3] p-4"><summary className="cursor-pointer font-bold text-[#173f50]">Traveler availability details</summary><ul className="mt-3 space-y-1 text-sm text-[#66757d]"><li>Jay · Dec 15–20</li><li>Henry · Dec 18–23</li><li>Andrew · Dec 19–21</li><li>Maya · Dec 19–20</li></ul></details>
@@ -99,7 +92,7 @@ export default function DemoTripPage() {
                 {[1, 2, 2, 3, 4, 4, 3, 2, 1].map((value, index) => (
                   <div className="text-center" key={index}>
                     <p className="mb-2 text-[10px] font-bold text-[#849095] sm:text-xs">DEC</p>
-                    <div className={`flex h-12 items-center justify-center rounded-lg text-xs font-bold sm:h-14 sm:text-sm ${value === 4 ? "bg-[#e4664f] text-white" : value === 3 ? "bg-[#f3b5a4] text-[#704338]" : value === 2 ? "bg-[#dfe9e7] text-[#536b67]" : "bg-[#eef0ee] text-[#8a9599]"}`}>{15 + index}</div>
+                    <div className={`flex h-12 items-center justify-center rounded-lg text-xs font-bold sm:h-14 sm:text-sm ${value === 4 ? "bg-[#276655] text-white" : value === 3 ? "bg-[#9ed7b8] text-[#276655]" : value === 2 ? "bg-[#dfe9e7] text-[#536b67]" : "bg-[#eef0ee] text-[#8a9599]"}`}>{15 + index}</div>
                   </div>
                 ))}
               </div>
@@ -111,8 +104,8 @@ export default function DemoTripPage() {
 
           <div className="space-y-6">
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="interests">
-              <p className="eyebrow">What the group likes</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight" id="interests">Shared interests</h2>
+              <p className="eyebrow">What The Group Likes</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight" id="interests">Shared Interests</h2>
               <div className="mt-6 flex flex-wrap gap-2.5">
                 {interests.map((interest) => (
                   <div className={`rounded-full px-4 py-2 text-sm font-bold ${interest.color}`} key={interest.name}>
@@ -126,7 +119,7 @@ export default function DemoTripPage() {
             <section className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white" aria-labelledby="invite-group">
               <div className="p-6 sm:p-8">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#fbe4d9] text-[#e4664f]" aria-hidden="true">↗</div>
-                <h2 className="mt-5 text-2xl font-bold tracking-tight" id="invite-group">Invite your group</h2>
+                <h2 className="mt-5 text-2xl font-bold tracking-tight" id="invite-group">Invite Your Group</h2>
                 <p className="mt-2 text-sm leading-6 text-[#718087]">Send this demo link to anyone who still needs to add their preferences.</p>
                 <div className="mt-5 rounded-2xl border border-dashed border-[#173f50]/30 bg-[#f7f7f3] p-4">
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#889398]">Invite link</p>
@@ -137,7 +130,7 @@ export default function DemoTripPage() {
               </div>
               <div className="border-t border-[#172733]/8 bg-[#173f50] p-6 text-white sm:p-8">
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Coming after preferences</p>
-                <p className="mt-2 text-lg font-bold">Get Ready → Compare Options → Decide Together → Shared Itinerary</p>
+                <p className="mt-2 text-lg font-bold">Get Ready → Itinerary Options &amp; Vote → Shared Itinerary → Book Travel</p>
                 <p className="mt-2 text-sm leading-6 text-white/65">Later, the group can adjust the shared plan while each traveler keeps room for personal alternatives.</p>
               </div>
             </section>

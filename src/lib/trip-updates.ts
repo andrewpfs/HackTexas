@@ -12,6 +12,8 @@ export function clearPlanningOutputs(trip: Trip) {
   trip.itinerary = undefined;
   trip.chat = undefined;
   trip.travel = undefined;
+  trip.pendingItineraryProposal = undefined;
+  trip.lastApprovedItineraryProposal = undefined;
 }
 
 export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {

@@ -39,23 +39,23 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   }
 
   try {
-    const [fromId, toId] = await Promise.all([findCityFlightId(from), findCityFlightId(trip.itinerary.destination)]);
+    const [fromId, toId] = await Promise.all([findCityFlightId(from), findCityFlightId(claim.trip.itinerary!.destination)]);
     if (!fromId || !toId) {
-      await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: `We couldn't find airports for ${!fromId ? from : trip.itinerary.destination}.` });
+      await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: `We couldn't find airports for ${!fromId ? from : claim.trip.itinerary!.destination}.` }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);
       return NextResponse.json({ error: "We couldn't find the airports." }, { status: 422 });
     }
 
     const options = await searchFlights({ apiKey }, {
       fromId,
       toId,
-      outboundDate: trip.itinerary.startDate,
-      returnDate: trip.itinerary.endDate,
+      outboundDate: claim.trip.itinerary!.startDate,
+      returnDate: claim.trip.itinerary!.endDate,
     });
-    await finishFlightSearch(tripId, body.travelerId, { status: "done", options });
+    await finishFlightSearch(tripId, body.travelerId, { status: "done", options }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);
     return NextResponse.json({ status: "done", count: options.length });
   } catch (error) {
     console.error("Flight search failed:", error);
-    await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: "We couldn't load flights right now." });
+    await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: "We couldn't load flights right now." }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);
     return NextResponse.json({ error: "We couldn't load flights right now." }, { status: 502 });
   }
 }

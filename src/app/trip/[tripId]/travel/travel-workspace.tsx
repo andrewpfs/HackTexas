@@ -1,15 +1,18 @@
 "use client";
 
 import Image from "next/image";
+import { flightHighlights } from "@/lib/travel-display";
+import { EmailConfirmation } from "./email-confirmation";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Booking, FlightSearchResult, HotelSearchResult } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
-type TravelerInfo = { id: string; name: string; isHost: boolean; departure: string };
+type TravelerInfo = { id: string; name: string; isHost: boolean; departure: string; needsLodging: boolean };
 
 type TravelWorkspaceProps = {
   tripId: string;
+  tripName: string;
   destination: string;
   nights: number;
   lodgingCount: number;
@@ -89,6 +92,9 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
   const hotelTotal = selectedHotel ? selectedHotel.totalPrice ?? (selectedHotel.pricePerNight ?? 0) * props.nights : 0;
   const hotelShare = selectedHotel ? hotelTotal / Math.max(1, props.lodgingCount) : 0;
   const iBookHotel = Boolean(me && selectedHotel && hotels?.selectedByTravelerId === me.id);
+  const highlights = flightHighlights(myFlights?.options ?? []);
+  const owedShare = myBooking?.hotelShare ?? (me?.needsLodging && selectedHotel && hotelBooker && !iBookHotel ? { bookerName: hotelBooker.name, hotelName: selectedHotel.name, amount: hotelShare, confirmationCode: bookings[hotelBooker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode } : undefined);
+  const owedCopy = owedShare ? `You owe ${owedShare.bookerName} about ${money(owedShare.amount)} for your hotel share.` : "";
   const myTotal = (myFlight?.price ?? 0) + (iBookHotel ? hotelTotal : 0);
 
   if (!props.searchConfigured) {
@@ -110,7 +116,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             <p className="eyebrow">Where You&apos;ll Stay</p>
             <h2 className="mt-1 text-2xl font-bold tracking-tight" id="stay-heading">Hotels In {props.destination}</h2>
             <p className="mt-1 text-sm text-[#718087]">
-              {props.nights} night{props.nights === 1 ? "" : "s"} for {props.lodgingCount} traveler{props.lodgingCount === 1 ? "" : "s"} · live prices from Google Hotels
+              {props.nights} night{props.nights === 1 ? "" : "s"} for {props.lodgingCount} traveler{props.lodgingCount === 1 ? "" : "s"} · live hotel results from Google Hotels via SerpApi
             </p>
           </div>
           {selectedHotel ? (
@@ -120,6 +126,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
           )}
         </div>
 
+        {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} <span className="block font-normal">Separate from your own flight charge.</span></p> : null}
         {!hotels || hotels.status === "pending" ? (
           <div className="mt-6">
             <p className="flex items-center gap-2 text-sm font-semibold text-[#276655]" role="status"><Spinner /> Searching hotels for your dates…</p>
@@ -193,7 +200,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
           <p className="mt-4 text-sm text-[#718087]">Open this trip from your invite link on this device to see your flights.</p>
         ) : (
           <>
-            <p className="mt-1 text-sm text-[#718087]">Round trip from {me.departure} · live prices from Google Flights</p>
+            <p className="mt-1 text-sm text-[#718087]">Round trip from {me.departure} · live prices from Google Flights via SerpApi</p>
             {!myFlights || myFlights.status === "pending" ? (
               <div className="mt-5 space-y-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-[#276655]" role="status"><Spinner /> Searching flights from {me.departure}…</p>
@@ -213,8 +220,9 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   return (
                     <li className={`flex flex-col gap-4 rounded-2xl border-2 p-4 sm:flex-row sm:items-center ${picked ? "border-[#276655] bg-[#f3fbf8]" : "border-[#172733]/8"}`} key={flight.id}>
                       <div className="flex min-w-0 flex-1 items-center gap-4">
-                        {flight.airlineLogo ? <Image alt="" className="h-10 w-10 shrink-0 object-contain" height={40} src={flight.airlineLogo} unoptimized width={40} /> : null}
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#f7f7f3]">{flight.airlineLogo ? <Image alt="" className="h-10 w-10 object-contain" height={40} src={flight.airlineLogo} unoptimized width={40} onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <span aria-hidden="true">✈️</span>}</span>
                         <div className="min-w-0">
+                          <div className="mb-1 flex flex-wrap gap-1.5">{flight.price === highlights.cheapest ? <span className="rounded-full bg-[#daf0ea] px-2 py-1 text-xs font-bold text-[#276655]">Cheapest</span> : null}{flight.durationMinutes === highlights.shortest ? <span className="rounded-full bg-[#deedff] px-2 py-1 text-xs font-bold text-[#2f6699]">Shortest</span> : null}</div>
                           <p className="font-bold text-[#173f50]">{formatTime(flight.departTime)} → {formatTime(flight.arriveTime)}</p>
                           <p className="text-sm text-[#718087]">
                             {flight.airline} · {flight.departAirport} → {flight.arriveAirport} · {formatDuration(flight.durationMinutes)} · {flight.stops === 0 ? "Nonstop" : `${flight.stops} stop${flight.stops === 1 ? "" : "s"}`}
@@ -283,7 +291,9 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 text-right text-lg font-extrabold text-[#173f50]">Total {money(myBooking.total)}</p>
+              <p className="mt-4 text-right text-lg font-extrabold text-[#173f50]">You Paid {money(myBooking.total)} {myBooking.items.every((item) => item.source !== "assistant") ? "(Simulated)" : "(Recorded)"}</p>
+              {owedCopy ? <p className="mt-3 rounded-2xl bg-[#fff8dc] p-4 font-bold text-[#6f5a16]">{owedCopy} This is separate from the amount above.</p> : null}
+              <EmailConfirmation booking={myBooking} hotelShare={owedShare} tripName={props.tripName} />
               <p className="mt-2 text-xs text-[#879196]">
                 {myBooking.items.some((item) => item.source === "assistant")
                   ? "Items marked “By your assistant” were recorded by your connected assistant. Demo items were not reserved and no card was charged."
@@ -305,12 +315,13 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                         ? "The host hasn't picked one yet"
                         : iBookHotel
                           ? `${selectedHotel.name} · you book it for the group`
-                          : `${selectedHotel.name} · ${hotelBooker?.name ?? "The host"} books it; your share is about ${money(hotelShare)}`}
+                          : `${selectedHotel.name} · ${hotelBooker?.name ?? "The host"} books it; ${owedCopy}`}
                     </span>
                   </span>
                   <b>{iBookHotel ? money(hotelTotal) : "—"}</b>
                 </li>
               </ul>
+              {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} This is not part of your simulated charge.</p> : null}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-lg font-extrabold text-[#173f50]">Estimated total {money(myTotal)}</p>
                 <button

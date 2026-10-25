@@ -23,7 +23,7 @@ Every planned phase is built. The project is demo-ready.
 | 15 | README, demo seeding, polish | Done |
 | 16 (partial) | Phone sign-in, MCP assistant connector | Done. Calendar OAuth, real payments, full accounts: **not built** |
 
-Also built beyond the plan: trip sketch from the host's description, avatars you can customize, a live-updating dashboard, a real-time city autocomplete, photos on every option and stop.
+Also built beyond the plan: trip sketch from the host's description, avatars you can customize, a live-updating dashboard, a real-time city autocomplete, candidate hero/day-header photos and real-place photos on the shared itinerary.
 
 ## 2. Rules that must not be broken
 
@@ -142,7 +142,7 @@ Last known state: **all tests, lint and production build pass.**
 - `npm run build` rewrites generated route types, so run it once after adding a route to clear phantom type errors.
 - Travel times between stops are straight-line estimates (×1.3), not routing.
 - Flight prices are Google's round-trip price shown for the outbound leg; the return flight isn't chosen separately.
-- Option generation takes about 45 s (Muse), then photos load in the background (Wikipedia, then SerpApi for gaps, up to roughly 25 searches).
+- Option generation takes about 45 s (Muse), then day-header photos load in the background (Wikipedia, then SerpApi for gaps). Candidate activity rows use local icons, with roughly one header image per candidate/day.
 - A trip's itinerary photos use SerpApi thumbnails; approximately 20 to 35 searches the first time an itinerary opens.
 - Stop photos from Wikipedia can miss; the fallback is a time-of-day icon.
 - Anyone with a trip link can act as an unsaved traveler. Phone sign-in only protects *saved* travelers' ability to restore themselves.
@@ -155,7 +155,7 @@ Last known state: **all tests, lint and production build pass.**
 2. Paste the host's `localStorage` line into the browser console and reload (acts as Jay).
 3. Show the boarding pass, the green availability calendar (hover a day), and the crew card. Click your avatar and change it.
 4. **Compare Options** → **Create Shared Itinerary**. Show the compromise and real places with reviews.
-5. Group chat: "I'd rather skip the museum on day 3 and shop in Ginza." Muse makes a personal plan.
+5. Group chat: "@muse I'd rather skip the museum on day 3 and shop in Ginza." Muse makes a personal plan.
 6. **Book Travel**: pick a hotel for the group, choose a flight, approve the demo booking.
 7. **Connect**: create a token and run the quick-test command to show an assistant reading the trip.
 
@@ -175,3 +175,19 @@ Last known state: **all tests, lint and production build pass.**
 - [ ] `npm run seed:demo`, click through every page above
 - [ ] Read `AGENTS.md`, `PROJECT_SPEC.md`, `IMPLEMENTATION_PLAN.md`, then this file
 - [ ] Don't run Git commands as an AI agent
+
+
+## Current polish and revision behavior
+
+- Ordinary group chat only saves messages. Muse runs only when a trimmed message begins with the @muse mention (case insensitive).
+- Minor shared edits and personal alternatives remain supported. Destination changes, whole-trip replacement and substantial multi-day rewrites become one pending proposal instead of applying immediately.
+- Every currently joined traveler must vote. A strict approval majority applies atomically against the original itinerary id/revision; ties reject, and stale proposals cannot overwrite newer work.
+- Approved moves update trip destination/name and itinerary title/destination/days, clear old real-place matches and personal plans, clear travel searches/bookings, and show an approval notice. Same-city major edits preserve only unchanged personal stops.
+- Major-change votes require a signed browser proof from create/join or the traveler's existing verified saved phone. The demo seed script prints a signed proof with each console identity command; rerun it for a newly seeded demo. Old localStorage-only identities without a saved phone cannot securely prove ownership and cannot vote without trusted recovery; they can still save and restore their phone. Their normal planning/chat access still works.
+- Phone saving/restoration remains compatible. A newly linked phone only gains voting access when the browser already has valid voter proof; an unsigned first-time phone save is tagged phoneVotingVerified false and cannot grant someone else's vote. Existing previously saved-phone restoration through My Trips is preserved.
+- Preferences show one total budget and one combined final notes field. Legacy optional budgets survive edits, and legacy destination notes are combined without duplication.
+- Availability supports mouse/pen painting, keyboard clicks and touch taps. Options over seven days use seven-day dialogs. The avatar editor uses a viewport-bounded native dialog.
+- Progress has four blue stages: Get Ready, Itinerary Options & Vote, Shared Itinerary, Book Travel.
+- Travel keeps its existing airline logos, adds Cheapest/Shortest badges, distinguishes hotel shares from simulated charges, and offers an honest mailto email draft/copy action.
+- Early availability flight-price hints remain deferred; no new automatic paid searches or Expedia provider were added.
+- Browser-based manual desktop/mobile QA could not be completed in the implementation session because no browser surface was available. Run the requested interaction checklist before presenting.

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addImagesToActivities } from "@/lib/place-images";
+import { addImagesToCandidateDays } from "@/lib/place-images";
 import { addSerpPhotosToCandidates, getSerpApiKey } from "@/lib/serpapi-places";
 import { claimOptionPhotos, finishOptionPhotos } from "@/lib/trip-repository";
 
@@ -21,7 +21,7 @@ export async function POST(
     }
 
     try {
-      let candidates = await addImagesToActivities(claim.candidates);
+      let candidates = await addImagesToCandidateDays(claim.candidates);
 
       const serpKey = getSerpApiKey();
       if (serpKey) {

@@ -8,7 +8,7 @@
 //
 // No Muse or SerpApi credits are used. In the itinerary stage the real Google
 // Maps places load the first time someone opens the itinerary page.
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -266,6 +266,11 @@ console.log(`  Join link:  ${base}/join?trip=${inviteCode}\n`);
 console.log("The app remembers who you are per browser. To act as a traveler, open the dashboard,");
 console.log("then paste one of these into the browser console (Cmd+Option+J) and reload:\n");
 for (const person of trip.travelers) {
+  // Seeded travelers need the same signed browser proof as create/join gives
+  // real travelers. Only this local maintainer script prints demo identities.
+  const payload = Buffer.from(JSON.stringify({ tripId: trip.id, travelerId: person.id, expiresAt: Date.now() + 30 * 86400000 })).toString("base64url");
+  const signature = createHmac("sha256", env.SESSION_SECRET?.trim() || "hacktx-dev-session-secret-change-me").update(`traveler:${payload}`).digest("base64url");
+  const cookie = `tp_traveler_${trip.id}=${payload}.${signature}; path=/; SameSite=Lax; Max-Age=${30 * 86400}`;
   console.log(`  ${person.name}${person.isHost ? " (host)" : ""}:`);
-  console.log(`  localStorage.setItem("hacktx-trip-planner:traveler:${trip.id}", "${person.id}")\n`);
+  console.log(`  localStorage.setItem("hacktx-trip-planner:traveler:${trip.id}", "${person.id}"); document.cookie = ${JSON.stringify(cookie)}; location.reload();\n`);
 }

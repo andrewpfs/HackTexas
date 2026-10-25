@@ -114,9 +114,9 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
   return (
     <section className="mt-7 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]" aria-labelledby="decide-together">
       <div className="rounded-3xl border border-[#e4664f]/20 bg-white p-6 sm:p-8">
-        <p className="eyebrow">Decide together</p>
+        <p className="eyebrow">Decide Together</p>
         <h2 className="mt-2 text-2xl font-bold tracking-tight" id="decide-together">
-          {itineraryReady ? "Voting is closed" : "Cast your vote"}
+          {itineraryReady ? "Voting Is Closed" : "Cast Your Vote"}
         </h2>
 
         {itineraryReady ? (
@@ -187,7 +187,7 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
 
       <div className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8">
         <div className="flex items-center justify-between gap-4">
-          <h3 className="text-lg font-bold text-[#173f50]">Group votes</h3>
+          <h3 className="text-lg font-bold text-[#173f50]">Group Votes</h3>
           <p className="text-sm font-bold text-[#52766c]">{votedCount} of {travelers.length} voted</p>
         </div>
         <ul className="mt-4 divide-y divide-[#172733]/8">

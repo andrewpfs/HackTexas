@@ -34,20 +34,20 @@ export async function POST(
         includeReviews: process.env.SERPAPI_INCLUDE_REVIEWS !== "false",
       });
     } catch (error) {
-      await finishPlacesLookup(tripId, claim.itinerary.id, null);
+      await finishPlacesLookup(tripId, claim.itinerary.id, null, claim.itinerary.revision ?? 0);
       throw error;
     }
 
     // Nothing worked (bad key, quota, outage): release the claim so it can be retried.
     if (lookup.foundCount === 0 && lookup.failedCount > 0) {
-      await finishPlacesLookup(tripId, claim.itinerary.id, null);
+      await finishPlacesLookup(tripId, claim.itinerary.id, null, claim.itinerary.revision ?? 0);
       return NextResponse.json(
         { error: "We couldn't reach the places service. Please try again." },
         { status: 502 },
       );
     }
 
-    await finishPlacesLookup(tripId, claim.itinerary.id, lookup.days);
+    await finishPlacesLookup(tripId, claim.itinerary.id, lookup.days, claim.itinerary.revision ?? 0);
     return NextResponse.json({
       status: "added",
       foundCount: lookup.foundCount,

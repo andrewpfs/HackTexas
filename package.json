@@ -40,10 +40,13 @@
     "pretest:places": "npm run clean:test-build",
     "test:places": "tsc -p tsconfig.tests.json && node --test .test-build/tests/serpapi-places.test.js",
     "posttest:places": "npm run clean:test-build",
-    "test": "npm run test:planning && npm run test:candidates && npm run test:updates && npm run test:muse && npm run test:voting && npm run test:places && npm run test:revision && npm run test:prefs && npm run test:avatar && npm run test:travel && npm run test:connect",
+    "test": "npm run test:planning && npm run test:candidates && npm run test:updates && npm run test:muse && npm run test:voting && npm run test:places && npm run test:revision && npm run test:prefs && npm run test:avatar && npm run test:travel && npm run test:connect && npm run test:improvements",
     "pretest:updates": "npm run clean:test-build",
     "test:updates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/trip-updates.test.js",
-    "posttest:updates": "npm run clean:test-build"
+    "posttest:updates": "npm run clean:test-build",
+    "test:improvements": "tsc -p tsconfig.tests.json && node --require ./tests/stub-server-only.cjs --test .test-build/tests/improvements.test.js",
+    "pretest:improvements": "npm run clean:test-build",
+    "posttest:improvements": "npm run clean:test-build"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.49.4",

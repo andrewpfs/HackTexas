@@ -47,10 +47,15 @@ export function CityInput({ id, name, value, onChange, onPick, placeholder, requ
         const response = await fetch(`/api/cities?q=${encodeURIComponent(value)}`, { signal: controller.signal });
         const data = (await response.json()) as { cities: string[]; unavailable?: boolean };
         setUnavailable(Boolean(data.unavailable));
+        if (data.unavailable) onPick?.(value);
         setSuggestions(data.cities);
         setHighlight(-1);
       } catch {
-        // A newer keystroke replaced this request.
+        if (!controller.signal.aborted) {
+          setUnavailable(true);
+          setSuggestions([]);
+          onPick?.(value);
+        }
       }
     }, 250);
 
@@ -58,7 +63,7 @@ export function CityInput({ id, name, value, onChange, onPick, placeholder, requ
       clearTimeout(timer);
       controller.abort();
     };
-  }, [value, picked]);
+  }, [value, picked, onPick]);
 
   function choose(city: string) {
     setPickedValue(city);

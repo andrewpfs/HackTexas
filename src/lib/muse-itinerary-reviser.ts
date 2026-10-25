@@ -7,8 +7,11 @@ const stringSchema = { type: "string" };
 const revisionSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "changed", "changes", "days", "personal"],
+  required: ["reply", "changed", "changes", "days", "personal", "kind", "proposedDestination", "proposedTripName"],
   properties: {
+    kind: { type: "string", enum: ["reply_only", "personal", "shared_minor", "shared_major"] },
+    proposedDestination: stringSchema,
+    proposedTripName: stringSchema,
     reply: stringSchema,
     changed: { type: "boolean" },
     changes: { type: "array", items: stringSchema },
@@ -64,6 +67,9 @@ const systemPrompt = [
   "- If they ask a question, or the request is unclear, or it would clearly hurt another traveler's stated interests or an earlier message in the chat, set changed to false and reply with a short answer, question, or compromise. Do not silently overrule someone else.",
   "- If only the sender wants something different and the rest of the group would likely keep the stop (for example \"I'd rather hit the arcade while everyone shops\"), do NOT change the shared plan. Set changed to false and fill personal: applies true, the dayNumber and the exact title of the group stop they are skipping, and what they will do instead (title, location, short description). Their friends can join that plan later.",
   "- Otherwise set personal.applies to false with empty strings and dayNumber 0.",
+  "Classify kind as reply_only, personal, shared_minor, or shared_major. Destination/city/region changes, multiple rewritten days, or a fundamentally different trip concept are shared_major and require a group vote. Never claim a major proposal is already applied.",
+  "For shared_major return changed true, complete days, proposedDestination and proposedTripName. Otherwise use empty strings for those two fields. A destination change must explicitly name the new city in proposedDestination.",
+  "Use a flexible realistic schedule with meals, transit, check-in/out, rest, wandering, free time and buffers. Avoid hourly attractions and allow enough travel time. A free day can have one flexible Free time block. Keep clock times chronological.",
   "When you change the plan:",
   "- Return the COMPLETE list of days (every day, with every activity), not just the edited ones. Keep unchanged stops exactly as they were, including their title and placeSearchQuery.",
   "- Keep the same dates, the same number of days, and the same day numbers.",
@@ -75,6 +81,9 @@ const systemPrompt = [
 ].join("\n");
 
 type MuseRevision = {
+  kind?: unknown;
+  proposedDestination?: unknown;
+  proposedTripName?: unknown;
   reply?: unknown;
   changed?: unknown;
   changes?: unknown;
@@ -109,7 +118,14 @@ export function parseMuseRevision(output: unknown): RevisionResult {
         }
       : null;
 
+  if (parsed.kind !== undefined && !["reply_only", "personal", "shared_minor", "shared_major"].includes(String(parsed.kind))) {
+    throw new MusePlannerError("Muse returned an invalid revision kind.");
+  }
+  if (parsed.changed === true && days.length === 0) throw new MusePlannerError("Muse omitted the revised days.");
   return {
+    kind: parsed.kind as RevisionResult["kind"],
+    proposedDestination: typeof parsed.proposedDestination === "string" ? parsed.proposedDestination.trim() : undefined,
+    proposedTripName: typeof parsed.proposedTripName === "string" ? parsed.proposedTripName.trim() : undefined,
     reply: parsed.reply.trim(),
     changes: parsed.changed === true ? changes : [],
     days: parsed.changed === true && days.length > 0 ? days : null,

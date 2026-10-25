@@ -68,7 +68,7 @@ const systemPrompt = [
   "- Explain the major compromises in compromiseExplanation (2-4 sentences) and list each concrete change in compromises, naming whose concern it addresses.",
   "- Use only dates in planning.groupAvailability.sharedDates. Keep startDate..endDate consecutive shared dates, normally the chosen option's dates.",
   "- Include one entry in days for every date from startDate to endDate.",
-  "- Give each day 3-5 activities with a clock time like 9:00 AM, a specific location in the destination, and a short description.",
+  "- Use a flexible realistic schedule with chronological clock times, specific locations and short descriptions. Mix a few main activities with meals, transit, check-in/out, rest, free time, wandering and buffers. Avoid impossible back-to-back travel or major attractions every hour; do not force 3-5 attractions into each day.",
   "- Respect each traveler's departure city and the group's budgets. The lowest maximum budget is the binding constraint.",
   "- Do not invent current prices, flight numbers, or hotel availability.",
   "- For each activity, set placeSearchQuery to a short Google Maps search that finds one real, well-reviewed place for it, including the neighborhood and city (for example \"ramen Shinjuku Tokyo\"). Use an empty string for Travel and Free time.",

@@ -1,3 +1,4 @@
+import { createTravelerProof, travelerCookieName, travelerCookieOptions } from "@/lib/trip-browser-identity";
 import { randomInt, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { verifyCity } from "@/lib/city-search";
@@ -85,10 +86,9 @@ export async function POST(request: Request) {
 
     await saveTrip(trip);
 
-    return NextResponse.json(
-      { trip: { id: trip.id, inviteCode: trip.inviteCode, hostTravelerId: trip.travelers[0].id } },
-      { status: 201 },
-    );
+    const response = NextResponse.json({ trip: { id: trip.id, inviteCode: trip.inviteCode, hostTravelerId: trip.travelers[0].id } }, { status: 201 });
+    response.cookies.set(travelerCookieName(trip.id), createTravelerProof(trip.id, trip.travelers[0].id), travelerCookieOptions);
+    return response;
   } catch (error) {
     console.error("Failed to create trip:", error);
     return NextResponse.json(

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   formatCalendarDate,
@@ -50,10 +50,38 @@ export function AvailabilityCalendar({
   const [storedTravelerMissing, setStoredTravelerMissing] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saveErrors, setSaveErrors] = useState<string[]>([]);
+  const drag = useRef<{ selecting: boolean; visited: Set<string> } | null>(null);
+  const suppressClick = useRef(false);
   const today = useToday();
   const months = getCalendarMonths(earliestPossibleDate, latestPossibleDate);
   // Days that have already passed cannot be chosen.
   const allSelectableDates = getDatesInRange(earliestPossibleDate, latestPossibleDate).filter((date) => !today || date >= today);
+
+  useEffect(() => {
+    function endDrag() { drag.current = null; }
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("blur", endDrag);
+    return () => {
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("blur", endDrag);
+    };
+  }, []);
+
+  function paintDate(date: string) {
+    const currentDrag = drag.current;
+    if (!currentDrag || currentDrag.visited.has(date) || !allSelectableDates.includes(date)) return;
+    currentDrag.visited.add(date);
+    setSelectedDates((previous) => {
+      if (currentDrag.selecting) {
+        if (previous.includes(date)) return previous;
+        return [...previous, date].sort();
+      }
+      return previous.filter((item) => item !== date);
+    });
+    setSaveErrors([]);
+  }
 
   useEffect(() => {
     if (!travelerId) {
@@ -153,8 +181,8 @@ export function AvailabilityCalendar({
   if (!travelerId || storedTravelerMissing) {
     return (
       <section className="mt-8 rounded-3xl border border-[#172733]/8 bg-white p-7 sm:p-9" aria-labelledby="identity-title">
-        <p className="eyebrow">Browser traveler identity</p>
-        <h2 className="mt-3 text-2xl font-bold" id="identity-title">This browser isn&apos;t associated with a traveler on this trip yet.</h2>
+        <p className="eyebrow">Browser Traveler Identity</p>
+        <h2 className="mt-3 text-2xl font-bold" id="identity-title">This Browser Isn&apos;t Associated With A Traveler On This Trip Yet.</h2>
         <p className="mt-3 max-w-2xl leading-7 text-[#66757d]">
           Open the invite and join the trip in this browser to save availability for your traveler.
         </p>
@@ -181,7 +209,8 @@ export function AvailabilityCalendar({
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="eyebrow">{travelerName}&apos;s calendar</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">Choose all dates that work.</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight">Choose All Dates That Work</h2>
+            <p className="mt-2 text-sm text-[#718087]">Click or drag to add or remove dates. On a phone, tap each date.</p>
             <p className="mt-2 text-sm leading-6 text-[#718087]">
               Selected {selectedDates.length} of {allSelectableDates.length} possible dates.
             </p>
@@ -228,7 +257,22 @@ export function AvailabilityCalendar({
                     }`}
                     disabled={!selectable}
                     key={date}
-                    onClick={() => toggleDate(date)}
+                    onPointerDown={(event) => {
+                      suppressClick.current = false;
+                      if (event.pointerType === "touch" || event.button !== 0) return;
+                      event.preventDefault();
+                      event.currentTarget.focus();
+                      suppressClick.current = true;
+                      drag.current = { selecting: !selectedDates.includes(date), visited: new Set() };
+                      paintDate(date);
+                    }}
+                    onPointerEnter={(event) => {
+                      if (event.buttons === 1) paintDate(date);
+                    }}
+                    onClick={(event) => {
+                      if (event.detail === 0 || !suppressClick.current) toggleDate(date);
+                      suppressClick.current = false;
+                    }}
                     type="button"
                   >
                     {dayNumber}

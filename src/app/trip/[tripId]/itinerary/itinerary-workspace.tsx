@@ -1,24 +1,28 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { ProposalCard, type ChatState } from "./proposal-card";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { getChangedStopKeys, getStopKey, needsPlaceLookup } from "@/lib/itinerary-diff";
 import { estimateTravel, formatDistance, formatMinutes, travelModes, type TravelMode } from "@/lib/travel-time";
-import type { ChatMessage, GroupItinerary, ItineraryActivity, PersonalOverride, PlaceSuggestion } from "@/lib/trip-types";
+import type { ChatMessage, GroupItinerary, ItineraryProposal, ItineraryActivity, PersonalOverride, PlaceSuggestion } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
 type WorkspaceProps = {
   tripId: string;
   initialItinerary: GroupItinerary;
   initialMessages: ChatMessage[];
+  initialProposal: ItineraryProposal | null;
+  initialApprovedProposal: ItineraryProposal | null;
   travelers: { id: string; name: string }[];
   placesConfigured: boolean;
 };
 
 type Panel = "map" | "chat";
 
-const directionFlags: Record<TravelMode, string> = { walk: "w", bike: "b", car: "d" };
+const directionFlags: Record<TravelMode, string> = { walk: "w", bike: "b", car: "d", transit: "r" };
 
 function hasCoordinates(place: PlaceSuggestion | undefined): place is PlaceSuggestion & { latitude: number; longitude: number } {
   return place !== undefined && typeof place.latitude === "number" && typeof place.longitude === "number";
@@ -48,7 +52,10 @@ function getMapSource(
   return `${base}?q=${encodeURIComponent(query)}&z=15&output=embed`;
 }
 
-export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, travelers, placesConfigured }: WorkspaceProps) {
+export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, initialProposal, initialApprovedProposal, travelers, placesConfigured }: WorkspaceProps) {
+  const router = useRouter();
+  const [proposal, setProposal] = useState(initialProposal);
+  const [approvedProposal, setApprovedProposal] = useState(initialApprovedProposal);
   const { browserReady, travelerId } = useTravelerIdentity(tripId);
   const currentTraveler = travelers.find((traveler) => traveler.id === travelerId);
 
@@ -67,6 +74,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [draft, setDraft] = useState("");
   const [aboutStop, setAboutStop] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [askingMuse, setAskingMuse] = useState(false);
   const [chatError, setChatError] = useState("");
   const [placesError, setPlacesError] = useState(false);
   const [placesAttempt, setPlacesAttempt] = useState(0);
@@ -74,6 +82,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const lookingUpRef = useRef(false);
   const itineraryRef = useRef(itinerary);
   const messagesCountRef = useRef(messages.length);
+  const lastMessageIdRef = useRef(messages.at(-1)?.id);
   const sendCounter = useRef(0);
   const messageListRef = useRef<HTMLDivElement>(null);
 
@@ -87,12 +96,19 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
       (next.revision ?? 0) > (previous.revision ?? 0) ? getChangedStopKeys(previous.days, next.days) : []
     );
 
+    if (next.destination !== previous.destination) router.refresh();
     setItinerary(next);
     setMessages(nextMessages);
     if (changed.length > 0) {
       setChangedKeys(changed);
     }
-  }, []);
+  }, [router]);
+
+  function applyProposalState(data: ChatState) {
+    setProposal(data.proposal ?? null);
+    setApprovedProposal(data.approvedProposal ?? null);
+    applyState(data.itinerary, data.messages);
+  }
 
   // Everyone sees plan changes and new messages without refreshing.
   useEffect(() => {
@@ -107,12 +123,15 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
           return;
         }
 
-        const data = (await response.json()) as { itinerary: GroupItinerary; messages: ChatMessage[] };
+        const data = (await response.json()) as ChatState;
+        setProposal(data.proposal ?? null);
+        setApprovedProposal(data.approvedProposal ?? null);
         const current = itineraryRef.current;
         const same =
           data.itinerary.revision === current.revision &&
           data.itinerary.placesStatus === current.placesStatus &&
-          data.messages.length === messagesCountRef.current;
+          data.messages.length === messagesCountRef.current &&
+          data.messages.at(-1)?.id === lastMessageIdRef.current;
 
         if (!same) {
           applyState(data.itinerary, data.messages);
@@ -127,8 +146,9 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
   useEffect(() => {
     messagesCountRef.current = messages.length;
+    lastMessageIdRef.current = messages.at(-1)?.id;
     messageListRef.current?.scrollTo({ top: messageListRef.current.scrollHeight });
-  }, [messages.length, isSending, panel]);
+  }, [messages, isSending, panel]);
 
   // Real places load once after the plan is created, and again for stops Muse adds.
   useEffect(() => {
@@ -149,7 +169,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
         const stateResponse = await fetch(`/api/trips/${tripId}/itinerary`, { cache: "no-store" });
         if (stateResponse.ok) {
-          const data = (await stateResponse.json()) as { itinerary: GroupItinerary; messages: ChatMessage[] };
+          const data = (await stateResponse.json()) as ChatState;
           setItinerary(data.itinerary);
           setMessages(data.messages);
         }
@@ -228,6 +248,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
     sendingRef.current = true;
     setIsSending(true);
+    setAskingMuse(text.toLowerCase().startsWith("@muse"));
     setChatError("");
     setDraft("");
 
@@ -254,6 +275,8 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         itinerary?: GroupItinerary;
         messages?: ChatMessage[];
         changedStops?: string[];
+        proposal?: ItineraryProposal | null;
+        approvedProposal?: ItineraryProposal | null;
       };
 
       if (!response.ok || !data.itinerary || !data.messages) {
@@ -263,6 +286,8 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         return;
       }
 
+      setProposal(data.proposal ?? null);
+      setApprovedProposal(data.approvedProposal ?? null);
       applyState(data.itinerary, data.messages, data.changedStops);
     } catch {
       setChatError("We couldn't reach the server. Please try again.");
@@ -291,7 +316,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         {place.address ? <p className="mt-1 text-xs text-[#879196]">{place.address}</p> : null}
 
         {place.reviews.length > 0 ? (
-          <ul className="mt-4 space-y-3">
+          <details className="mt-4"><summary className="cursor-pointer text-sm font-bold">Reviews ({place.reviews.length})</summary><ul className="mt-3 space-y-3">
             {place.reviews.map((review) => (
               <li className="rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#53666f]" key={`${review.author}-${review.date}`}>
                 <p>&ldquo;{review.snippet}&rdquo;</p>
@@ -302,7 +327,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 </p>
               </li>
             ))}
-          </ul>
+          </ul></details>
         ) : null}
 
         <a className="mt-4 inline-block text-sm font-bold text-[#173f50] underline decoration-[#e4664f]/40 underline-offset-4 hover:text-[#e4664f]" href={place.mapsUrl} rel="noopener noreferrer" target="_blank">
@@ -375,6 +400,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
   return (
     <div className="mt-6">
+      {approvedProposal ? <section className="mb-5 rounded-2xl border-2 border-[#276655]/30 bg-[#daf0ea] p-5" role="status"><h2 className="text-xl font-bold text-[#276655]">Major Trip Change Approved</h2><p className="mt-2 text-sm leading-6">{approvedProposal.previousDestination !== approvedProposal.proposedDestination ? `The group voted to move the trip from ${approvedProposal.previousDestination} to ${approvedProposal.proposedDestination}. ` : "The group approved a major rewrite. "}The shared itinerary was updated. Old travel searches and simulated bookings were cleared; find travel again for the new plan.</p></section> : null}
       {currentTraveler ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex rounded-full border border-[#172733]/10 bg-white p-1" role="radiogroup" aria-label="Whose plan to show">
@@ -387,14 +413,14 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
           <p className="text-sm text-[#718087]">{view === "mine" ? "Your day, including any stops where you do your own thing." : "Everyone's shared plan. Pick a stop to do your own thing instead."}</p>
         </div>
       ) : null}
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2" role="tablist" aria-label="Days">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 py-2" role="tablist" aria-label="Days">
         {itinerary.days.map((dayItem, index) => {
           const photo = dayPhoto(dayItem);
           const selected = index === dayIndex;
           return (
             <button
               aria-selected={selected}
-              className={`relative isolate h-32 w-52 shrink-0 overflow-hidden rounded-2xl bg-[#173f50] p-4 text-left text-white transition sm:w-60 ${selected ? "ring-4 ring-[#e4664f]" : "opacity-80 hover:opacity-100"}`}
+              className={`relative isolate h-32 w-52 shrink-0 overflow-hidden rounded-2xl bg-[#173f50] p-4 text-left text-white transition sm:w-60 ${selected ? "ring-4 ring-inset ring-[#397bb3]" : "opacity-80 hover:opacity-100"}`}
               key={dayItem.date}
               onClick={() => {
                 setDayIndex(index);
@@ -518,7 +544,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                             title="Show this trip on the map"
                             type="button"
                           >
-                            {travelModes.find((option) => option.mode === mode)?.icon} {formatMinutes(estimate.minutes)} {mode === "walk" ? "walk" : mode === "bike" ? "by bike" : "by car"}
+                            {travelModes.find((option) => option.mode === mode)?.icon} {formatMinutes(estimate.minutes)} {mode === "walk" ? "walk" : mode === "bike" ? "by bike" : mode === "transit" ? "by transit" : "by car"}
                           </button>
                           <span className="text-xs text-[#879196]">{formatDistance(estimate.distanceKm)} · estimate</span>
                           <span className="flex gap-1" role="group" aria-label="Change how you get there">
@@ -526,7 +552,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                               <button
                                 aria-label={option.label}
                                 aria-pressed={mode === option.mode}
-                                className={`h-8 rounded-full px-2.5 text-sm transition ${mode === option.mode ? "bg-[#173f50] text-white" : "bg-[#f2f0ea] hover:bg-[#e9e5da]"}`}
+                                className={`h-8 rounded-full px-2.5 text-sm transition ${mode === option.mode ? "bg-[#deedff] text-[#173f50] ring-2 ring-[#397bb3]" : "bg-[#f2f0ea] hover:bg-[#e9e5da]"}`}
                                 key={option.mode}
                                 onClick={() => setModes((existing) => ({ ...existing, [connectorKey]: option.mode }))}
                                 title={option.label}
@@ -551,7 +577,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white shadow-[0_14px_38px_rgba(23,63,80,0.07)]">
             <div className="flex border-b border-[#172733]/8" role="tablist">
-              {([["map", "Map and reviews"], ["chat", `Group chat${messages.length ? ` (${messages.length})` : ""}`]] as [Panel, string][]).map(([id, label]) => (
+              {([["map", "Map And Reviews"], ["chat", `Group Chat${messages.length ? ` (${messages.length})` : ""}`]] as [Panel, string][]).map(([id, label]) => (
                 <button
                   aria-selected={panel === id}
                   className={`flex-1 px-4 py-3 text-sm font-bold transition ${panel === id ? "bg-white text-[#173f50] shadow-[inset_0_-3px_0_#e4664f]" : "bg-[#f7f7f3] text-[#879196] hover:text-[#173f50]"}`}
@@ -597,11 +623,12 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 </div>
               </div>
             ) : (
-              <div className="flex h-[34rem] flex-col">
+              <div className="flex h-[40rem] max-h-[85dvh] flex-col"><p className="border-b border-[#172733]/8 p-4 text-xs font-semibold text-[#53666f]">{travelers.map((traveler) => traveler.name).join(" ? ")} ? <span className="rounded-full bg-[#fff8dc] px-2 py-1 text-[#6f5a16]">✦ Muse</span></p>
                 <div className="flex-1 space-y-3 overflow-y-auto p-5" ref={messageListRef}>
+                  {proposal ? <ProposalCard onUpdate={applyProposalState} proposal={proposal} travelerId={travelerId} travelers={travelers} tripId={tripId} /> : null}
                   {messages.length === 0 ? (
                     <p className="rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#718087]">
-                      Not feeling a stop? Tell Muse what you would change and why, for example &ldquo;I&apos;d rather skip shopping, it&apos;s not really my thing.&rdquo; Muse updates the shared plan for everyone.
+                      Message your group here. For help with the plan, try &ldquo;@muse make day 3 more relaxed.&rdquo; Major changes go to a group vote.
                     </p>
                   ) : null}
                   {messages.map((message) => {
@@ -624,8 +651,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                   })}
                   {isSending ? (
                     <div className="flex flex-col items-start">
-                      <p className="mb-1 px-1 text-xs font-bold text-[#879196]">✦ Muse</p>
-                      <div className="rounded-2xl bg-[#fff8dc] px-4 py-3 text-sm text-[#5a4a12]" role="status">Reading your message and updating the plan…</div>
+                      <div className="rounded-2xl bg-[#f7f7f3] px-4 py-3 text-sm text-[#53666f]" role="status">{askingMuse ? "Muse is considering your request…" : "Sending your message…"}</div>
                     </div>
                   ) : null}
                 </div>
@@ -635,6 +661,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                     <p className="text-sm text-[#718087]">Open this trip from your invite link on this device to join the chat.</p>
                   ) : (
                     <>
+                      <p className="mb-2 text-xs leading-5 text-[#607179]">Message the group normally. Start with @muse to ask Muse to help change the plan.</p>
                       {activity ? (
                         <label className="mb-2 flex cursor-pointer items-center gap-2 text-xs font-semibold text-[#607179]">
                           <input checked={aboutStop} className="h-4 w-4 accent-[#e4664f]" onChange={(event) => setAboutStop(event.target.checked)} type="checkbox" />
@@ -653,7 +680,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                               event.currentTarget.form?.requestSubmit();
                             }
                           }}
-                          placeholder="example: I don't like this, I'd rather do something outdoors"
+                          placeholder="Message the group… or type @muse"
                           rows={2}
                           value={draft}
                         />

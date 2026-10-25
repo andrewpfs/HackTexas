@@ -8,6 +8,7 @@ import type {
   CandidateVote,
   ChatMessage,
   ItineraryDay,
+  ItineraryProposal,
   GroupItinerary,
   PlannerSource,
   Traveler,
@@ -20,6 +21,7 @@ import { applyTripDetailsUpdate, clearPlanningOutputs } from "./trip-updates";
 import { needsPlaceLookup } from "./itinerary-diff";
 import { jsonTripStore, type TripStore } from "./trip-store";
 import { getSupabaseTripStore } from "./supabase-trip-store";
+import { applyProposalVote, proposalMatchesBase } from "./itinerary-proposals";
 
 type JoinResult =
   | { status: "duplicate" }
@@ -115,7 +117,13 @@ export async function updateTravelerPreferences(
       return { save: false, result: { status: "traveler-not-found" as const } };
     }
 
-    traveler.preferences = preferences;
+    // The current questionnaire no longer edits these optional historical budgets.
+    traveler.preferences = {
+      ...preferences,
+      foodBudgetPerDay: preferences.foodBudgetPerDay ?? traveler.preferences?.foodBudgetPerDay,
+      lodgingBudgetPerNight: preferences.lodgingBudgetPerNight ?? traveler.preferences?.lodgingBudgetPerNight,
+      activitiesBudget: preferences.activitiesBudget ?? traveler.preferences?.activitiesBudget,
+    };
     traveler.departureLocation = departureLocation.trim();
     traveler.preferencesComplete = true;
     clearPlanningOutputs(trip);
@@ -264,10 +272,11 @@ export async function finishPlacesLookup(
   tripId: string,
   itineraryId: string,
   days: GroupItinerary["days"] | null,
+  expectedRevision?: number,
 ) {
   const result = await getStore().update<{ status: "saved" | "released" | "stale" }>(tripId, (trip) => {
     const itinerary = trip.itinerary;
-    if (!itinerary || itinerary.id !== itineraryId) {
+    if (!itinerary || itinerary.id !== itineraryId || (expectedRevision !== undefined && (itinerary.revision ?? 0) !== expectedRevision)) {
       return { save: false, result: { status: "stale" as const } };
     }
 
@@ -296,6 +305,25 @@ export async function appendChatMessage(tripId: string, message: ChatMessage) {
     return { save: true, result: { status: "added" as const, trip } };
   });
 
+  return result ?? { status: "trip-not-found" as const };
+}
+
+export async function saveItineraryProposal(tripId: string, proposal: ItineraryProposal, message: ChatMessage) {
+  const result = await getStore().update<{ status: "saved" | "conflict" | "already-open"; trip: Trip }>(tripId, (trip) => {
+    if (!proposalMatchesBase(trip, proposal)) return { save: false, result: { status: "conflict", trip } };
+    if (trip.pendingItineraryProposal?.status === "pending") return { save: false, result: { status: "already-open", trip } };
+    trip.pendingItineraryProposal = proposal;
+    pushMessages(trip, [message]);
+    return { save: true, result: { status: "saved", trip } };
+  });
+  return result ?? { status: "trip-not-found" as const };
+}
+
+export async function voteOnItineraryProposal(tripId: string, proposalId: string, travelerId: string, choice: "approve" | "reject") {
+  const result = await getStore().update<{ status: string; trip: Trip }>(tripId, (trip) => {
+    const status = applyProposalVote(trip, proposalId, travelerId, choice);
+    return { save: status !== "not-allowed" && status !== "closed", result: { status, trip } };
+  });
   return result ?? { status: "trip-not-found" as const };
 }
 
@@ -382,7 +410,7 @@ export async function finishOptionPhotos(tripId: string, candidates: CandidateTr
     }
 
     if (candidates && current) {
-      trip.candidateOptions = current.map((candidate, index) => ({ ...candidate, days: candidates[index].days }));
+      trip.candidateOptions = current.map((candidate, index) => ({ ...candidate, imageUrl: candidates[index].imageUrl ?? candidate.imageUrl, days: candidates[index].days }));
       trip.optionPhotosStatus = "added";
     } else {
       trip.optionPhotosStatus = undefined;
@@ -436,10 +464,10 @@ export async function claimHotelSearch(tripId: string, checkIn: string, checkOut
   return result ?? { status: "no-itinerary" as const };
 }
 
-export async function finishHotelSearch(tripId: string, update: Partial<NonNullable<NonNullable<Trip["travel"]>["hotels"]>>) {
+export async function finishHotelSearch(tripId: string, update: Partial<NonNullable<NonNullable<Trip["travel"]>["hotels"]>>, expectedStartedAt?: string) {
   await getStore().update<null>(tripId, (trip) => {
     const current = trip.travel?.hotels;
-    if (!current) {
+    if (!current || current.startedAt !== expectedStartedAt) {
       return { save: false, result: null };
     }
     trip.travel = { ...trip.travel, hotels: { ...current, ...update, startedAt: undefined } };
@@ -492,10 +520,11 @@ export async function finishFlightSearch(
   tripId: string,
   travelerId: string,
   update: Partial<NonNullable<NonNullable<Trip["travel"]>["flights"]>[string]>,
+  expectedStartedAt?: string,
 ) {
   await getStore().update<null>(tripId, (trip) => {
     const current = trip.travel?.flights?.[travelerId];
-    if (!current) {
+    if (!current || current.startedAt !== expectedStartedAt) {
       return { save: false, result: null };
     }
     trip.travel = { ...trip.travel, flights: { ...trip.travel?.flights, [travelerId]: { ...current, ...update, startedAt: undefined } } };
@@ -517,8 +546,9 @@ export async function selectFlight(tripId: string, travelerId: string, flightId:
   return result ?? { status: "not-found" as const };
 }
 
-export async function saveBooking(tripId: string, booking: Booking) {
-  const result = await getStore().update<{ status: "saved" | "traveler-not-found" }>(tripId, (trip) => {
+export async function saveBooking(tripId: string, booking: Booking, expectedItinerary?: { id: string; revision: number }) {
+  const result = await getStore().update<{ status: "saved" | "traveler-not-found" | "stale" }>(tripId, (trip) => {
+    if (expectedItinerary && (trip.itinerary?.id !== expectedItinerary.id || (trip.itinerary?.revision ?? 0) !== expectedItinerary.revision)) return { save: false, result: { status: "stale" as const } };
     if (!trip.travelers.some((traveler) => traveler.id === booking.travelerId)) {
       return { save: false, result: { status: "traveler-not-found" as const } };
     }
@@ -647,11 +677,13 @@ export async function findTripsByAssistantToken(assistantTokenHash: string) {
 }
 
 // Saves a trip to a phone. A traveler already saved to a different phone can't be taken over.
-export async function linkTravelerPhone(tripId: string, travelerId: string, phoneHash: string, last4: string) {
+export async function linkTravelerPhone(tripId: string, travelerId: string, phoneHash: string, last4: string, votingProof = false) {
   const result = await getStore().update<{ status: "linked" | "taken" | "traveler-not-found" }>(tripId, (trip) => {
     const traveler = trip.travelers.find((item) => item.id === travelerId);
     if (!traveler) return { save: false, result: { status: "traveler-not-found" as const } };
     if (traveler.phoneHash && traveler.phoneHash !== phoneHash) return { save: false, result: { status: "taken" as const } };
+    if (!traveler.phoneHash) traveler.phoneVotingVerified = votingProof;
+    else if (votingProof) traveler.phoneVotingVerified = true;
     traveler.phoneHash = phoneHash;
     traveler.phoneLast4 = last4;
     return { save: true, result: { status: "linked" as const } };

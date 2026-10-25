@@ -7,24 +7,23 @@ type ProgressNavProps = {
   itineraryReady: boolean;
 };
 
-// The five planning stages. Stages that can be opened are links.
+// The four planning stages. Stages that can be opened are links.
 export function ProgressNav({ tripId, currentStep, optionsReady, itineraryReady }: ProgressNavProps) {
   const steps = [
     { label: "Get Ready", href: `/trip/${tripId}`, available: true },
-    { label: "Compare Options", href: `/trip/${tripId}/options`, available: optionsReady },
-    { label: "Decide Together", href: `/trip/${tripId}/options#decide-together`, available: optionsReady },
+    { label: "Itinerary Options & Vote", href: `/trip/${tripId}/options`, available: optionsReady },
     { label: "Shared Itinerary", href: `/trip/${tripId}/itinerary`, available: itineraryReady },
     { label: "Book Travel", href: `/trip/${tripId}/travel`, available: itineraryReady },
   ];
 
   return (
     <nav aria-label="Planning progress">
-      <ol className="grid grid-cols-5 gap-2">
+      <ol className="grid grid-cols-4 gap-2">
         {steps.map((step, index) => {
           const reached = index <= currentStep;
-          const bar = <div className={`h-1.5 rounded-full transition ${reached ? "bg-[#e4664f]" : "bg-[#dfe3e1]"} ${step.available ? "group-hover:h-2" : ""}`} />;
+          const bar = <div className={`relative h-1.5 rounded-full transition ${reached ? "bg-[#397bb3]" : "bg-[#dfe3e1]"} ${step.available ? "group-hover:h-2" : ""}`} >{index === currentStep ? <span aria-hidden="true" className="absolute -top-3 right-1 text-xl">✈️</span> : null}</div>;
           const label = (
-            <p className={`mt-2 text-xs font-bold sm:text-sm ${index === currentStep ? "text-[#e4664f]" : reached ? "text-[#c9533f]" : "text-[#8a9599]"}`}>
+            <p className={`mt-2 text-xs font-bold sm:text-sm ${index === currentStep ? "text-[#397bb3]" : reached ? "text-[#2f6699]" : "text-[#8a9599]"}`}>
               {step.label}
             </p>
           );
