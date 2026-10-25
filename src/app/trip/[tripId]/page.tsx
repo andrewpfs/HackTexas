@@ -16,6 +16,8 @@ import { getVotingSummary } from "@/lib/voting";
 import { confirmedDatesStillShared, suggestTripDates } from "@/lib/date-suggestions";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { ConfirmDatesCard } from "./confirm-dates-card";
+import { estimateGroupFlightTimes } from "@/lib/flight-time";
+import { getTravelerDepartureLocation } from "@/lib/planning-context";
 
 export const instant = false;
 
@@ -93,7 +95,11 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const host = trip.travelers.find((traveler) => traveler.isHost);
   const showDateConfirmation = !candidatesAvailable && !itineraryReady && trip.travelers.length > 0 &&
     completedAvailabilityCount === trip.travelers.length && planningReadiness.sharedDates.length > 0;
-  const dateSuggestions = showDateConfirmation ? suggestTripDates(sharedWindows, preferredDurationDays) : [];
+  // With a known destination, flight time sets the shortest sensible trip.
+  const flightTimes = showDateConfirmation && trip.destination?.trim()
+    ? await estimateGroupFlightTimes(trip.travelers.map((traveler) => getTravelerDepartureLocation(trip, traveler)), trip.destination.trim())
+    : null;
+  const dateSuggestions = showDateConfirmation ? suggestTripDates(sharedWindows, preferredDurationDays, 3, flightTimes?.recommendedMinimumDays) : [];
   const confirmedDates = confirmedDatesStillShared(trip.confirmedDates, planningReadiness.sharedDates) ? trip.confirmedDates! : null;
 
   const completedAvailabilityLabel =
@@ -198,6 +204,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 confirmed={confirmedDates}
                 destination={trip.destination?.trim() || null}
                 faresConfigured={getSerpApiKey() !== null}
+                flightTimes={flightTimes}
                 hostId={host?.id ?? ""}
                 hostName={host?.name ?? "The host"}
                 priceCheck={trip.datePriceCheck ?? null}

@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { describeTripDates, type DateSuggestion } from "@/lib/date-suggestions";
-import { formatCalendarDate } from "@/lib/date-utils";
+import { formatCalendarDate, getDatesInRange } from "@/lib/date-utils";
+import type { GroupFlightTimes } from "@/lib/flight-time";
 import type { DatePriceCheck } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
@@ -17,6 +18,7 @@ type ConfirmDatesCardProps = {
   destination: string | null;
   priceCheck: DatePriceCheck | null;
   faresConfigured: boolean;
+  flightTimes: GroupFlightTimes | null;
 };
 
 function rangeLabel(startDate: string, endDate: string) {
@@ -40,7 +42,12 @@ export function ConfirmDatesCard(props: ConfirmDatesCardProps) {
   const [busy, setBusy] = useState<"" | "confirm" | "fares">("");
   const [error, setError] = useState("");
 
-  const selectedNotes = startDate && endDate && startDate <= endDate ? describeTripDates(startDate, endDate).notes : [];
+  const selectedDays = startDate && endDate && startDate <= endDate ? getDatesInRange(startDate, endDate).length : 0;
+  const minimumDays = props.flightTimes?.recommendedMinimumDays ?? 1;
+  const selectedNotes = selectedDays > 0 ? [
+    ...(selectedDays < minimumDays ? [`Only ${selectedDays} ${selectedDays === 1 ? "day" : "days"}: short for these flights (at least ${minimumDays} recommended).`] : []),
+    ...describeTripDates(startDate, endDate).notes,
+  ] : [];
   const shared = new Set(props.sharedDates);
   const endChoices = props.sharedDates.filter((date) => date >= startDate);
   const isConfirmed = props.confirmed?.startDate === startDate && props.confirmed?.endDate === endDate;
@@ -97,6 +104,18 @@ export function ConfirmDatesCard(props: ConfirmDatesCardProps) {
             ? "Pick the exact days before Muse plans options. These suggestions fit everyone's availability and dodge pricey travel days."
             : `Waiting for ${props.hostName} to confirm the exact dates. Here's what the app suggests.`}
       </p>
+
+      {props.flightTimes ? (
+        <div className="mt-4 rounded-2xl bg-[#eef6ff] p-4 text-sm text-[#2f4f66]">
+          <p className="font-bold text-[#173f50]">✈ Flight time</p>
+          <p className="mt-1 leading-6">{props.flightTimes.note}</p>
+          <p className="mt-2 flex flex-wrap gap-1.5 text-xs">
+            {props.flightTimes.estimates.map((estimate) => (
+              <span className="rounded-full bg-white px-2.5 py-1 font-bold" key={estimate.from}>{estimate.from.split(",")[0]}: ~{estimate.hoursEachWay}h</span>
+            ))}
+          </p>
+        </div>
+      ) : null}
 
       {props.suggestions.length > 0 ? (
         <ul className="mt-4 grid gap-2">

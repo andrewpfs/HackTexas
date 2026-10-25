@@ -1,5 +1,6 @@
 import type { CandidatePlanner } from "./candidate-planner";
 import { validateCandidateOptions } from "./candidate-validation";
+import { estimateGroupFlightTimes } from "./flight-time";
 import { buildPlanningContext } from "./planning-context";
 import type { Trip } from "./trip-types";
 
@@ -17,7 +18,14 @@ export async function generateCandidateOptionsForTrip(
     };
   }
 
-  const candidates = await planner.generateCandidates(contextResult.context);
+  // Flight time decides how many days are really spent at the destination.
+  const context = contextResult.context;
+  if (context.trip.destination) {
+    const flightTimes = await estimateGroupFlightTimes(context.travelers.map((traveler) => traveler.departureLocation), context.trip.destination);
+    if (flightTimes) context.trip.flightTimes = flightTimes;
+  }
+
+  const candidates = await planner.generateCandidates(context);
   const validation = validateCandidateOptions(candidates);
 
   if (!validation.valid) {

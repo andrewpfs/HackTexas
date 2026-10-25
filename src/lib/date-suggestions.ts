@@ -94,15 +94,21 @@ export function describeTripDates(startDate: string, endDate: string): Omit<Date
   return { startDate, endDate, peaks, notes, score };
 }
 
-// The best few date choices inside the group's shared windows, at the preferred trip length.
-export function suggestTripDates(windows: DateWindow[], preferredDays: number | undefined, limit = 3): DateSuggestion[] {
+// The best few date choices inside the group's shared windows, at the preferred trip
+// length, but never shorter than the flights need (minimumDays) when the window allows.
+export function suggestTripDates(windows: DateWindow[], preferredDays: number | undefined, limit = 3, minimumDays = 1): DateSuggestion[] {
   const choices: DateSuggestion[] = [];
   for (const window of windows) {
-    const length = Math.min(preferredDays ?? window.dayCount, window.dayCount);
+    const length = Math.min(Math.max(preferredDays ?? window.dayCount, minimumDays), window.dayCount);
     if (length < 1) continue;
     for (let start = window.startDate; addDays(start, length - 1) <= window.endDate; start = addDays(start, 1)) {
       const end = addDays(start, length - 1);
-      choices.push({ ...describeTripDates(start, end), dayCount: length });
+      const choice = { ...describeTripDates(start, end), dayCount: length };
+      if (length < minimumDays) {
+        choice.notes.unshift(`Short for these flights: at least ${minimumDays} days is recommended.`);
+        choice.score -= 20;
+      }
+      choices.push(choice);
     }
   }
   choices.sort((a, b) => b.score - a.score || a.startDate.localeCompare(b.startDate));

@@ -70,6 +70,7 @@ const systemPrompt = [
   "- Include one entry in days for every date from startDate to endDate.",
   "- Use a flexible realistic schedule with chronological clock times, specific locations and short descriptions. Mix a few main activities with meals, transit, check-in/out, rest, free time, wandering and buffers. Avoid impossible back-to-back travel or major attractions every hour; do not force 3-5 attractions into each day.",
   "- Respect each traveler's departure city and the group's budgets. The lowest maximum budget is the binding constraint.",
+  "- Plan around the flights. Day 1 is the arrival day and the last day is the flight home. After a long flight (over about 9 hours, like the US to Japan), Day 1 should only be landing, getting to the hotel, check-in and a relaxed dinner nearby; the last day should be a light morning, then getting to the airport with time to spare. Title those days so the group sees it (for example \"Arrival and Shinjuku Dinner\").",
   "- Do not invent current prices, flight numbers, or hotel availability.",
   "- For each activity, set placeSearchQuery to a short Google Maps search that finds one real, well-reviewed place for it, including the neighborhood and city (for example \"ramen Shinjuku Tokyo\"). Use an empty string for Travel and Free time.",
   "- Do not quote travelers' private questionnaire notes. Vote feedback may be referenced.",

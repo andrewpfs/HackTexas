@@ -5,6 +5,7 @@ import {
   calculatePlanningReadiness,
 } from "../src/lib/planning-context";
 import { describeTripDates, suggestTripDates } from "../src/lib/date-suggestions";
+import { estimateFlightHours, recommendedMinimumDays } from "../src/lib/flight-time";
 import type {
   Traveler,
   TravelerPreferences,
@@ -259,4 +260,17 @@ test("date suggestions dodge holiday peaks and pricey weekend flights", () => {
   assert.match(describeTripDates("2026-12-23", "2026-12-27").notes[0], /Christmas/);
   assert.match(describeTripDates("2026-11-24", "2026-11-28").notes[0], /Thanksgiving/);
   assert.match(describeTripDates("2026-12-08", "2026-12-11").notes.join(" "), /Tue/);
+});
+
+test("long flights raise the shortest sensible trip length", () => {
+  const austinToTokyo = estimateFlightHours(10400);
+  assert.equal(austinToTokyo >= 13 && austinToTokyo <= 17, true);
+  assert.equal(recommendedMinimumDays(austinToTokyo), 7);
+  assert.equal(recommendedMinimumDays(estimateFlightHours(2500)), 3);
+  assert.equal(recommendedMinimumDays(estimateFlightHours(180)), 2);
+
+  const picks = suggestTripDates([{ startDate: "2027-02-01", endDate: "2027-02-20", dayCount: 20 }], 2, 3, 7);
+  for (const pick of picks) assert.equal(pick.dayCount, 7);
+  const tooShort = suggestTripDates([{ startDate: "2027-02-01", endDate: "2027-02-03", dayCount: 3 }], 2, 3, 7);
+  assert.match(tooShort[0].notes[0], /Short for these flights/);
 });

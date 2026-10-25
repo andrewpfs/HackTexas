@@ -93,6 +93,8 @@ export type PlanningContext = {
     joinedTravelerCount: number;
     // The first rough plan drawn from the host's description, when there is one.
     sketch?: { summary: string; places: string[]; days: string[] };
+    // Rough flight hours from each departure city, added when the destination is known.
+    flightTimes?: import("./flight-time").GroupFlightTimes;
   };
   groupAvailability: {
     sharedDates: string[];
