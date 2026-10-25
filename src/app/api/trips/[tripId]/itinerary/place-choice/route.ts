@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
 import { lookupDestinationArea } from "@/lib/city-search";
-import { textTravelers, voteOpenedText } from "@/lib/group-texts";
+import { notifyGroup, voteOpenedText } from "@/lib/group-texts";
 import { createItineraryProposal } from "@/lib/itinerary-proposals";
 import { makeChatMessage } from "@/lib/itinerary-revision";
 import { personalLocationError } from "@/lib/personal-location";
@@ -61,7 +61,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
     const saved = await saveItineraryProposal(tripId, proposal, museMessage);
     if (saved.status === "already-open") return NextResponse.json({ error: "Finish the open vote first, then propose this." }, { status: 409 });
     if (saved.status !== "saved") return NextResponse.json({ error: "The plan changed. Ask @muse again for fresh options." }, { status: 409 });
-    after(() => textTravelers(saved.trip, voteOpenedText(saved.trip, proposal, origin), traveler.id));
+    after(() => notifyGroup(saved.trip, voteOpenedText(saved.trip, proposal), origin, traveler.id));
   } else {
     const result = await changePersonalOverride(tripId, {
       action: "add", travelerId, dayNumber: day.dayNumber, stopTime: options.stopTime, stopTitle: options.stopTitle,

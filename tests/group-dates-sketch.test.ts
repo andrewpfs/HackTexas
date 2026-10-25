@@ -5,7 +5,9 @@ import { buildPlanningContext, calculatePlanningReadiness } from "../src/lib/pla
 import { checkFeasibility, getTripFeasibility } from "../src/lib/trip-feasibility";
 import { getSketchBasis, getSketchRequest, sketchNeedsRedraw } from "../src/lib/trip-sketch";
 import { detectTripStyle } from "../src/lib/trip-style";
-import { applyTripDetailsUpdate } from "../src/lib/trip-updates";
+import { applyTripDetailsUpdate, clearPlanningOutputs, isGeneratingCandidates } from "../src/lib/trip-updates";
+import { fastestMode } from "../src/lib/travel-time";
+import { maximumNotifications, pushNotification, tripPath } from "../src/lib/trip-notifications";
 import type { Traveler, Trip } from "../src/lib/trip-types";
 
 function traveler(id: string, name: string, isHost: boolean, dates: string[], budget = 2000): Traveler {
@@ -184,4 +186,28 @@ test("feasibility warns about short trips, crowded routes, budgets and busy trav
   const trip = makeTrip();
   trip.confirmedDates = { startDate: "2026-12-03", endDate: "2026-12-06", confirmedAt: "", confirmedByName: "Jay", outsideSharedDates: true };
   assert.equal(getTripFeasibility(trip, null).some((item) => item.code === "not_everyone_free"), true);
+});
+
+test("editing answers after options exist marks them for an automatic redo", () => {
+  const trip = makeTrip();
+  trip.candidateOptions = [{ id: "c" } as NonNullable<Trip["candidateOptions"]>[number]];
+  clearPlanningOutputs(trip);
+  assert.equal(trip.optionsNeedRefresh, true);
+  assert.equal(trip.candidateOptions, undefined);
+  assert.equal(isGeneratingCandidates({ candidatesGeneratingSince: new Date().toISOString() }), true);
+  assert.equal(isGeneratingCandidates({ candidatesGeneratingSince: new Date(Date.now() - 10 * 60 * 1000).toISOString() }), false);
+});
+
+test("the default way between stops is the fastest of walking, transit and driving", () => {
+  const start = { latitude: 35.6595, longitude: 139.7005 };
+  assert.equal(fastestMode(start, { latitude: 35.6605, longitude: 139.7015 }), "walk");
+  assert.equal(fastestMode(start, { latitude: 35.7148, longitude: 139.7967 }), "transit");
+});
+
+test("notifications keep only the newest updates", () => {
+  const trip = makeTrip();
+  for (let index = 0; index < maximumNotifications + 5; index += 1) pushNotification(trip, `Update ${index}`, tripPath(trip), "jay");
+  assert.equal(trip.notifications?.length, maximumNotifications);
+  assert.equal(trip.notifications?.at(-1)?.text, `Update ${maximumNotifications + 4}`);
+  assert.equal(trip.notifications?.[0].path, "/trip/trip");
 });

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
-import { textTravelers, voteDecidedText } from "@/lib/group-texts";
+import { notifyGroup, voteDecidedText } from "@/lib/group-texts";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 import { getTripById, voteOnItineraryProposal } from "@/lib/trip-repository";
@@ -26,7 +26,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   const decided = result.status === "approved" || result.status === "rejected" ? result.trip.pendingItineraryProposal : undefined;
   if (decided) {
     const origin = new URL(request.url).origin;
-    after(() => textTravelers(result.trip, voteDecidedText(result.trip, decided, origin)));
+    after(() => notifyGroup(result.trip, voteDecidedText(result.trip, decided), origin));
   }
   return NextResponse.json({ itinerary: result.trip.itinerary, messages: result.trip.chat ?? [], proposal: result.trip.pendingItineraryProposal, approvedProposal: result.trip.lastApprovedItineraryProposal ?? null });
 }

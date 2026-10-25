@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
-import { datesConfirmedText, textTravelers } from "@/lib/group-texts";
+import { datesConfirmedText, notifyGroup } from "@/lib/group-texts";
 import { confirmedDatesStillShared } from "@/lib/date-suggestions";
 import { addDays, getDatesInRange, isValidISODate } from "@/lib/date-utils";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
@@ -47,6 +47,6 @@ export async function PUT(request: Request, context: RouteContext<"/api/trips/[t
   }
   const confirmedTrip = result.trip!;
   const origin = new URL(request.url).origin;
-  after(() => textTravelers(confirmedTrip, datesConfirmedText(confirmedTrip, origin), hostTravelerId));
+  after(() => notifyGroup(confirmedTrip, datesConfirmedText(confirmedTrip), origin, hostTravelerId));
   return NextResponse.json({ confirmedDates: confirmedTrip.confirmedDates });
 }

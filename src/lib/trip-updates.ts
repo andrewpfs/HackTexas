@@ -3,6 +3,8 @@ import type { Trip, UpdateTripInput } from "./trip-types";
 // Candidates, votes, and the shared itinerary all depend on planning inputs, so
 // they are cleared together whenever trip details or traveler answers change.
 export function clearPlanningOutputs(trip: Trip) {
+  // Options were already planned, so Muse redoes them for the new inputs.
+  if (trip.candidateOptions?.length) trip.optionsNeedRefresh = true;
   trip.candidateOptions = undefined;
   trip.candidatesGeneratedAt = undefined;
   trip.candidatesSource = undefined;
@@ -48,4 +50,11 @@ export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   clearPlanningOutputs(trip);
 
   return affectedTravelerCount;
+}
+
+const candidateGenerationTimeoutMs = 3 * 60 * 1000;
+
+// True while some browser is planning options (the lock expires after 3 minutes).
+export function isGeneratingCandidates(trip: Pick<Trip, "candidatesGeneratingSince">, now = Date.now()) {
+  return Boolean(trip.candidatesGeneratingSince && now - Date.parse(trip.candidatesGeneratingSince) < candidateGenerationTimeoutMs);
 }

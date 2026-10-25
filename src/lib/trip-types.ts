@@ -200,6 +200,24 @@ export type GroupItinerary = {
   revision?: number;
   updatedAt?: string;
   overrides?: PersonalOverride[];
+  // Travelers' notes on the plan: how they're getting around, what they love about a place, ...
+  notes?: ItineraryNote[];
+};
+
+export const itineraryNoteKinds = ["note", "getting-around", "love"] as const;
+export type ItineraryNoteKind = (typeof itineraryNoteKinds)[number];
+
+// A note on one stop (stopKey from getStopKey) or on the whole trip (no stopKey).
+export type ItineraryNote = {
+  id: string;
+  travelerId: string;
+  authorName: string;
+  kind: ItineraryNoteKind;
+  text: string;
+  createdAt: string;
+  dayNumber?: number;
+  stopKey?: string;
+  stopTitle?: string;
 };
 
 export type HotelOption = {
@@ -355,6 +373,17 @@ export type PlaceOptions = {
   chosen?: { placeIndex: number; mode: "group" | "me"; travelerName: string };
 };
 
+// One update in the trip's notification bar.
+export type TripNotification = {
+  id: string;
+  text: string;
+  // Page to open, for example /trip/abc/options.
+  path: string;
+  createdAt: string;
+  // Who caused it, so they don't get notified about their own change.
+  actorTravelerId?: string;
+};
+
 export type ItineraryProposal = {
   id: string;
   createdAt: string;
@@ -401,6 +430,12 @@ export type Trip = {
   sketch?: TripSketch;
   pendingItineraryProposal?: ItineraryProposal;
   lastApprovedItineraryProposal?: ItineraryProposal;
+  notifications?: TripNotification[];
+  // Options existed and a planning input changed, so Muse redoes them automatically
+  // as soon as the group is ready again.
+  optionsNeedRefresh?: boolean;
+  // Set while Muse is planning options, so two viewers don't both start it.
+  candidatesGeneratingSince?: string;
   // The exact dates the host approved before options are generated. Muse only plans inside them.
   confirmedDates?: ConfirmedTripDates;
   // Real round-trip fares the host looked up for a few date choices (SerpApi Google Flights).

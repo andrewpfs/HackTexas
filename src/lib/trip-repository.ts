@@ -17,10 +17,11 @@ import type {
   TravelerPreferences,
   Trip,
   TripSketch,
+  ItineraryNoteKind,
   UpdateTripInput,
 } from "./trip-types";
 import { normalizeInviteCode } from "./trip-validation";
-import { applyTripDetailsUpdate, clearPlanningOutputs } from "./trip-updates";
+import { applyTripDetailsUpdate, clearPlanningOutputs, isGeneratingCandidates } from "./trip-updates";
 import { needsPlaceLookup } from "./itinerary-diff";
 import { jsonTripStore, type TripStore } from "./trip-store";
 import { getSupabaseTripStore } from "./supabase-trip-store";
@@ -29,6 +30,7 @@ import { applyManualEdit, type ManualStopEdit, type TravelWarning } from "./manu
 import { personalLocationError, type DestinationArea } from "./personal-location";
 import { getHotelStays, isSoloLodger, sameStay, type StayPlan } from "./hotel-stays";
 import { getSketchBasis, sketchHasContent, sketchNeedsRedraw } from "./trip-sketch";
+import { pushNotification, tripPath } from "./trip-notifications";
 
 export async function editSharedStop(tripId: string, edit: ManualStopEdit, allowLongTravel: boolean) {
   return getStore().update<{ saved: boolean; warnings: TravelWarning[]; trip: Trip }>(tripId, (trip) => {
@@ -126,6 +128,7 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
 
     current.travelers.push(traveler);
     clearPlanningOutputs(current);
+    pushNotification(current, `${traveler.name} joined the trip.`, tripPath(current), traveler.id);
     return {
       save: true,
       result: { status: "joined" as const, tripId: current.id, travelerId: traveler.id },
@@ -155,8 +158,11 @@ export async function updateTravelerPreferences(
       activitiesBudget: preferences.activitiesBudget ?? traveler.preferences?.activitiesBudget,
     };
     traveler.departureLocation = departureLocation.trim();
+    const firstTime = !traveler.preferencesComplete;
     traveler.preferencesComplete = true;
+    const hadOptions = Boolean(trip.candidateOptions?.length);
     clearPlanningOutputs(trip);
+    pushNotification(trip, `${traveler.name} ${firstTime ? "shared" : "updated"} their preferences.${hadOptions ? " Muse is redoing the trip options." : ""}`, tripPath(trip), traveler.id);
     return { save: true, result: { status: "updated" as const, traveler } };
   });
 
@@ -175,7 +181,9 @@ export async function updateTravelerAvailability(
     }
 
     traveler.availableDates = availableDates;
+    const firstTime = !traveler.availabilityComplete;
     traveler.availabilityComplete = true;
+    pushNotification(trip, `${traveler.name} ${firstTime ? "shared" : "updated"} their available dates.${trip.candidateOptions?.length ? " Muse is redoing the trip options." : ""}`, tripPath(trip), traveler.id);
     // The first draft stays on screen; it is redrawn in the background once everyone has answered.
     clearPlanningOutputs(trip);
     return { save: true, result: { status: "updated" as const, traveler } };
@@ -196,6 +204,7 @@ export async function updateTripDetails(
     }
 
     const affectedTravelerCount = applyTripDetailsUpdate(trip, input);
+    pushNotification(trip, `${hostTraveler.name} changed the trip details.`, tripPath(trip), hostTraveler.id);
     return { save: true, result: { status: "updated" as const, trip, affectedTravelerCount } };
   });
 
@@ -209,6 +218,8 @@ export async function saveCandidateOptions(
 ) {
   const result = await getStore().update(tripId, (trip) => {
     clearPlanningOutputs(trip);
+    trip.optionsNeedRefresh = undefined;
+    trip.candidatesGeneratingSince = undefined;
     trip.candidateOptions = candidateOptions;
     trip.candidatesGeneratedAt = candidateOptions[0]?.generatedAt;
     trip.candidatesSource = source;
@@ -260,6 +271,7 @@ export async function saveGroupItinerary(tripId: string, itinerary: GroupItinera
     }
 
     trip.itinerary = itinerary;
+    pushNotification(trip, "The shared itinerary is ready. Take a look and add notes.", tripPath(trip, "itinerary"));
     return { save: true, result: { status: "updated" as const, trip } };
   });
 
@@ -390,6 +402,7 @@ export async function saveItineraryRevision(
     itinerary.placesStatus = needsPlaceLookup(days) ? undefined : "added";
     itinerary.placesStartedAt = undefined;
     pushMessages(trip, [museMessage]);
+    pushNotification(trip, "Muse updated the shared itinerary.", tripPath(trip, "itinerary"));
     return { save: true, result: { status: "saved" as const, trip } };
   });
 
@@ -542,6 +555,10 @@ export async function selectStayHotel(tripId: string, travelerId: string, stayIn
     } else {
       const unpick = hotels.selectedToken === token;
       saveHotelStay(trip, stay.plan, { ...hotels, selectedToken: unpick ? undefined : token, selectedByTravelerId: unpick ? undefined : travelerId });
+      if (!unpick) {
+        const hotelName = hotels.options.find((option) => option.token === token)?.name ?? "a hotel";
+        pushNotification(trip, `${traveler.name} picked ${hotelName} for the group.`, tripPath(trip, "travel"), traveler.id);
+      }
     }
     return { save: true, result: { status: "updated" as const } };
   });
@@ -604,6 +621,8 @@ export async function saveBooking(tripId: string, booking: Booking, expectedItin
       return { save: false, result: { status: "traveler-not-found" as const } };
     }
     trip.travel = { ...trip.travel, bookings: { ...trip.travel?.bookings, [booking.travelerId]: booking } };
+    const bookerName = trip.travelers.find((traveler) => traveler.id === booking.travelerId)?.name ?? "Someone";
+    pushNotification(trip, `${bookerName} booked their travel.`, tripPath(trip, "travel"), booking.travelerId);
     return { save: true, result: { status: "saved" as const } };
   });
   return result ?? { status: "traveler-not-found" as const };
@@ -703,6 +722,48 @@ export async function changePersonalOverride(tripId: string, change: OverrideAct
   return result ?? { status: "no-itinerary" as const };
 }
 
+// ---------- itinerary notes ----------
+
+export type NoteAction =
+  | { action: "add"; travelerId: string; kind: ItineraryNoteKind; text: string; dayNumber?: number; stopKey?: string; stopTitle?: string }
+  | { action: "remove"; travelerId: string; noteId: string };
+
+type NoteResult = { status: "updated"; trip: Trip } | { status: "no-itinerary" | "not-allowed" | "not-found" | "too-many" };
+
+const maximumNotes = 300;
+
+// Anyone on the trip can add a note; only the author can remove it.
+export async function changeItineraryNote(tripId: string, change: NoteAction) {
+  const result = await getStore().update<NoteResult>(tripId, (trip) => {
+    const itinerary = trip.itinerary;
+    if (!itinerary) return { save: false, result: { status: "no-itinerary" as const } };
+    const author = trip.travelers.find((traveler) => traveler.id === change.travelerId);
+    if (!author) return { save: false, result: { status: "not-allowed" as const } };
+    const notes = itinerary.notes ?? [];
+
+    if (change.action === "add") {
+      if (notes.length >= maximumNotes) return { save: false, result: { status: "too-many" as const } };
+      itinerary.notes = [...notes, {
+        id: randomUUID(),
+        travelerId: author.id,
+        authorName: author.name,
+        kind: change.kind,
+        text: change.text,
+        createdAt: new Date().toISOString(),
+        ...(change.stopKey ? { dayNumber: change.dayNumber, stopKey: change.stopKey, stopTitle: change.stopTitle } : {}),
+      }];
+      return { save: true, result: { status: "updated" as const, trip } };
+    }
+
+    const target = notes.find((note) => note.id === change.noteId);
+    if (!target) return { save: false, result: { status: "not-found" as const } };
+    if (target.travelerId !== change.travelerId) return { save: false, result: { status: "not-allowed" as const } };
+    itinerary.notes = notes.filter((note) => note.id !== target.id);
+    return { save: true, result: { status: "updated" as const, trip } };
+  });
+  return result ?? { status: "no-itinerary" as const };
+}
+
 // ---------- trip sketch ----------
 
 type SketchBasis = ReturnType<typeof getSketchBasis>;
@@ -742,7 +803,9 @@ export async function finishTripSketch(tripId: string, basis: SketchBasis, outco
   await getStore().update<null>(tripId, (trip) => {
     const current = trip.sketch;
     if (outcome.ok) {
+      const wasGroupUpdate = basis.stage === "group" && sketchHasContent(current);
       trip.sketch = { status: "done", ...outcome.draft, source: outcome.source, generatedAt: new Date().toISOString(), basisKey: basis.key, stage: basis.stage };
+      if (wasGroupUpdate) pushNotification(trip, "Muse updated the first draft with everyone's preferences and dates.", tripPath(trip));
     } else if (current && sketchHasContent(current)) {
       current.refreshing = undefined;
       current.failedBasisKey = basis.key;
@@ -836,7 +899,12 @@ export async function agreeToTripDates(tripId: string, travelerId: string, start
     if (dates.startDate !== startDate || dates.endDate !== endDate) return { save: false, result: { status: "dates-changed" as const } };
     if (trip.candidateOptions?.length || trip.itinerary) return { save: false, result: { status: "already-planned" as const } };
     const agreed = dates.agreedTravelerIds ?? [];
-    if (!agreed.includes(travelerId)) dates.agreedTravelerIds = [...agreed, travelerId];
+    if (!agreed.includes(travelerId)) {
+      dates.agreedTravelerIds = [...agreed, travelerId];
+      const name = trip.travelers.find((traveler) => traveler.id === travelerId)?.name ?? "Someone";
+      const everyone = trip.travelers.every((traveler) => traveler.isHost || dates.agreedTravelerIds!.includes(traveler.id));
+      pushNotification(trip, everyone ? `${name} confirmed. Everyone is in for the dates, so Muse can plan options.` : `${name} confirmed the trip dates.`, tripPath(trip), travelerId);
+    }
     return { save: true, result: { status: "agreed" as const, trip } };
   });
   return result ?? { status: "traveler-not-found" as const };
@@ -856,5 +924,35 @@ export async function markPlaceOptionChosen(tripId: string, messageId: string, c
     if (!message?.placeOptions) return { save: false, result: trip };
     message.placeOptions.chosen = chosen;
     return { save: true, result: trip };
+  });
+}
+
+// ---------- notifications ----------
+
+// Records an update for the notification bar.
+export async function addTripNotification(tripId: string, text: string, path: string, actorTravelerId?: string) {
+  await getStore().update<null>(tripId, (trip) => {
+    pushNotification(trip, text, path, actorTravelerId);
+    return { save: true, result: null };
+  });
+}
+
+// ---------- option generation lock ----------
+
+// Only one viewer plans options at a time (Muse takes about 45 seconds).
+export async function claimCandidateGeneration(tripId: string) {
+  const result = await getStore().update<"claimed" | "busy">(tripId, (trip) => {
+    if (isGeneratingCandidates(trip)) return { save: false, result: "busy" as const };
+    trip.candidatesGeneratingSince = new Date().toISOString();
+    return { save: true, result: "claimed" as const };
+  });
+  return result ?? "busy";
+}
+
+export async function releaseCandidateGeneration(tripId: string) {
+  await getStore().update<null>(tripId, (trip) => {
+    if (!trip.candidatesGeneratingSince) return { save: false, result: null };
+    trip.candidatesGeneratingSince = undefined;
+    return { save: true, result: null };
   });
 }

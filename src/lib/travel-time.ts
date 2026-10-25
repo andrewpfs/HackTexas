@@ -35,6 +35,24 @@ export function estimateTravel(from: Point, to: Point, mode: TravelMode) {
   return { distanceKm, minutes: Math.max(1, Math.round(driving)) };
 }
 
+// Modes a group can use without planning ahead. Bikes are a choice, not assumed.
+const defaultModeChoices: TravelMode[] = ["walk", "transit", "car"];
+
+// The quickest way between two stops, used as the default in the itinerary.
+// Ties go to the earlier mode in the list (walking before transit before a car).
+export function fastestMode(from: Point, to: Point): TravelMode {
+  let best: TravelMode = "walk";
+  let bestMinutes = Infinity;
+  for (const mode of defaultModeChoices) {
+    const { minutes } = estimateTravel(from, to, mode);
+    if (minutes < bestMinutes) {
+      best = mode;
+      bestMinutes = minutes;
+    }
+  }
+  return best;
+}
+
 export function formatMinutes(minutes: number) {
   if (minutes < 60) {
     return `${minutes} min`;
