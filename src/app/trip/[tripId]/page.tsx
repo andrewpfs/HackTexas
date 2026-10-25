@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "../../components/header";
 import { getTripById } from "@/lib/trip-repository";
+import { CopyInviteLink } from "./copy-invite-link";
 
 export const instant = false;
 
@@ -40,7 +41,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const displayName = trip.destination ? `${trip.destination} Trip` : "Group Trip";
   const travelWindow = `${formatDate(trip.earliestPossibleDate)} – ${formatDate(trip.latestPossibleDate)}`;
   const travelerCount = trip.expectedTravelerCount
-    ? `${trip.travelers.length} of ${trip.expectedTravelerCount} expected`
+    ? `${trip.travelers.length} travelers joined · ${trip.expectedTravelerCount} expected`
     : `${trip.travelers.length} joined`;
   const joinPath = `/join?trip=${trip.inviteCode}`;
 
@@ -104,7 +105,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#718087]">Additional travelers have not joined yet. Joining and questionnaires are coming in the next phases.</p>
+              <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#718087]">Traveler questionnaires are coming in the next phase.</p>
             </section>
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
@@ -136,7 +137,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                   <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-[#889398]">Join link</p>
                   <Link className="mt-2 block break-all font-mono text-sm font-bold text-[#173f50] underline decoration-[#e4664f]/40 underline-offset-4" href={joinPath}>{joinPath}</Link>
                 </div>
-                <p className="mt-3 text-xs text-[#8a9498]">The join page is still a shell; real joining arrives in Phase 3.</p>
+                <CopyInviteLink joinPath={joinPath} />
               </div>
               <div className="border-t border-[#172733]/8 bg-[#173f50] p-6 text-white sm:p-8">
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Coming after preferences</p>

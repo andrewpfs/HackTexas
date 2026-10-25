@@ -4,6 +4,16 @@ export type TripValidationResult =
   | { valid: true; data: CreateTripInput }
   | { valid: false; errors: string[] };
 
+export type JoinTripValidationResult =
+  | { valid: true; data: { inviteCode: string; travelerName: string } }
+  | { valid: false; error: string };
+
+export const maximumTravelerNameLength = 80;
+
+export function normalizeInviteCode(inviteCode: string) {
+  return inviteCode.trim().toUpperCase();
+}
+
 function readRequiredText(value: unknown, label: string, errors: string[]) {
   if (typeof value !== "string" || value.trim() === "") {
     errors.push(`${label} is required.`);
@@ -99,4 +109,34 @@ export function validateCreateTripInput(body: unknown): TripValidationResult {
       expectedTravelerCount,
     },
   };
+}
+
+export function validateJoinTripInput(body: unknown): JoinTripValidationResult {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { valid: false, error: "Please provide an invite code and your name." };
+  }
+
+  const values = body as Record<string, unknown>;
+  if (typeof values.inviteCode !== "string") {
+    return { valid: false, error: "Invite code is required." };
+  }
+
+  const inviteCode = normalizeInviteCode(values.inviteCode);
+  if (inviteCode === "") {
+    return { valid: false, error: "Invite code is required." };
+  }
+
+  if (typeof values.travelerName !== "string" || values.travelerName.trim() === "") {
+    return { valid: false, error: "Your name is required." };
+  }
+
+  const travelerName = values.travelerName.trim();
+  if (travelerName.length > maximumTravelerNameLength) {
+    return {
+      valid: false,
+      error: `Your name must be ${maximumTravelerNameLength} characters or fewer.`,
+    };
+  }
+
+  return { valid: true, data: { inviteCode, travelerName } };
 }

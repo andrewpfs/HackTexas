@@ -33,3 +33,17 @@ export type CreateTripInput = {
   preferredDurationDays?: number;
   expectedTravelerCount?: number;
 };
+
+export type JoinTripPreview = {
+  inviteCode: string;
+  displayName: string;
+  hostName: string;
+  prompt: string;
+  origin: string;
+  destination?: string;
+  earliestPossibleDate: string;
+  latestPossibleDate: string;
+  preferredDurationDays?: number;
+  travelerCount: number;
+  expectedTravelerCount?: number;
+};
