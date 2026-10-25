@@ -547,16 +547,6 @@ export async function selectStayHotel(tripId: string, travelerId: string, stayIn
       return { save: false, result: { status: "not-found" as const } };
     }
 
-<<<<<<< HEAD
-    const unpick = hotels.selectedToken === token;
-    trip.travel = {
-      ...trip.travel,
-      hotels: { ...hotels, selectedToken: unpick ? undefined : token, selectedByTravelerId: unpick ? undefined : travelerId },
-    };
-    if (!unpick) {
-      const hotelName = hotels.options.find((option) => option.token === token)?.name ?? "a hotel";
-      pushNotification(trip, `${traveler.name} picked ${hotelName} for the group.`, tripPath(trip, "travel"), traveler.id);
-=======
     if (solo) {
       const picks = { ...hotels.soloPicks };
       if (picks[travelerId] === token) delete picks[travelerId];
@@ -565,7 +555,10 @@ export async function selectStayHotel(tripId: string, travelerId: string, stayIn
     } else {
       const unpick = hotels.selectedToken === token;
       saveHotelStay(trip, stay.plan, { ...hotels, selectedToken: unpick ? undefined : token, selectedByTravelerId: unpick ? undefined : travelerId });
->>>>>>> 2f6842b15cbe3ffc63716062b8698aa22d1e8b1a
+      if (!unpick) {
+        const hotelName = hotels.options.find((option) => option.token === token)?.name ?? "a hotel";
+        pushNotification(trip, `${traveler.name} picked ${hotelName} for the group.`, tripPath(trip, "travel"), traveler.id);
+      }
     }
     return { save: true, result: { status: "updated" as const } };
   });
@@ -924,7 +917,16 @@ export async function saveDatePriceCheck(tripId: string, check: NonNullable<Trip
   });
 }
 
-<<<<<<< HEAD
+// Marks which of Muse's place options someone picked, so nobody picks twice.
+export async function markPlaceOptionChosen(tripId: string, messageId: string, chosen: NonNullable<NonNullable<ChatMessage["placeOptions"]>["chosen"]>) {
+  return getStore().update<Trip | null>(tripId, (trip) => {
+    const message = trip.chat?.find((item) => item.id === messageId);
+    if (!message?.placeOptions) return { save: false, result: trip };
+    message.placeOptions.chosen = chosen;
+    return { save: true, result: trip };
+  });
+}
+
 // ---------- notifications ----------
 
 // Records an update for the notification bar.
@@ -936,7 +938,6 @@ export async function addTripNotification(tripId: string, text: string, path: st
 }
 
 // ---------- option generation lock ----------
-
 
 // Only one viewer plans options at a time (Muse takes about 45 seconds).
 export async function claimCandidateGeneration(tripId: string) {
@@ -953,14 +954,5 @@ export async function releaseCandidateGeneration(tripId: string) {
     if (!trip.candidatesGeneratingSince) return { save: false, result: null };
     trip.candidatesGeneratingSince = undefined;
     return { save: true, result: null };
-=======
-// Marks which of Muse's place options someone picked, so nobody picks twice.
-export async function markPlaceOptionChosen(tripId: string, messageId: string, chosen: NonNullable<NonNullable<ChatMessage["placeOptions"]>["chosen"]>) {
-  return getStore().update<Trip | null>(tripId, (trip) => {
-    const message = trip.chat?.find((item) => item.id === messageId);
-    if (!message?.placeOptions) return { save: false, result: trip };
-    message.placeOptions.chosen = chosen;
-    return { save: true, result: trip };
->>>>>>> 2f6842b15cbe3ffc63716062b8698aa22d1e8b1a
   });
 }
