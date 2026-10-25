@@ -5,19 +5,26 @@ import { Header } from "../../components/header";
 import { getTripById } from "@/lib/trip-repository";
 import { CopyInviteLink } from "./copy-invite-link";
 import { MyPreferencesAction } from "./my-preferences-action";
+import {
+  findSharedDates,
+  formatCalendarDate,
+  getContiguousDateWindows,
+  type DateWindow,
+} from "@/lib/date-utils";
 
 export const instant = false;
 
 const progressSteps = ["Preferences", "AI Suggestions", "Vote", "Final Itinerary"];
 
-function formatDate(dateString: string) {
-  const date = new Date(`${dateString}T00:00:00Z`);
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+function formatSharedWindow(window: DateWindow) {
+  if (window.startDate === window.endDate) {
+    return formatCalendarDate(window.startDate);
+  }
+
+  const startYear = window.startDate.slice(0, 4);
+  const endYear = window.endDate.slice(0, 4);
+  const includeStartYear = startYear !== endYear;
+  return `${formatCalendarDate(window.startDate, includeStartYear)} – ${formatCalendarDate(window.endDate)}`;
 }
 
 export async function generateMetadata(props: PageProps<"/trip/[tripId]">): Promise<Metadata> {
@@ -40,17 +47,28 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   }
 
   const displayName = trip.destination ? `${trip.destination} Trip` : "Group Trip";
-  const travelWindow = `${formatDate(trip.earliestPossibleDate)} – ${formatDate(trip.latestPossibleDate)}`;
+  const travelWindow = `${formatCalendarDate(trip.earliestPossibleDate)} – ${formatCalendarDate(trip.latestPossibleDate)}`;
   const travelerCount = trip.expectedTravelerCount
     ? `${trip.travelers.length} travelers joined · ${trip.expectedTravelerCount} expected`
     : `${trip.travelers.length} joined`;
   const joinPath = `/join?trip=${trip.inviteCode}`;
   let completedPreferencesCount = 0;
+  let completedAvailabilityCount = 0;
+  const submittedAvailability: string[][] = [];
   for (const traveler of trip.travelers) {
     if (traveler.preferencesComplete) {
       completedPreferencesCount += 1;
     }
+
+    if (traveler.availabilityComplete) {
+      completedAvailabilityCount += 1;
+      submittedAvailability.push(traveler.availableDates || []);
+    }
   }
+  const sharedDates = findSharedDates(submittedAvailability);
+  const sharedWindows = getContiguousDateWindows(sharedDates);
+  const allTravelersSubmitted = completedAvailabilityCount === trip.travelers.length;
+  const preferredDurationDays = trip.preferredDurationDays;
 
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
@@ -105,21 +123,31 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 {trip.travelers.map((traveler) => (
                   <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" key={traveler.id}>
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#173f50] text-sm font-bold text-white">{traveler.name.charAt(0).toUpperCase()}</span>
-                    <span className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</span>
-                    <span className={`ml-auto rounded-full px-3 py-1 text-xs font-bold ${traveler.preferencesComplete ? "bg-[#daf0ea] text-[#276655]" : "bg-[#f0efeb] text-[#778388]"}`}>
-                      {traveler.preferencesComplete ? "Preferences complete" : "Preferences incomplete"}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold">
+                        <span className={traveler.preferencesComplete ? "text-[#276655]" : "text-[#778388]"}>
+                          Preferences {traveler.preferencesComplete ? "✓" : "waiting"}
+                        </span>
+                        <span className={traveler.availabilityComplete ? "text-[#276655]" : "text-[#778388]"}>
+                          Availability {traveler.availabilityComplete ? "✓" : "waiting"}
+                        </span>
+                      </div>
+                    </div>
                   </li>
                 ))}
               </ul>
               <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm font-semibold leading-6 text-[#53666f]">
                 {completedPreferencesCount} of {trip.travelers.length} travelers completed preferences
+                <br />
+                {completedAvailabilityCount} of {trip.travelers.length} travelers submitted availability
               </p>
               <MyPreferencesAction
                 tripId={trip.id}
                 travelers={trip.travelers.map((traveler) => ({
                   id: traveler.id,
                   preferencesComplete: traveler.preferencesComplete,
+                  availabilityComplete: traveler.availabilityComplete === true,
                 }))}
               />
             </section>
@@ -127,7 +155,43 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
               <p className="eyebrow">Possible dates</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight" id="availability">Availability overlap</h2>
-              <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-5 text-sm leading-6 text-[#718087]">Manual availability selection will be completed separately in the next step.</p>
+              {completedAvailabilityCount === 0 ? (
+                <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-5 text-sm leading-6 text-[#718087]">Waiting for travelers to submit availability.</p>
+              ) : (
+                <div className="mt-5">
+                  <p className="text-sm font-bold text-[#3b505a]">
+                    {allTravelersSubmitted
+                      ? "Shared group availability"
+                      : `Current overlap among ${completedAvailabilityCount} of ${trip.travelers.length} submitted travelers`}
+                  </p>
+                  {!allTravelersSubmitted ? (
+                    <p className="mt-1 text-sm leading-6 text-[#718087]">This overlap is provisional until every joined traveler submits availability.</p>
+                  ) : null}
+
+                  {sharedWindows.length === 0 ? (
+                    <p className="mt-4 rounded-2xl bg-[#fff0ec] p-4 text-sm font-semibold text-[#a34532]">No dates currently work for everyone who has submitted.</p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {sharedWindows.map((window) => {
+                        const viable = preferredDurationDays !== undefined && window.dayCount >= preferredDurationDays;
+                        return (
+                          <li className="rounded-2xl bg-[#f7f7f3] p-4" key={`${window.startDate}-${window.endDate}`}>
+                            <p className="font-bold text-[#173f50]">{formatSharedWindow(window)}</p>
+                            <p className="mt-1 text-sm text-[#718087]">
+                              {window.dayCount} {window.dayCount === 1 ? "day" : "consecutive days"}
+                              {viable ? ` — viable for a ${preferredDurationDays}-day trip` : ""}
+                            </p>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+
+                  {preferredDurationDays !== undefined && sharedWindows.length > 0 && !sharedWindows.some((window) => window.dayCount >= preferredDurationDays) ? (
+                    <p className="mt-4 text-sm leading-6 text-[#718087]">No current overlap window is long enough for the group&apos;s preferred {preferredDurationDays}-day trip yet.</p>
+                  ) : null}
+                </div>
+              )}
             </section>
           </div>
 

@@ -70,6 +70,8 @@ export async function POST(request: Request) {
           name: input.hostName,
           isHost: true,
           preferencesComplete: false,
+          availabilityComplete: false,
+          availableDates: [],
         },
       ],
     };

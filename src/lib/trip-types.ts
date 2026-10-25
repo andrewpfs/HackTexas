@@ -62,6 +62,8 @@ export type Traveler = {
   isHost: boolean;
   preferencesComplete: boolean;
   preferences?: TravelerPreferences;
+  availabilityComplete?: boolean;
+  availableDates?: string[];
 };
 
 export type Trip = {

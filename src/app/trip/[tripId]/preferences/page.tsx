@@ -37,7 +37,7 @@ export default async function PreferencesPage(
             Tell the group what works for you.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[#66757d]">
-            Your answers will help the group compare options later. Availability is a separate next step.
+            Your answers will help the group compare options later. Availability is saved separately and can be completed in either order.
           </p>
         </div>
 

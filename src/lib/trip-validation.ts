@@ -10,6 +10,7 @@ import {
   type LodgingType,
   type TravelerPreferences,
 } from "./trip-types";
+import { isValidISODate } from "./date-utils";
 
 export type TripValidationResult =
   | { valid: true; data: CreateTripInput }
@@ -21,6 +22,10 @@ export type JoinTripValidationResult =
 
 export type PreferencesValidationResult =
   | { valid: true; data: TravelerPreferences }
+  | { valid: false; errors: string[] };
+
+export type AvailabilityValidationResult =
+  | { valid: true; data: { availableDates: string[] } }
   | { valid: false; errors: string[] };
 
 export const maximumTravelerNameLength = 80;
@@ -53,15 +58,6 @@ function readOptionalText(value: unknown) {
   return trimmedValue;
 }
 
-function isValidDateString(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
 function readOptionalInteger(value: unknown, label: string, maximum: number, errors: string[]) {
   if (value === undefined || value === null || value === "") {
     return undefined;
@@ -90,17 +86,17 @@ export function validateCreateTripInput(body: unknown): TripValidationResult {
   const earliestPossibleDate = readRequiredText(values.earliestPossibleDate, "Earliest date", errors);
   const latestPossibleDate = readRequiredText(values.latestPossibleDate, "Latest date", errors);
 
-  if (earliestPossibleDate !== "" && !isValidDateString(earliestPossibleDate)) {
+  if (earliestPossibleDate !== "" && !isValidISODate(earliestPossibleDate)) {
     errors.push("Earliest date must be a valid date.");
   }
 
-  if (latestPossibleDate !== "" && !isValidDateString(latestPossibleDate)) {
+  if (latestPossibleDate !== "" && !isValidISODate(latestPossibleDate)) {
     errors.push("Latest date must be a valid date.");
   }
 
   if (
-    isValidDateString(earliestPossibleDate) &&
-    isValidDateString(latestPossibleDate) &&
+    isValidISODate(earliestPossibleDate) &&
+    isValidISODate(latestPossibleDate) &&
     latestPossibleDate < earliestPossibleDate
   ) {
     errors.push("Latest date cannot be before earliest date.");
@@ -319,4 +315,52 @@ export function validateTravelerPreferences(body: unknown): PreferencesValidatio
       notes,
     },
   };
+}
+
+export function validateTravelerAvailability(
+  body: unknown,
+  earliestPossibleDate: string,
+  latestPossibleDate: string,
+): AvailabilityValidationResult {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { valid: false, errors: ["Please provide valid availability details."] };
+  }
+
+  const values = body as Record<string, unknown>;
+  if (!Array.isArray(values.availableDates)) {
+    return { valid: false, errors: ["Available dates must be a list."] };
+  }
+
+  if (values.availableDates.length === 0) {
+    return { valid: false, errors: ["Select at least one available date."] };
+  }
+
+  const availableDates: string[] = [];
+  const errors: string[] = [];
+
+  for (const value of values.availableDates) {
+    if (typeof value !== "string" || !isValidISODate(value)) {
+      errors.push("Every available date must use the YYYY-MM-DD format and be a real calendar date.");
+      break;
+    }
+
+    if (availableDates.includes(value)) {
+      errors.push("Available dates must not contain duplicates.");
+      break;
+    }
+
+    if (value < earliestPossibleDate || value > latestPossibleDate) {
+      errors.push("Every available date must be inside the trip planning window.");
+      break;
+    }
+
+    availableDates.push(value);
+  }
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  availableDates.sort();
+  return { valid: true, data: { availableDates } };
 }

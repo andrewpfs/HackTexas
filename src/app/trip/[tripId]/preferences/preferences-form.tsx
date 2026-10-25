@@ -344,8 +344,8 @@ export function PreferencesForm({ tripId, inviteCode }: PreferencesFormProps) {
 
       <section className="rounded-3xl bg-[#173f50] p-6 text-white sm:p-8">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Next step</p>
-        <p className="mt-2 text-lg font-bold">Availability will be completed separately.</p>
-        <p className="mt-2 text-sm leading-6 text-white/65">This phase saves preferences only. The manual calendar is intentionally not included yet.</p>
+        <p className="mt-2 text-lg font-bold">Preferences and availability are separate.</p>
+        <p className="mt-2 text-sm leading-6 text-white/65">Save these answers, then use My Availability on the trip dashboard whenever you are ready.</p>
 
         {saveErrors.length > 0 ? (
           <div className="mt-6 rounded-2xl bg-[#fff0ec] p-4 text-sm font-semibold text-[#a34532]" role="alert">

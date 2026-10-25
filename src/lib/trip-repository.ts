@@ -110,6 +110,8 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
       name: travelerName.trim(),
       isHost: false,
       preferencesComplete: false,
+      availabilityComplete: false,
+      availableDates: [],
     };
 
     trip.travelers.push(traveler);
@@ -144,6 +146,42 @@ export async function updateTravelerPreferences(
 
       traveler.preferences = preferences;
       traveler.preferencesComplete = true;
+      trip.travelers[travelerIndex] = traveler;
+      store.trips[tripIndex] = trip;
+
+      await mkdir(dataDirectory, { recursive: true });
+      await writeFile(dataFilePath, JSON.stringify(store, null, 2), "utf8");
+
+      return { status: "updated" as const, traveler };
+    }
+
+    return { status: "traveler-not-found" as const };
+  }
+
+  return { status: "trip-not-found" as const };
+}
+
+export async function updateTravelerAvailability(
+  tripId: string,
+  travelerId: string,
+  availableDates: string[],
+) {
+  const store = await readStore();
+
+  for (let tripIndex = 0; tripIndex < store.trips.length; tripIndex += 1) {
+    const trip = store.trips[tripIndex];
+    if (trip.id !== tripId) {
+      continue;
+    }
+
+    for (let travelerIndex = 0; travelerIndex < trip.travelers.length; travelerIndex += 1) {
+      const traveler = trip.travelers[travelerIndex];
+      if (traveler.id !== travelerId) {
+        continue;
+      }
+
+      traveler.availableDates = availableDates;
+      traveler.availabilityComplete = true;
       trip.travelers[travelerIndex] = traveler;
       store.trips[tripIndex] = trip;
 
