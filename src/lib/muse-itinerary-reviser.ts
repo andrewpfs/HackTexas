@@ -72,6 +72,7 @@ const systemPrompt = [
   "Use a flexible realistic schedule with meals, transit, check-in/out, rest, wandering, free time and buffers. Avoid hourly attractions and allow enough travel time. A free day can have one flexible Free time block. Keep clock times chronological.",
   "When you change the plan:",
   "- Return the COMPLETE list of days (every day, with every activity), not just the edited ones. Keep unchanged stops exactly as they were, including their title and placeSearchQuery.",
+  "- Preserve unchanged user-added untimed stops with an empty time. Do not invent times for those stops.",
   "- Keep the same dates, the same number of days, and the same day numbers.",
   "- Only change what the message asks for, plus nearby stops if needed to keep the day sensible (geography, timing, meals).",
   "- Give each new or changed stop a clock time, a specific location, a short description, and a placeSearchQuery for Google Maps that includes the neighborhood and city. Use an empty string for Travel and Free time.",

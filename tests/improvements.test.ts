@@ -272,7 +272,7 @@ test("transit estimates, day blocks and activity icons are deterministic", () =>
   for (let number = 1; number <= 15; number += 1) days.push({ dayNumber: number, date: "2026-12-17", title: "Day", activities: [] });
   assert.deepEqual(groupCandidateDays(days).map((block) => block.length), [7, 7, 1]);
   assert.deepEqual(groupCandidateDays(days.slice(0, 8)).map((block) => block.length), [7, 1]);
-  assert.equal(activityEmoji({ title: "Lunch", description: "Eat", timeOfDay: "Afternoon" }), "🍜");
+  assert.equal(activityEmoji({ title: "Lunch", description: "Eat", timeOfDay: "Afternoon" }), "🍽️");
 });
 
 test("day-photo pipeline uses one lookup per day and preserves old stop images", async () => {

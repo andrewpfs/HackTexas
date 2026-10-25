@@ -1,9 +1,11 @@
 import type { CandidateActivity, CandidateDay } from "./trip-types";
+import { activityIcon } from "./activity-icons";
 
 export function activityEmoji(activity: Pick<CandidateActivity, "title" | "description" | "timeOfDay">) {
   const text = `${activity.title} ${activity.description}`.toLowerCase();
-  if (/flight|train|transfer|airport|transit|check.in|check.out/.test(text)) return "🚆";
-  if (/food|meal|dinner|lunch|breakfast|ramen|cafe|restaurant/.test(text)) return "🍜";
+  const icon = activityIcon(activity);
+  if (icon !== "📍") return icon;
+  if (/transfer|airport|transit/.test(text)) return "🚆";
   if (/museum|culture|temple|gallery|shrine|history/.test(text)) return "🏛️";
   if (/park|garden|hike|outdoor|beach|forest|trail/.test(text)) return "🌳";
   if (/shop|mall|boutique/.test(text)) return "🛍️";

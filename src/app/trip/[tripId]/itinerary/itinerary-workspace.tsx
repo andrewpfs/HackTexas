@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import { activityIcon } from "@/lib/activity-icons";
+import { ManualStopEditor } from "./manual-stop-editor";
 import { useRouter } from "next/navigation";
 import { ProposalCard, type ChatState } from "./proposal-card";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -68,6 +70,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [legKey, setLegKey] = useState<string | null>(null);
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
   const [view, setView] = useState<"group" | "mine">("group");
+  const [editing, setEditing] = useState<{ dayNumber: number; stopIndex: number } | null>(null);
   const [planDraft, setPlanDraft] = useState({ title: "", location: "", note: "" });
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState("");
@@ -426,6 +429,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 setDayIndex(index);
                 setStopIndex(null);
                 setLegKey(null);
+                setEditing(null);
               }}
               role="tab"
               type="button"
@@ -494,9 +498,9 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#879196]">
-                          {item.time}
+                          <span aria-hidden="true">{activityIcon(item)}</span> {item.time || "Time not set"}
                           <span className="rounded-full bg-[#f2f0ea] px-2 py-0.5 text-[#607179]">{item.type}</span>
-                          {isChanged ? <span className="rounded-full bg-[#f3c969] px-2 py-0.5 text-[#173f50]">Updated by Muse</span> : null}
+                          {isChanged ? <span className="rounded-full bg-[#f3c969] px-2 py-0.5 text-[#173f50]">Updated</span> : null}
                           {rejoinHere ? <span className="rounded-full bg-[#daf0ea] px-2 py-0.5 text-[#276655]">Rejoin the group here</span> : null}
                         </p>
                         {view === "mine" && myPlan ? (
@@ -533,6 +537,9 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                       </div>
                     </div>
                   </button>
+
+                  {currentTraveler && view === "group" ? <div className="flex justify-end"><button aria-label={`Edit shared stop: ${item.title}`} aria-expanded={editing?.dayNumber === day.dayNumber && editing.stopIndex === index} className="rounded-lg px-3 py-2 text-xs font-bold text-[#53666f] hover:bg-[#deedff] focus-visible:outline-2 focus-visible:outline-[#397bb3]" onClick={() => setEditing({ dayNumber: day.dayNumber, stopIndex: index })} type="button">✎ Edit</button></div> : null}
+                  {currentTraveler && editing?.dayNumber === day.dayNumber && editing.stopIndex === index ? <ManualStopEditor dayNumber={day.dayNumber} itinerary={itinerary} key={`${day.dayNumber}-${index}`} onClose={() => setEditing(null)} onSaved={(next, chat) => { applyState(next, chat); setStopIndex(null); setLegKey(null); setModes({}); }} stopIndex={index} travelerId={currentTraveler.id} tripId={tripId} /> : null}
 
                   {next ? (
                     <div className="ml-8 flex min-h-12 items-center gap-3 border-l-2 border-dashed border-[#173f50]/20 py-2 pl-6">
@@ -577,7 +584,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white shadow-[0_14px_38px_rgba(23,63,80,0.07)]">
             <div className="flex border-b border-[#172733]/8" role="tablist">
-              {([["map", "Map And Reviews"], ["chat", `Group Chat${messages.length ? ` (${messages.length})` : ""}`]] as [Panel, string][]).map(([id, label]) => (
+              {([["map", "Map And Reviews"], ["chat", "Group Chat"]] as [Panel, string][]).map(([id, label]) => (
                 <button
                   aria-selected={panel === id}
                   className={`flex-1 px-4 py-3 text-sm font-bold transition ${panel === id ? "bg-white text-[#173f50] shadow-[inset_0_-3px_0_#e4664f]" : "bg-[#f7f7f3] text-[#879196] hover:text-[#173f50]"}`}
@@ -587,6 +594,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                   type="button"
                 >
                   {label}
+                  {id === "chat" ? <span className="ml-2 text-xs text-[#7a5ea8]">✦ Muse</span> : null}
                 </button>
               ))}
             </div>
@@ -623,7 +631,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 </div>
               </div>
             ) : (
-              <div className="flex h-[40rem] max-h-[85dvh] flex-col"><p className="border-b border-[#172733]/8 p-4 text-xs font-semibold text-[#53666f]">{travelers.map((traveler) => traveler.name).join(" ? ")} ? <span className="rounded-full bg-[#fff8dc] px-2 py-1 text-[#6f5a16]">✦ Muse</span></p>
+              <div className="flex h-[40rem] max-h-[85dvh] flex-col"><p className="border-b border-[#172733]/8 p-4 text-xs font-semibold text-[#53666f]">{travelers.map((traveler) => traveler.name).join(" · ")} · <span className="rounded-full bg-[#fff8dc] px-2 py-1 text-[#6f5a16]">✦ Muse AI</span></p>
                 <div className="flex-1 space-y-3 overflow-y-auto p-5" ref={messageListRef}>
                   {proposal ? <ProposalCard onUpdate={applyProposalState} proposal={proposal} travelerId={travelerId} travelers={travelers} tripId={tripId} /> : null}
                   {messages.length === 0 ? (
@@ -636,7 +644,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                     const fromMuse = message.role === "muse";
                     return (
                       <div className={`flex flex-col ${mine ? "items-end" : "items-start"}`} key={message.id}>
-                        <p className="mb-1 px-1 text-xs font-bold text-[#879196]">{fromMuse ? "✦ Muse" : message.authorName}</p>
+                        <p className="mb-1 px-1 text-xs font-bold text-[#879196]">{fromMuse ? "✦ Muse AI" : message.authorName}</p>
                         <div className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${mine ? "bg-[#173f50] text-white" : fromMuse ? "bg-[#fff8dc] text-[#5a4a12]" : "bg-[#f2f0ea] text-[#273b46]"}`}>
                           {message.focus ? <p className={`mb-1 text-xs font-bold ${mine ? "text-[#f3c969]" : "text-[#879196]"}`}>Re: Day {message.focus.dayNumber}, {message.focus.title}</p> : null}
                           <p>{message.text}</p>
@@ -646,6 +654,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                             </ul>
                           ) : null}
                         </div>
+                        {fromMuse ? <p className="mt-1 px-1 text-[11px] text-[#718087]">Use @muse to ask Muse to reply.</p> : null}
                       </div>
                     );
                   })}

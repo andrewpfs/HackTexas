@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { flightHighlights } from "@/lib/travel-display";
+import { hotelPage, hotelProviderLabel, expediaSearchUrl, hotelPriceTotal } from "@/lib/hotel-display";
 import { EmailConfirmation } from "./email-confirmation";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -61,6 +62,8 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
   const myBooking = me ? bookings[me.id] : undefined;
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [hotelPageNumber, setHotelPageNumber] = useState(1);
+  const pagedHotels = hotelPage(hotels?.options ?? [], hotelPageNumber);
   const startedHotels = useRef(false);
   const startedFlights = useRef(false);
 
@@ -89,13 +92,13 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
   const selectedHotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
   const hotelBooker = travelers.find((traveler) => traveler.id === hotels?.selectedByTravelerId);
   const myFlight = myFlights?.options.find((option) => option.id === myFlights.selectedId);
-  const hotelTotal = selectedHotel ? selectedHotel.totalPrice ?? (selectedHotel.pricePerNight ?? 0) * props.nights : 0;
-  const hotelShare = selectedHotel ? hotelTotal / Math.max(1, props.lodgingCount) : 0;
+  const hotelTotal = selectedHotel ? hotelPriceTotal(selectedHotel, props.nights) : null;
+  const hotelShare = hotelTotal !== null ? hotelTotal / Math.max(1, props.lodgingCount) : null;
   const iBookHotel = Boolean(me && selectedHotel && hotels?.selectedByTravelerId === me.id);
   const highlights = flightHighlights(myFlights?.options ?? []);
-  const owedShare = myBooking?.hotelShare ?? (me?.needsLodging && selectedHotel && hotelBooker && !iBookHotel ? { bookerName: hotelBooker.name, hotelName: selectedHotel.name, amount: hotelShare, confirmationCode: bookings[hotelBooker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode } : undefined);
+  const owedShare = myBooking?.hotelShare ?? (me?.needsLodging && selectedHotel && hotelBooker && !iBookHotel && hotelShare !== null ? { bookerName: hotelBooker.name, hotelName: selectedHotel.name, amount: hotelShare, confirmationCode: bookings[hotelBooker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode } : undefined);
   const owedCopy = owedShare ? `You owe ${owedShare.bookerName} about ${money(owedShare.amount)} for your hotel share.` : "";
-  const myTotal = (myFlight?.price ?? 0) + (iBookHotel ? hotelTotal : 0);
+  const myTotal = (myFlight?.price ?? 0) + (iBookHotel ? hotelTotal ?? 0 : 0);
 
   if (!props.searchConfigured) {
     return (
@@ -116,7 +119,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             <p className="eyebrow">Where You&apos;ll Stay</p>
             <h2 className="mt-1 text-2xl font-bold tracking-tight" id="stay-heading">Hotels In {props.destination}</h2>
             <p className="mt-1 text-sm text-[#718087]">
-              {props.nights} night{props.nights === 1 ? "" : "s"} for {props.lodgingCount} traveler{props.lodgingCount === 1 ? "" : "s"} · live hotel results from Google Hotels via SerpApi
+              {props.nights} night{props.nights === 1 ? "" : "s"} for {props.lodgingCount} traveler{props.lodgingCount === 1 ? "" : "s"} · Expedia discovery with Google Hotels fallback via SerpApi
             </p>
           </div>
           {selectedHotel ? (
@@ -125,6 +128,13 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             <p className="text-sm font-semibold text-[#879196]">{me?.isHost ? "Pick one for the group." : "The host picks the group hotel."}</p>
           )}
         </div>
+
+        {hotels?.providerNote ? <p className="mt-3 text-xs leading-5 text-[#53666f]">{hotels.providerNote}</p> : null}
+        {hotels?.status === "done" && !selectedHotel ? (
+          <button className="mt-3 rounded-full border border-[#173f50]/20 px-4 py-2 text-xs font-bold text-[#173f50] hover:bg-[#edf5fb] disabled:opacity-50" disabled={busy !== ""} onClick={() => { setHotelPageNumber(1); act("hotel-refresh", `/api/trips/${tripId}/travel/hotels`, "POST", { retry: true }); }} type="button">
+            {busy === "hotel-refresh" ? "Searching…" : "Refresh Hotels"}
+          </button>
+        ) : null}
 
         {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} <span className="block font-normal">Separate from your own flight charge.</span></p> : null}
         {!hotels || hotels.status === "pending" ? (
@@ -143,7 +153,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
           <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm text-[#718087]">No hotels matched these dates and the group&apos;s price level.</p>
         ) : (
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {hotels.options.map((hotel) => {
+            {pagedHotels.options.map((hotel) => {
               const picked = hotel.token === hotels.selectedToken;
               const perPerson = hotel.pricePerNight !== null ? hotel.pricePerNight / Math.max(1, props.lodgingCount) : null;
               const fits = perPerson !== null && props.lowestBudgetPerNight !== null && perPerson <= props.lowestBudgetPerNight;
@@ -156,6 +166,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   </div>
                   <div className="flex flex-1 flex-col p-4">
                     <p className="font-bold leading-snug text-[#173f50]">{hotel.name}</p>
+                    <p className="mt-2 text-xs font-bold text-[#397bb3]">{hotelProviderLabel(hotel)}{hotel.provider === "expedia" ? " · Expedia ↗" : ""}</p>
                     <p className="mt-1 text-sm text-[#718087]">
                       {hotel.rating !== null ? <span className="font-bold text-[#b0661c]">★ {hotel.rating.toFixed(1)}</span> : null}
                       {hotel.reviewCount !== null ? ` · ${hotel.reviewCount.toLocaleString("en-US")} reviews` : ""}
@@ -168,7 +179,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                           <span className="text-xl font-extrabold text-[#173f50]">{money(hotel.pricePerNight)}</span> / night
                           {perPerson !== null ? <span className="block text-xs text-[#879196]">about {money(perPerson)} per person per night</span> : null}
                         </p>
-                      ) : <p className="text-sm text-[#879196]">Price not listed</p>}
+                      ) : <p className="text-sm font-semibold text-[#53666f]">{hotel.provider === "expedia" ? "See Current Price On Expedia" : "Price not listed"}</p>}
                       <div className="mt-3 flex flex-wrap gap-2">
                         {me?.isHost ? (
                           <button
@@ -180,7 +191,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                             {busy === `hotel-${hotel.token}` ? "Saving…" : picked ? "Picked ✓" : "Pick For The Group"}
                           </button>
                         ) : null}
-                        <a className="rounded-full border border-[#172733]/15 px-4 py-2 text-sm font-bold text-[#173f50] hover:bg-[#f7f7f3]" href={hotel.link} rel="noopener noreferrer" target="_blank">View ↗</a>
+                        <a className="rounded-full border border-[#172733]/15 px-4 py-2 text-sm font-bold text-[#173f50] hover:bg-[#f7f7f3]" href={hotel.link} rel="noopener noreferrer" target="_blank">{hotel.provider === "expedia" ? "View On Expedia ↗" : "View On Provider ↗"}</a>
                       </div>
                     </div>
                   </div>
@@ -189,6 +200,12 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             })}
           </div>
         )}
+        {pagedHotels.totalPages > 1 ? <nav aria-label="Hotel pages" className="mt-6 flex flex-wrap justify-center gap-2">
+          <button className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" disabled={pagedHotels.page === 1} onClick={() => setHotelPageNumber(pagedHotels.page - 1)} type="button">Previous</button>
+          {Array.from({ length: pagedHotels.totalPages }, (_, index) => index + 1).map((number) => <button aria-current={pagedHotels.page === number ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-sm font-bold ${pagedHotels.page === number ? "bg-[#173f50] text-white" : "bg-white"}`} key={number} onClick={() => setHotelPageNumber(number)} type="button">{number}</button>)}
+          <button className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" disabled={pagedHotels.page === pagedHotels.totalPages} onClick={() => setHotelPageNumber(pagedHotels.page + 1)} type="button">Next</button>
+        </nav> : null}
+        {hotels?.status === "done" && (pagedHotels.page === pagedHotels.totalPages || pagedHotels.totalPages === 0) ? <a className="mt-5 block text-center text-sm font-bold text-[#173f50] underline underline-offset-4" href={hotels.expediaSearchUrl || expediaSearchUrl()} rel="noopener noreferrer" target="_blank">View More On Expedia ↗</a> : null}
       </section>
 
       {/* ---------- flights ---------- */}
@@ -318,9 +335,10 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                           : `${selectedHotel.name} · ${hotelBooker?.name ?? "The host"} books it; ${owedCopy}`}
                     </span>
                   </span>
-                  <b>{iBookHotel ? money(hotelTotal) : "—"}</b>
+                  <b>{selectedHotel && hotelTotal === null ? "Price on provider" : iBookHotel ? money(hotelTotal ?? 0) : "—"}</b>
                 </li>
               </ul>
+              {selectedHotel && hotelTotal === null ? <p className="mt-3 text-sm text-[#53666f]">This hotel has no listed price. View current pricing and availability on its provider site; it is excluded from simulated charges and hotel shares.</p> : null}
               {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} This is not part of your simulated charge.</p> : null}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-lg font-extrabold text-[#173f50]">Estimated total {money(myTotal)}</p>

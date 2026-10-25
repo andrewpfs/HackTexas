@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Booking, BookingItem, Trip } from "./trip-types";
 import { addDaysToDate, type HotelSearch } from "./travel-search";
 import { hotelShareForTraveler } from "./travel-display";
+import { hotelPriceTotal } from "./hotel-display";
 
 // Travelers who need a bed. People who chose "No need" are staying elsewhere.
 export function travelersNeedingLodging(trip: Trip) {
@@ -79,9 +80,9 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
 
   const hotels = trip.travel?.hotels;
   const hotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
-  if (hotel && hotels && hotels.selectedByTravelerId === travelerId) {
+  if (hotel && hotels && hotels.selectedByTravelerId === travelerId && hotelPriceTotal(hotel, getNights(hotels.checkIn, hotels.checkOut)) !== null) {
     const nights = getNights(hotels.checkIn, hotels.checkOut);
-    const amount = hotel.totalPrice ?? (hotel.pricePerNight ?? 0) * nights;
+    const amount = hotelPriceTotal(hotel, nights)!;
     items.push({
       kind: "hotel",
       label: hotel.name,
@@ -92,7 +93,7 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
   }
 
   if (items.length === 0) {
-    return { error: "Pick your flight first. The host books the group hotel." };
+    return { error: "Choose a priced flight or hotel for demo checkout. Check unpriced hotel results on the provider's site." };
   }
 
   return {

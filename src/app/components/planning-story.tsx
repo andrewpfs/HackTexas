@@ -12,7 +12,8 @@ const steps = [
 ];
 
 function PhoneScreen({ stage }: { stage: number }) {
-  return <div className="mx-auto w-full max-w-[19rem] rounded-[2.5rem] border-[7px] border-[#173f50] bg-[#f8f6f1] p-4 shadow-xl">
+  return <div className="relative mx-auto aspect-[9/19.5] w-full max-w-[280px] overflow-hidden rounded-[2.5rem] border-[7px] border-[#173f50] bg-[#f8f6f1] shadow-xl">
+    <div className="h-full overflow-y-auto px-4 pb-8 pt-4">
     <div aria-hidden="true" className="mx-auto mb-4 h-3 w-20 rounded-full bg-[#173f50]" />
     <p className="text-xs font-bold uppercase tracking-widest text-[#397bb3]">Trip Planner · Demo</p>
     <h3 className="mb-5 mt-2 text-xl font-bold text-[#173f50]">{steps[stage].title}</h3>
@@ -21,10 +22,11 @@ function PhoneScreen({ stage }: { stage: number }) {
       {stage === 1 ? <><div className="rounded-2xl bg-[#daf0ea] p-4"><p className="font-bold">You&apos;re Invited</p><p className="mt-2 font-mono">trip.link/winter</p></div>{["Ryan · Austin", "Tin · Houston", "Jay · Dallas"].map((person) => <p className="rounded-xl bg-white p-3" key={person}>👤 {person} <span className="float-right text-[#276655]">✓</span></p>)}</> : null}
       {stage === 2 ? <><p className="rounded-2xl bg-white p-4">Your Budget <b className="mt-1 block text-2xl">$1,200</b></p><div className="flex flex-wrap gap-2">{["🍜 Food", "🏛️ Museums", "🌳 Outdoors"].map((tag) => <span className="rounded-full bg-[#e7e2f5] px-3 py-2 font-bold text-[#4b3d8a]" key={tag}>{tag}</span>)}</div><p className="rounded-xl bg-[#daf0ea] p-4">Available Dec 17–21 ✓</p></> : null}
       {stage === 3 ? <><p className="rounded-xl bg-[#daf0ea] p-4 font-bold text-[#276655]">Everyone Is Free Dec 19–21</p>{["Tokyo · Food & Culture", "Kyoto · A Slower Pace", "Osaka · Explore Together"].map((option, index) => <p className="rounded-2xl border border-[#397bb3]/20 bg-white p-4" key={option}><span className="mr-2 text-[#397bb3]">0{index + 1}</span>{option}</p>)}</> : null}
-      {stage === 4 ? <><div className="rounded-2xl bg-white p-4"><p className="font-bold">Kyoto · A Slower Pace</p><p className="mt-3 text-[#276655]">✓ Ryan · ✓ Tin · ✓ Jay</p></div><p className="rounded-2xl bg-[#173f50] p-3 text-white">@muse leave a free afternoon?</p><p className="rounded-2xl bg-[#fff8dc] p-4 text-[#6f5a16]">✦ Muse<br />A little room to wander. Afternoon kept flexible.</p></> : null}
+      {stage === 4 ? <><div className="rounded-2xl bg-white p-4"><p className="font-bold">Kyoto · A Slower Pace</p><p className="mt-3 text-[#276655]">✓ Ryan · ✓ Tin · ✓ Jay</p></div><p className="rounded-2xl bg-[#173f50] p-3 text-white">@muse leave a free afternoon?</p><div className="rounded-2xl bg-[#fff8dc] p-4 text-[#6f5a16]">✦ Muse AI<p>A little room to wander. Afternoon kept flexible.</p><p className="mt-2 text-[10px]">Use @muse to ask Muse to reply.</p></div></> : null}
       {stage === 5 ? <><p className="rounded-2xl bg-[#173f50] p-4 text-white">Day 2 · Explore At Your Pace</p>{["9:00 AM · Breakfast Together", "10:30 AM · Garden Walk", "1:00 PM · Lunch & Free Time", "7:00 PM · Meet For Dinner"].map((stop) => <p className="border-l-2 border-[#397bb3] bg-white p-3" key={stop}>{stop}</p>)}</> : null}
     </div>
-    <div aria-hidden="true" className="mx-auto mt-5 h-1 w-20 rounded-full bg-[#173f50]/30" />
+    </div>
+    <div aria-hidden="true" className="pointer-events-none absolute bottom-2 left-1/2 h-1 w-20 -translate-x-1/2 rounded-full bg-[#173f50]/30" />
   </div>;
 }
 

@@ -195,6 +195,7 @@ export type GroupItinerary = {
 };
 
 export type HotelOption = {
+  provider?: "expedia" | "google_hotels";
   token: string;
   name: string;
   kind: string;
@@ -229,6 +230,8 @@ export type FlightOption = {
 export type SearchStatus = "pending" | "done" | "failed";
 
 export type HotelSearchResult = {
+  expediaSearchUrl?: string;
+  providerNote?: string;
   status: SearchStatus;
   startedAt?: string;
   options: HotelOption[];
@@ -302,7 +305,7 @@ export type TripSketch = {
 
 export type ChatMessage = {
   id: string;
-  role: "traveler" | "muse";
+  role: "traveler" | "muse" | "system";
   travelerId?: string;
   authorName: string;
   text: string;

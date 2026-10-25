@@ -70,10 +70,11 @@ export async function searchHotels(config: TravelSearchConfig, search: HotelSear
 
   return properties
     .filter((hotel) => hotel.name)
-    .slice(0, 8)
+    .slice(0, 27)
     .map((hotel) => {
       const query = encodeURIComponent(`${hotel.name} ${search.destination}`);
       return {
+        provider: "google_hotels" as const,
         token: hotel.property_token || hotel.name!,
         name: hotel.name!,
         kind: hotel.type || "hotel",

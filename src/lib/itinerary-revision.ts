@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { ItineraryDraft } from "./itinerary-planner";
-import { validateItineraryDraft } from "./itinerary-validation";
+import { isPreservedUntimedStop, validateItineraryDraft } from "./itinerary-validation";
 import type { PlanningContext } from "./planning-context";
 import type { ChatMessage, GroupItinerary, ItineraryDay } from "./trip-types";
 
@@ -124,7 +124,7 @@ export function validateRevisedDays(
     compromises: itinerary.compromises,
     days,
   };
-  const validation = validateItineraryDraft(draft, sharedDates, [basedOnCandidateId]);
+  const validation = validateItineraryDraft(draft, sharedDates, [basedOnCandidateId], itinerary.days);
   const errors = [...validation.errors];
 
   // The trip keeps the same dates: one entry per original day.
@@ -140,6 +140,7 @@ export function validateRevisedDays(
     }
     let previousMinutes = -1;
     for (const activity of day.activities ?? []) {
+      if (isPreservedUntimedStop(itinerary.days, day.dayNumber, activity)) continue;
       const clock = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(activity.time ?? "");
       if (!clock || Number(clock[1]) < 1 || Number(clock[1]) > 12 || Number(clock[2]) > 59) {
         errors.push("Use valid clock times for every stop.");

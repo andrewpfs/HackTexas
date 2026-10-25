@@ -1,4 +1,5 @@
 import type { Booking, FlightOption, Trip } from "./trip-types";
+import { hotelPriceTotal } from "./hotel-display";
 
 export function flightHighlights(options: FlightOption[]) {
   let cheapest: number | null = null;
@@ -22,7 +23,8 @@ export function hotelShareForTraveler(trip: Trip, travelerId: string) {
     if (member.preferences?.lodgingType !== "No need") count += 1;
   }
   const nights = Math.max(1, Math.round((Date.parse(hotels.checkOut) - Date.parse(hotels.checkIn)) / 86400000));
-  const total = hotel.totalPrice ?? (hotel.pricePerNight ?? 0) * nights;
+  const total = hotelPriceTotal(hotel, nights);
+  if (total === null) return undefined;
   return { bookerName: booker.name, hotelName: hotel.name, amount: total / Math.max(1, count), confirmationCode: trip.travel?.bookings?.[booker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode };
 }
 

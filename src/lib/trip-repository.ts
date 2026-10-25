@@ -22,6 +22,14 @@ import { needsPlaceLookup } from "./itinerary-diff";
 import { jsonTripStore, type TripStore } from "./trip-store";
 import { getSupabaseTripStore } from "./supabase-trip-store";
 import { applyProposalVote, proposalMatchesBase } from "./itinerary-proposals";
+import { applyManualEdit, type ManualStopEdit, type TravelWarning } from "./manual-itinerary";
+
+export async function editSharedStop(tripId: string, edit: ManualStopEdit, allowLongTravel: boolean) {
+  return getStore().update<{ saved: boolean; warnings: TravelWarning[]; trip: Trip }>(tripId, (trip) => {
+    const result = applyManualEdit(trip, edit, allowLongTravel);
+    return { save: result.saved, result: { ...result, trip } };
+  });
+}
 
 type JoinResult =
   | { status: "duplicate" }

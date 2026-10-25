@@ -1,15 +1,27 @@
 import { getDatesInRange, isValidISODate } from "./date-utils";
 import type { ItineraryDraft } from "./itinerary-planner";
-import { itineraryActivityTypes } from "./trip-types";
+import { itineraryActivityTypes, type ItineraryActivity, type ItineraryDay } from "./trip-types";
 
 function hasText(value: unknown) {
   return typeof value === "string" && value.trim() !== "";
+}
+
+// Later Muse edits may retain a freeform stop whose time was left blank.
+// This does not let generated plans introduce new untimed activities.
+export function isPreservedUntimedStop(originalDays: ItineraryDay[], dayNumber: number, activity: ItineraryActivity) {
+  if (activity.time !== "") return false;
+  const day = originalDays.find((item) => item.dayNumber === dayNumber);
+  if (!day) return false;
+  return day.activities.some((old) =>
+    old.time === "" && old.title === activity.title && old.location === activity.location &&
+    old.type === activity.type && old.description === activity.description && old.placeSearchQuery === activity.placeSearchQuery);
 }
 
 export function validateItineraryDraft(
   draft: ItineraryDraft,
   sharedDates: string[],
   candidateIds: string[],
+  originalDays: ItineraryDay[] = [],
 ) {
   const errors: string[] = [];
 
@@ -55,7 +67,7 @@ export function validateItineraryDraft(
       continue;
     }
     for (const activity of day.activities) {
-      if (!hasText(activity.time) || !hasText(activity.title)) {
+      if ((!hasText(activity.time) && !isPreservedUntimedStop(originalDays, day.dayNumber, activity)) || !hasText(activity.title)) {
         errors.push(`Day ${day.dayNumber} has an activity without a time or title.`);
       }
       if (!itineraryActivityTypes.includes(activity.type)) {

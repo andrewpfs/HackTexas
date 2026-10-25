@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { getHotelSearchInputs } from "@/lib/travel-planning";
-import { searchHotels } from "@/lib/travel-search";
+import { discoverHotels } from "@/lib/hotel-discovery";
 import { claimHotelSearch, finishHotelSearch, getTripById, selectGroupHotel } from "@/lib/trip-repository";
 
 async function readBody(request: Request) {
@@ -12,7 +12,7 @@ async function readBody(request: Request) {
   }
 }
 
-// Runs the group's hotel search once (Google Hotels through SerpApi).
+// One claimed Expedia discovery search, with Google Hotels as a fallback.
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/travel/hotels">) {
   const { tripId } = await context.params;
   const body = await readBody(request);
@@ -33,9 +33,9 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   }
 
   try {
-    const options = await searchHotels({ apiKey }, getHotelSearchInputs(claim.trip)!);
-    await finishHotelSearch(tripId, { status: "done", options }, claim.trip.travel?.hotels?.startedAt);
-    return NextResponse.json({ status: "done", count: options.length });
+    const result = await discoverHotels({ apiKey }, getHotelSearchInputs(claim.trip)!);
+    await finishHotelSearch(tripId, { status: "done", ...result }, claim.trip.travel?.hotels?.startedAt);
+    return NextResponse.json({ status: "done", count: result.options.length });
   } catch (error) {
     console.error("Hotel search failed:", error);
     await finishHotelSearch(tripId, { status: "failed", error: "We couldn't load hotels right now." }, claim.trip.travel?.hotels?.startedAt);

@@ -147,9 +147,8 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               <span className="absolute -top-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
               <span className="absolute -bottom-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Invite Code</p>
-              <p className="mt-2 font-mono text-3xl font-bold tracking-[0.2em] text-[#173f50]">{trip.inviteCode}</p>
               <p className="mt-2 text-xs leading-5 text-[#718087]">Share this code so friends can board.</p>
-              <CopyInviteLink className="button-secondary mt-4 !min-h-10 !px-4 !text-sm" joinPath={joinPath} />
+              <CopyInviteLink className="button-secondary mt-2 !min-h-10 !px-4 !text-sm" joinPath={joinPath} showCode />
             </div>
           </div>
         </section>
@@ -187,7 +186,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 <span className="font-bold text-[#173f50]">{longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}{longestSharedWindow && preferredDurationDays !== undefined && longestSharedWindow.dayCount < preferredDurationDays ? <span className="ml-2 text-sm font-normal text-[#718087]">shorter than the preferred {preferredDurationDays} days</span> : null}</span>
               </div>
             </section>
-            {!candidatesAvailable && !itineraryReady ? <TripSketchCard hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
+            {!candidatesAvailable && !itineraryReady ? <TripSketchCard destination={trip.destination || "Your Group Trip"} origin={trip.origin} dateLabel={travelWindow} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
           <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
         </div>

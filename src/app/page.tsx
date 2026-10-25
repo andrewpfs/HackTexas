@@ -11,10 +11,16 @@ const groupNeeds = [
 ];
 
 const exampleTravelers = [
-  { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "Dec 17–21" },
-  { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife"], budget: "$1,500", available: "Dec 18–23" },
-  { name: "Jay", icon: "👨🏼", interests: ["Outdoors", "Sightseeing"], budget: "$1,000", available: "Dec 19–22" },
+  { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "Dec 17–21", request: "I really want one free afternoon.", hotel: "" },
+  { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife", "Sightseeing"], budget: "$1,500", available: "Dec 18–23", request: "I want to stay near public transit.", hotel: "4★ hotel" },
+  { name: "Jordan", icon: "👨🏼", interests: ["Outdoors"], budget: "$900", available: "Dec 17–19", request: "No super early mornings.", hotel: "" },
 ];
+
+const interestColors: Record<string, string> = {
+  Food: "bg-[#fff0db] text-[#805212]", Museums: "bg-[#e7e2f5] text-[#4b3d8a]",
+  Shopping: "bg-[#fbe4d9] text-[#93432f]", Nightlife: "bg-[#e7e2f5] text-[#4b3d8a]",
+  Sightseeing: "bg-[#deedff] text-[#2f6699]", Outdoors: "bg-[#daf0ea] text-[#276655]",
+};
 
 export default function Home() {
   return (
@@ -105,8 +111,15 @@ export default function Home() {
       <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <div className="text-center"><p className="eyebrow">Different Travelers, One Shared Plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See The Common Ground Clearly.</h2></div>
-          <div className="mt-9 grid gap-4 md:grid-cols-3">
-            {exampleTravelers.map((traveler) => <article className="ticket-card p-5" key={traveler.name}><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span><div><h3 className="font-bold">{traveler.name}</h3><div className="mt-2 flex flex-wrap gap-1.5">{traveler.interests.map((interest, index) => <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${index === 0 ? "bg-[#daf0ea] text-[#276655]" : "bg-[#e7e2f5] text-[#4b3d8a]"}`} key={interest}>{interest}</span>)}</div></div></div><p className="mt-4 border-t border-dashed border-[#173f50]/20 pt-3 text-sm font-bold text-[#173f50]">Budget: {traveler.budget}</p><p className="mt-1 text-sm text-[#66757d]">Available: {traveler.available}</p></article>)}
+          <div className="mx-auto mt-9 max-w-4xl space-y-4">
+            {exampleTravelers.map((traveler) => <article className="ticket-card p-5 sm:p-6" key={traveler.name}>
+              <div className="flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span>
+                <div className="min-w-0 flex-1"><h3 className="text-lg font-bold">{traveler.name}</h3><div className="mt-2 flex flex-wrap gap-1.5">{traveler.interests.map((interest) => <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${interestColors[interest]}`} key={interest}>{interest}</span>)}</div>
+                  <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[#53666f]"><li><b>{traveler.budget}</b> budget</li><li>Available {traveler.available}</li>{traveler.hotel ? <li>Hotel preference: {traveler.hotel}</li> : null}</ul>
+                  <p className="mt-3 border-t border-dashed border-[#173f50]/15 pt-3 text-sm leading-6 text-[#173f50]"><span className="font-bold">Request:</span> &ldquo;{traveler.request}&rdquo;</p>
+                </div>
+              </div>
+            </article>)}
           </div>
           <div className="mt-6 flex flex-col items-center justify-center gap-2 text-center text-sm font-bold text-[#53666f] sm:flex-row sm:gap-4"><span>Different people</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span>Different schedules &amp; preferences</span><span className="text-[#e4664f]" aria-hidden="true">→</span><span className="rounded-full bg-[#daf0ea] px-4 py-2 text-[#276655]">One trip everyone can enjoy</span></div>
         </div>

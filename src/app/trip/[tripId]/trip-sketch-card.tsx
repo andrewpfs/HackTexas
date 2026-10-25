@@ -4,9 +4,17 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { TripSketch } from "@/lib/trip-types";
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
+import { activityIcon } from "@/lib/activity-icons";
+
+const dayColors = ["border-[#397bb3]/25 bg-[#edf5fd]", "border-[#276655]/25 bg-[#eaf6f0]", "border-[#ae7d2a]/25 bg-[#fff6e3]"];
+
+function sketchSections(plan: string) {
+  // Keep prose intact when the sketch has no explicit time-of-day labels.
+  return plan.split(/(?=\b(?:Morning|Afternoon|Evening)\s*:)/i).filter((section) => section.trim() !== "");
+}
 
 // The first rough plan, drawn from the host's description before anyone votes.
-export function TripSketchCard({ tripId, sketch, hostId }: { tripId: string; sketch: TripSketch | null; hostId: string }) {
+export function TripSketchCard({ tripId, sketch, hostId, destination, origin, dateLabel }: { tripId: string; sketch: TripSketch | null; hostId: string; destination: string; origin: string; dateLabel: string }) {
   const router = useRouter();
   const { travelerId } = useTravelerIdentity(tripId);
   const isHostView = travelerId === hostId;
@@ -33,7 +41,9 @@ export function TripSketchCard({ tripId, sketch, hostId }: { tripId: string; ske
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="eyebrow">First Draft</p>
-          <h2 className="mt-1 text-xl font-bold" id="sketch-heading">✦ Trip Sketch</h2>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-[#173f50] sm:text-3xl" id="sketch-heading">{destination}</h2>
+          <p className="mt-2 text-sm font-bold text-[#397bb3]">✦ Trip Sketch · {origin} → {destination}</p>
+          <p className="mt-1 text-sm text-[#53666f]">{dateLabel}</p>
         </div>
         <p className="text-sm text-[#738087]">
           {sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
@@ -70,11 +80,11 @@ export function TripSketchCard({ tripId, sketch, hostId }: { tripId: string; ske
           ) : null}
 
           <ol className="mt-6 grid gap-3 sm:grid-cols-2">
-            {sketch.days.map((day) => (
-              <li className="rounded-2xl border border-[#397bb3]/15 bg-white p-5 shadow-sm" key={day.dayNumber}>
+            {sketch.days.map((day, index) => (
+              <li className={`rounded-2xl border p-5 shadow-sm ${dayColors[index % dayColors.length]}`} key={day.dayNumber}>
                 <p className="text-xs font-bold uppercase tracking-wide text-[#397bb3]">🗓 Day {day.dayNumber}</p>
-                <p className="mt-0.5 font-bold text-[#173f50]">{day.title}</p>
-                <p className="mt-1 text-sm leading-6 text-[#718087]">{day.plan}</p>
+                <p className="mt-1 text-lg font-bold text-[#173f50]">{activityIcon({ title: day.title })} {day.title}</p>
+                <div className="mt-3 divide-y divide-[#173f50]/10">{sketchSections(day.plan).map((section, sectionIndex) => <p className="py-2 text-sm leading-6 text-[#53666f]" key={sectionIndex}><span aria-hidden="true">{activityIcon({ title: section })}</span> {section}</p>)}</div>
               </li>
             ))}
           </ol>

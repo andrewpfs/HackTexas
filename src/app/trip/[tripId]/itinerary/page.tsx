@@ -9,6 +9,7 @@ import type { PlannerSource } from "@/lib/trip-types";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { ProgressNav } from "../progress-nav";
 import { ItineraryWorkspace } from "./itinerary-workspace";
+import { CompromiseDisclosure } from "./compromise-disclosure";
 
 export const instant = false;
 
@@ -99,34 +100,12 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
           </dl>
         </section>
 
-        <details className="group mt-6 rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
-            <span>
-              <span className="eyebrow block">How The Group Got Here</span>
-              <span className="mt-2 block text-xl font-bold tracking-tight">The compromise</span>
-            </span>
-            <span className="text-[#879196] transition group-open:rotate-180" aria-hidden="true">⌄</span>
-          </summary>
-          <p className="mt-4 leading-7 text-[#53666f]">{itinerary.compromiseExplanation}</p>
-          {itinerary.compromises.length > 0 ? (
-            <ul className="mt-5 space-y-2">
-              {itinerary.compromises.map((compromise) => (
-                <li className="flex gap-3 rounded-2xl bg-[#fff8dc] p-4 text-sm leading-6 text-[#6f5a16]" key={compromise}>
-                  <span aria-hidden="true">✓</span>
-                  <span>{compromise}</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </details>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-[#53666f]">Review your shared plan, then arrange your travel.</p>
+          <Link className="button-primary" href={`/trip/${trip.id}/travel`}>Book Flights &amp; Hotels →</Link>
+        </div>
 
-        <Link className="mt-6 flex flex-col gap-2 rounded-3xl bg-[#173f50] p-6 text-white transition hover:-translate-y-0.5 hover:shadow-lg sm:flex-row sm:items-center sm:justify-between" href={`/trip/${trip.id}/travel`}>
-          <span>
-            <span className="block text-xs font-bold uppercase tracking-[0.18em] text-[#f3c969]">Next Step</span>
-            <span className="mt-1 block text-xl font-bold">Find real hotels and everyone&apos;s flights</span>
-          </span>
-          <span className="rounded-full bg-[#f3c969] px-5 py-2.5 text-sm font-bold text-[#173f50]">Book Flights And Hotel →</span>
-        </Link>
+        <CompromiseDisclosure explanation={itinerary.compromiseExplanation} compromises={itinerary.compromises} />
 
         <ItineraryWorkspace
           initialItinerary={itinerary}
@@ -137,6 +116,13 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
           travelers={trip.travelers.map((traveler) => ({ id: traveler.id, name: traveler.name }))}
           tripId={trip.id}
         />
+
+        <section className="mt-8 rounded-3xl border border-[#173f50]/15 bg-white p-6 sm:p-8">
+          <p className="eyebrow">Arrange Your Travel</p>
+          <h2 className="mt-2 text-xl font-bold">Find Hotels And Everyone&apos;s Flights</h2>
+          <p className="mt-2 text-sm leading-6 text-[#53666f]">Browse real provider results, choose a group hotel and individual flights, and try the simulated booking checkout. No payment or real reservation is made.</p>
+          <Link className="mt-3 inline-block text-sm font-bold underline underline-offset-4" href={`/trip/${trip.id}/travel`}>Continue To Book Travel →</Link>
+        </section>
 
         <p className="mt-6 text-center text-xs font-semibold text-[#879196]">
           {itinerary.placesStatus === "added"
