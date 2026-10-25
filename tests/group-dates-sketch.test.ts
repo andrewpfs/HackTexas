@@ -7,6 +7,10 @@ import { getSketchBasis, getSketchRequest, sketchNeedsRedraw } from "../src/lib/
 import { detectTripStyle } from "../src/lib/trip-style";
 import { applyTripDetailsUpdate, clearPlanningOutputs, isGeneratingCandidates } from "../src/lib/trip-updates";
 import { fastestMode } from "../src/lib/travel-time";
+import { detectRequestScope, personalPlansFromRevision } from "../src/lib/itinerary-revision";
+import { findFlightsWithNearbyAirports } from "../src/lib/flight-routing";
+import { findNearbyAirports } from "../src/lib/travel-search";
+import type { FlightOption, ItineraryDay } from "../src/lib/trip-types";
 import { maximumNotifications, pushNotification, tripPath } from "../src/lib/trip-notifications";
 import type { Traveler, Trip } from "../src/lib/trip-types";
 
@@ -210,4 +214,71 @@ test("notifications keep only the newest updates", () => {
   assert.equal(trip.notifications?.length, maximumNotifications);
   assert.equal(trip.notifications?.at(-1)?.text, `Update ${maximumNotifications + 4}`);
   assert.equal(trip.notifications?.[0].path, "/trip/trip");
+});
+
+test("chat requests about yourself are personal, requests for everyone are group", () => {
+  assert.equal(detectRequestScope("@muse I'd rather skip the museum and shop in Ginza"), "personal");
+  assert.equal(detectRequestScope("@muse I’ll do my own thing for lunch"), "personal");
+  assert.equal(detectRequestScope("@muse can we skip the museum"), "group");
+  assert.equal(detectRequestScope("@muse I think everyone would like a later start"), "group");
+  assert.equal(detectRequestScope("@muse make day 3 more relaxed"), "unclear");
+});
+
+test("a rewritten shared stop maps back to the stop it replaced", () => {
+  const stop = (time: string, title: string) => ({ time, title, type: "Food" as const, location: "Tokyo", description: title });
+  const oldDays: ItineraryDay[] = [{ dayNumber: 1, date: "2026-12-03", title: "Day", activities: [stop("10:00 AM", "Museum"), stop("1:00 PM", "Lunch")] }];
+  const newDays: ItineraryDay[] = [{ dayNumber: 1, date: "2026-12-03", title: "Day", activities: [stop("10:00 AM", "Ginza shopping"), stop("1:00 PM", "Lunch")] }];
+  assert.deepEqual(personalPlansFromRevision(oldDays, newDays), [{ dayNumber: 1, stopTitle: "Museum", title: "Ginza shopping", location: "Tokyo", note: "Ginza shopping" }]);
+});
+
+function flight(arriveAirport: string): FlightOption {
+  return { id: arriveAirport, airline: "Air", airlineLogo: null, flightNumbers: [], departAirport: "AUS", departTime: "", arriveAirport, arriveTime: "", durationMinutes: 300, stops: 1, price: 300 };
+}
+
+test("a place without an airport gets flights to the nearest airport plus a drive", async () => {
+  const searches: string[] = [];
+  const result = await findFlightsWithNearbyAirports("Austin, Texas", "Niagara Falls, New York", { outboundDate: "2026-12-03", returnDate: "2026-12-06" }, {
+    findCityFlightId: async (city) => (city.startsWith("Austin") ? "/m/0vzm" : "/m/niagara"),
+    lookupPoint: async () => ({ latitude: 43.0962, longitude: -79.0377 }),
+    findNearbyAirports: async () => [
+      { code: "IAG", name: "Niagara Falls International Airport", latitude: 43.1073, longitude: -78.9462, distanceKm: 8 },
+      { code: "BUF", name: "Buffalo Niagara International Airport", latitude: 42.9405, longitude: -78.7322, distanceKm: 30 },
+    ],
+    searchFlights: async (search) => {
+      searches.push(search.toId);
+      return search.toId === "/m/niagara" ? [] : [flight("BUF"), flight("IAG")];
+    },
+  });
+  assert.deepEqual(searches, ["/m/niagara", "IAG,BUF"]);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.match(result.groundNote ?? "", /Niagara Falls has no airport/);
+  assert.equal(result.options[0].groundTransfer?.airport, "BUF");
+  assert.ok((result.options[0].groundTransfer?.minutes ?? 0) > 15);
+  // An airport right at the destination needs no drive.
+  assert.equal(result.options[1].groundTransfer, undefined);
+});
+
+test("cities with their own flights don't look for other airports", async () => {
+  let lookedNearby = false;
+  const result = await findFlightsWithNearbyAirports("Austin, Texas", "Chicago", { outboundDate: "2026-12-03", returnDate: "2026-12-06" }, {
+    findCityFlightId: async () => "/m/id",
+    lookupPoint: async () => { lookedNearby = true; return null; },
+    findNearbyAirports: async () => [],
+    searchFlights: async () => [flight("ORD")],
+  });
+  assert.equal(result.ok && result.options.length, 1);
+  assert.equal(lookedNearby, false);
+});
+
+test("nearby airports are read from Wikidata, nearest first, without duplicates", async () => {
+  const body = { results: { bindings: [
+    { iata: { value: "buf" }, airportLabel: { value: "Buffalo Niagara International Airport" }, coord: { value: "Point(-78.7322 42.9405)" }, dist: { value: "30.1" }, country: { value: "US" } },
+    { iata: { value: "BUF" }, airportLabel: { value: "Duplicate" }, coord: { value: "Point(-78.7 42.9)" }, dist: { value: "30.2" } },
+    { iata: { value: "X1" }, airportLabel: { value: "Bad code" }, coord: { value: "Point(0 0)" }, dist: { value: "1" } },
+  ] } };
+  const airports = await findNearbyAirports({ latitude: 43.09, longitude: -79.03 }, (async () => new Response(JSON.stringify(body), { status: 200 })) as typeof fetch);
+  assert.deepEqual(airports.map((airport) => airport.code), ["BUF"]);
+  assert.equal(airports[0].latitude, 42.9405);
+  assert.equal(airports[0].countryCode, "US");
 });

@@ -111,6 +111,7 @@ const systemPrompt = [
   "- Balance different interests and lodging preferences, and explain the tradeoffs in rationale and considerations.",
   "- If planningMode is known_destination, all three options use that destination and differ in approach. When the destination is a region or the trip style is multi-stop, the three options are different routes through it.",
   tripStylePromptRule,
+  "- Many places have no airport of their own (Niagara Falls, Yosemite, Banff, Cinque Terre, small towns). Then the group flies into the nearest major airport (for example Buffalo, BUF, for Niagara Falls) and drives or takes a shuttle or train the rest of the way. Name that airport, and plan the transfer as a Travel activity on Day 1 and before the flight home on the last day.",
   "- If trip.confirmedDates is present, the group agreed on exactly those dates: every option starts on its startDate and ends on its endDate. Some travelers in travelersNotFreeOnEveryDay may arrive late or leave early; mention it in considerations.",
   "- trip.feasibilityWarnings lists problems the group was warned about (too short for the flights, tight budgets, too many places). Plan around them and say in considerations how each option handles them.",
   "- If planningMode is unknown_destination, recommend three different destinations that fit the group.",

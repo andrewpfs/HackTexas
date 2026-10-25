@@ -167,6 +167,10 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             ) : myFlights.options.length === 0 ? (
               <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-4 text-sm text-[#718087]">No flights found for these dates.</p>
             ) : (
+              <>
+              {myFlights.groundNote ? (
+                <p className="mt-5 rounded-2xl bg-[#eef6ff] p-4 text-sm leading-6 text-[#2f4f66]" role="note">🚗 {myFlights.groundNote}</p>
+              ) : null}
               <ul className="mt-5 space-y-3">
                 {myFlights.options.map((flight) => {
                   const picked = flight.id === myFlights.selectedId;
@@ -180,6 +184,9 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                           <p className="text-sm text-[#718087]">
                             {flight.airline} · {flight.departAirport} → {flight.arriveAirport} · {formatDuration(flight.durationMinutes)} · {flight.stops === 0 ? "Nonstop" : `${flight.stops} stop${flight.stops === 1 ? "" : "s"}`}
                           </p>
+                          {flight.groundTransfer ? (
+                            <p className="mt-1 text-sm font-semibold text-[#2f6699]">🚗 Then ~{formatDuration(flight.groundTransfer.minutes)} drive from {flight.groundTransfer.airportName} ({flight.groundTransfer.airport}) to {flight.groundTransfer.to}</p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex items-center justify-between gap-4 sm:justify-end">
@@ -197,6 +204,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   );
                 })}
               </ul>
+              </>
             )}
           </>
         )}
@@ -257,7 +265,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             <div>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-center justify-between gap-4 rounded-2xl bg-[#f7f7f3] px-4 py-3">
-                  <span><span className="font-bold text-[#173f50]">Your flight</span><span className="block text-[#718087]">{myFlight ? `${myFlight.airline}, ${myFlight.departAirport} → ${myFlight.arriveAirport}` : "Choose a flight above"}</span></span>
+                  <span><span className="font-bold text-[#173f50]">Your flight</span><span className="block text-[#718087]">{myFlight ? `${myFlight.airline}, ${myFlight.departAirport} → ${myFlight.arriveAirport}${myFlight.groundTransfer ? `, then ~${formatDuration(myFlight.groundTransfer.minutes)} drive` : ""}` : "Choose a flight above"}</span></span>
                   <b>{myFlight ? money(myFlight.price) : "—"}</b>
                 </li>
                 {me.needsLodging ? myStays.map((stay) => (

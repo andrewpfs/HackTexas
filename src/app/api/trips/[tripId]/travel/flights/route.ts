@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { getDepartureCity } from "@/lib/travel-planning";
-import { findCityFlightId, searchFlights } from "@/lib/travel-search";
+import { lookupDestinationArea } from "@/lib/city-search";
+import { findFlightsWithNearbyAirports } from "@/lib/flight-routing";
+import { findCityFlightId, findNearbyAirports, searchFlights } from "@/lib/travel-search";
 import { claimFlightSearch, finishFlightSearch, getTripById, selectFlight } from "@/lib/trip-repository";
 
 async function readBody(request: Request) {
@@ -39,20 +41,27 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   }
 
   try {
-    const [fromId, toId] = await Promise.all([findCityFlightId(from), findCityFlightId(claim.trip.itinerary!.destination)]);
-    if (!fromId || !toId) {
-      await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: `We couldn't find airports for ${!fromId ? from : claim.trip.itinerary!.destination}.` }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);
-      return NextResponse.json({ error: "We couldn't find the airports." }, { status: 422 });
-    }
-
-    const options = await searchFlights({ apiKey }, {
-      fromId,
-      toId,
+    const destination = claim.trip.itinerary!.destination;
+    const startedAt = claim.trip.travel?.flights?.[body.travelerId]?.startedAt;
+    const result = await findFlightsWithNearbyAirports(from, destination, {
       outboundDate: claim.trip.itinerary!.startDate,
       returnDate: claim.trip.itinerary!.endDate,
+    }, {
+      findCityFlightId: (city) => findCityFlightId(city),
+      findNearbyAirports: (point) => findNearbyAirports(point),
+      lookupPoint: async (place) => {
+        const area = await lookupDestinationArea(place);
+        return area?.latitude !== undefined && area.longitude !== undefined ? { latitude: area.latitude, longitude: area.longitude, countryCode: area.countryCode } : null;
+      },
+      searchFlights: (search) => searchFlights({ apiKey }, search),
     });
-    await finishFlightSearch(tripId, body.travelerId, { status: "done", options }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);
-    return NextResponse.json({ status: "done", count: options.length });
+    if (!result.ok) {
+      await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: result.error }, startedAt);
+      return NextResponse.json({ error: result.error }, { status: 422 });
+    }
+
+    await finishFlightSearch(tripId, body.travelerId, { status: "done", options: result.options, groundNote: result.groundNote }, startedAt);
+    return NextResponse.json({ status: "done", count: result.options.length });
   } catch (error) {
     console.error("Flight search failed:", error);
     await finishFlightSearch(tripId, body.travelerId, { status: "failed", error: "We couldn't load flights right now." }, claim.trip.travel?.flights?.[body.travelerId]?.startedAt);

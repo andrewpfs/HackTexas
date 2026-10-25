@@ -2,6 +2,7 @@ import type { FlightOption, HotelOption } from "./trip-types";
 
 const serpApiUrl = "https://serpapi.com/search.json";
 const wikidataApi = "https://www.wikidata.org/w/api.php";
+const wikidataSparql = "https://query.wikidata.org/sparql";
 const userAgent = "HackTXTripPlanner/1.0 (student hackathon project)";
 
 export type TravelSearchConfig = { apiKey: string; fetchImpl?: typeof fetch };
@@ -147,6 +148,52 @@ export async function findCityFlightId(city: string, fetchImpl: typeof fetch = f
     }
   }
   return null;
+}
+
+// ---------- nearby airports ----------
+
+export type NearbyAirport = { code: string; name: string; latitude: number; longitude: number; distanceKm: number; countryCode?: string };
+
+type SparqlResponse = { results?: { bindings?: Record<string, { value?: string }>[] } };
+
+// Airports with an IATA code near a point, nearest first. Places like Niagara
+// Falls or Yosemite have no airport of their own, so flights land at one of these
+// and the group drives the rest. Free (Wikidata), no API key.
+export async function findNearbyAirports(point: { latitude: number; longitude: number }, fetchImpl: typeof fetch = fetch, radiusKm = 200): Promise<NearbyAirport[]> {
+  const query = `SELECT DISTINCT ?airport ?airportLabel ?iata ?coord ?dist ?country WHERE {
+  SERVICE wikibase:around {
+    ?airport wdt:P625 ?coord .
+    bd:serviceParam wikibase:center "Point(${point.longitude} ${point.latitude})"^^geo:wktLiteral .
+    bd:serviceParam wikibase:radius "${radiusKm}" .
+    bd:serviceParam wikibase:distance ?dist .
+  }
+  VALUES ?type { wd:Q1248784 wd:Q644371 wd:Q94993988 }
+  ?airport wdt:P31 ?type ;
+           wdt:P238 ?iata .
+  FILTER NOT EXISTS { ?airport wdt:P576 ?closed }
+  OPTIONAL { ?airport wdt:P17/wdt:P297 ?country }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+} ORDER BY ?dist LIMIT 40`;
+  try {
+    const url = new URL(wikidataSparql);
+    url.search = new URLSearchParams({ query, format: "json" }).toString();
+    const response = await fetchImpl(url, { headers: { "User-Agent": userAgent, Accept: "application/sparql-results+json" }, signal: AbortSignal.timeout(15000) });
+    if (!response.ok) return [];
+    const rows = ((await response.json()) as SparqlResponse).results?.bindings ?? [];
+    const airports: NearbyAirport[] = [];
+    for (const row of rows) {
+      const code = row.iata?.value?.trim().toUpperCase() ?? "";
+      const match = /Point\(([-\d.]+) ([-\d.]+)\)/.exec(row.coord?.value ?? "");
+      const distanceKm = Number(row.dist?.value);
+      if (!/^[A-Z]{3}$/.test(code) || !match || !Number.isFinite(distanceKm)) continue;
+      if (airports.some((airport) => airport.code === code)) continue;
+      const countryCode = row.country?.value?.trim().toUpperCase();
+      airports.push({ code, name: row.airportLabel?.value ?? code, longitude: Number(match[1]), latitude: Number(match[2]), distanceKm, ...(countryCode ? { countryCode } : {}) });
+    }
+    return airports;
+  } catch {
+    return [];
+  }
 }
 
 // ---------- flights ----------

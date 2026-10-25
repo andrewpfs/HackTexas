@@ -250,6 +250,9 @@ export type FlightOption = {
   stops: number;
   // Round-trip price per person in USD.
   price: number;
+  // Set when the flight lands at a nearby airport and the group drives the rest
+  // (for example Buffalo for Niagara Falls). The drive is a rough estimate.
+  groundTransfer?: { airport: string; airportName: string; minutes: number; distanceKm: number; to: string };
 };
 
 // "pending" while a search runs, so two viewers never start the same paid search.
@@ -282,6 +285,8 @@ export type FlightSearchResult = {
   options: FlightOption[];
   selectedId?: string;
   error?: string;
+  // Explains why flights land at a nearby airport instead of the destination itself.
+  groundNote?: string;
 };
 
 export type BookingItem = {

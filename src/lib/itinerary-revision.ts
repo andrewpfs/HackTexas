@@ -11,8 +11,47 @@ export type RevisionRequest = {
   planning: PlanningContext;
   itinerary: Pick<GroupItinerary, "title" | "destination" | "startDate" | "endDate" | "summary" | "days">;
   history: { author: string; role: ChatMessage["role"]; text: string }[];
-  message: { author: string; text: string; focus: string | null };
+  // scope: "personal" when the sender only talks about themselves ("I'd rather..."),
+  // "group" when they speak for everyone ("we", "let's"), otherwise "unclear".
+  message: { author: string; text: string; focus: string | null; scope: RequestScope };
 };
+
+export type RequestScope = "personal" | "group" | "unclear";
+
+const groupWords = /\b(?:we|we're|we'd|we'll|we've|us|our|ours|ourselves|everyone|everybody|all of us|the group|whole group|y'all|you all|let's|lets|together)\b/i;
+const personalWords = /\b(?:i|i'm|i'd|i'll|i've|me|my|mine|myself|personally)\b/i;
+
+// Who a chat request is for, from the words the traveler used. Speaking for the
+// group ("we", "let's") wins over first person ("I think we should...").
+export function detectRequestScope(text: string): RequestScope {
+  const words = text.replace(/@muse\b/gi, " ").replace(/[\u2018\u2019]/g, "'");
+  if (groupWords.test(words)) return "group";
+  if (personalWords.test(words)) return "personal";
+  return "unclear";
+}
+
+// When Muse rewrote shared stops for a request that is only about the sender,
+// turn each replaced stop into that traveler's personal plan instead.
+export function personalPlansFromRevision(oldDays: ItineraryDay[], newDays: ItineraryDay[]): PersonalPlan[] {
+  const plans: PersonalPlan[] = [];
+  for (const oldDay of oldDays) {
+    const newDay = newDays.find((day) => day.dayNumber === oldDay.dayNumber);
+    if (!newDay) continue;
+    const normalize = (value: string) => value.trim().toLowerCase();
+    const newTitles = new Set(newDay.activities.map((item) => normalize(item.title)));
+    const oldTitles = new Set(oldDay.activities.map((item) => normalize(item.title)));
+    const removed = oldDay.activities.filter((item) => !newTitles.has(normalize(item.title)));
+    const added = newDay.activities.filter((item) => !oldTitles.has(normalize(item.title)));
+    for (const replacement of added) {
+      // Pair each new stop with the old stop at the same time, or the next unmatched one.
+      const index = removed.findIndex((item) => item.time === replacement.time);
+      const replaced = index >= 0 ? removed.splice(index, 1)[0] : removed.shift();
+      if (!replaced) break;
+      plans.push({ dayNumber: oldDay.dayNumber, stopTitle: replaced.title, title: replacement.title, location: replacement.location, note: replacement.description });
+    }
+  }
+  return plans.slice(0, 3);
+}
 
 export type PersonalPlan = {
   dayNumber: number;
@@ -78,6 +117,7 @@ export function buildRevisionRequest(
       author: newMessage.authorName,
       text: newMessage.text,
       focus: newMessage.focus ? `Day ${newMessage.focus.dayNumber}: ${newMessage.focus.title}` : null,
+      scope: detectRequestScope(newMessage.text),
     },
   };
 }

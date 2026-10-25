@@ -140,6 +140,17 @@ test("chat, proposals and repository writes remain safe without provider calls",
       const personal = await ask(after!, "@muse I will skip lunch", { kind: "personal", reply: "A personal coffee break.", changes: [], days: null, personal: { dayNumber: 1, stopTitle: "Lunch", title: "Coffee", location: "Nearby", note: "Meet back later" } });
       assert.ok(personal.trip.itinerary?.overrides?.some((item) => item.title === "Coffee"));
       assert.equal(personal.trip.itinerary?.days[0].activities[1].title, "Lunch");
+
+      // "I'd rather..." is about the sender only: even if Muse rewrites the shared day,
+      // it becomes a personal plan and no vote opens.
+      const myDays = structuredClone(personal.trip.itinerary!.days);
+      const firstStop = myDays[0].activities[0];
+      myDays[0].activities[0] = { ...firstStop, title: "Arcade", location: "Akihabara", description: "Games" };
+      const mine = await ask(personal.trip, "@muse I'd rather go to the arcade instead", { kind: "shared_minor", reply: "Swapping in the arcade.", changes: ["Arcade"], days: myDays });
+      assert.equal(mine.trip.pendingItineraryProposal?.status === "pending", false);
+      assert.equal(mine.trip.itinerary?.days[0].activities[0].title, firstStop.title);
+      assert.ok(mine.trip.itinerary?.overrides?.some((item) => item.title === "Arcade" && item.stopTitle === firstStop.title));
+      assert.match(mine.trip.chat?.at(-1)?.text ?? "", /personal plan/);
     });
     await suite.test("destination changes are proposals even when Muse labels them minor", async () => {
       const trip = await propose();

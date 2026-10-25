@@ -1,4 +1,4 @@
-import { buildRevisionRequest, carryOverPlaces, makeChatMessage, mentionsMuse, repairRevisedDays, validateRevisedDays, type RevisionRequest, type RevisionResult } from "./itinerary-revision";
+import { buildRevisionRequest, carryOverPlaces, detectRequestScope, makeChatMessage, mentionsMuse, personalPlansFromRevision, repairRevisedDays, validateRevisedDays, type PersonalPlan, type RevisionRequest, type RevisionResult } from "./itinerary-revision";
 import { createItineraryProposal, isMajorRevision } from "./itinerary-proposals";
 import { buildPlanningContext } from "./planning-context";
 import type { ChatMessage, PlaceSuggestion } from "./trip-types";
@@ -35,6 +35,22 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
   if (!mentionsMuse(input.text)) return { trip: current, changedStops: [] };
   if (current.pendingItineraryProposal?.status === "pending") return reply("Please finish voting on the open proposal first, then ask me to change the plan.");
 
+  // A request that is only about the sender ("I'd rather skip the museum") becomes
+  // their personal plan, never a group vote.
+  const scope = detectRequestScope(input.text);
+  async function savePersonalPlans(plans: PersonalPlan[], museMessage: ChatMessage, itinerary: NonNullable<typeof current.itinerary>) {
+    const saved: string[] = [];
+    for (const plan of plans) {
+      const day = itinerary.days.find((item) => item.dayNumber === plan.dayNumber);
+      const stop = day?.activities.find((item) => item.title.trim().toLowerCase() === plan.stopTitle.trim().toLowerCase());
+      if (!day || !stop) continue;
+      const result = await dependencies.changePersonalOverride(tripId, { action: "add", travelerId: traveler!.id, dayNumber: day.dayNumber, stopTime: stop.time, stopTitle: stop.title, title: plan.title.slice(0, 120), location: plan.location.slice(0, 160), note: plan.note.slice(0, 300) });
+      if (result.status === "updated") saved.push(`Personal plan for ${traveler!.name}, Day ${day.dayNumber}: ${plan.title} instead of ${stop.title}`);
+    }
+    if (saved.length > 0) museMessage.changes = saved;
+    return saved.length > 0;
+  }
+
   // Errors from Muse's last answer, sent back once so it can correct itself.
   let fixErrors: string[] = [];
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -47,6 +63,22 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
     }
     const result = await dependencies.revise(request);
     const museMessage = makeChatMessage({ role: "muse", authorName: "Muse", text: result.reply });
+
+    // Muse's own personal plan wins unless the traveler spoke for the whole group.
+    if (result.personal && scope !== "group") {
+      await savePersonalPlans([result.personal], museMessage, itinerary);
+      const added = await dependencies.appendChatMessage(tripId, museMessage);
+      return { trip: added.status === "added" ? added.trip : current, changedStops: [] };
+    }
+
+    if (result.days && scope === "personal" && !isMajorRevision(itinerary, result)) {
+      const plans = personalPlansFromRevision(itinerary.days, result.days);
+      if (plans.length > 0 && await savePersonalPlans(plans, museMessage, itinerary)) {
+        museMessage.text = `That sounds like just you, so I made it your personal plan. The group plan stays the same, and friends can join you. If you meant it for everyone, say "we" and I'll put it to a vote.`;
+        const added = await dependencies.appendChatMessage(tripId, museMessage);
+        return { trip: added.status === "added" ? added.trip : current, changedStops: [] };
+      }
+    }
 
     if (result.days) {
       result.days = repairRevisedDays(itinerary, result.days);
@@ -98,15 +130,7 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
       return { trip: added.status === "added" ? added.trip : current, changedStops: [] };
     }
 
-    if (result.personal) {
-      const plan = result.personal;
-      const day = itinerary.days.find((item) => item.dayNumber === plan.dayNumber);
-      const stop = day?.activities.find((item) => item.title.trim().toLowerCase() === plan.stopTitle.toLowerCase());
-      if (day && stop) {
-        const saved = await dependencies.changePersonalOverride(tripId, { action: "add", travelerId: traveler.id, dayNumber: day.dayNumber, stopTime: stop.time, stopTitle: stop.title, title: plan.title.slice(0, 120), location: plan.location.slice(0, 160), note: plan.note.slice(0, 300) });
-        if (saved.status === "updated") museMessage.changes = [`Personal plan for ${traveler.name}, Day ${day.dayNumber}: ${plan.title} instead of ${stop.title}`];
-      }
-    }
+    // A personal plan when the traveler spoke for the group: Muse misread it, so just reply.
     const added = await dependencies.appendChatMessage(tripId, museMessage);
     return { trip: added.status === "added" ? added.trip : current, changedStops: [] };
   }
