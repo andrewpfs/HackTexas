@@ -4,8 +4,9 @@ import { MusePlannerError } from "@/lib/muse-client";
 import { getSketchRequest, MockSketchPlanner } from "@/lib/trip-sketch";
 import { claimTripSketch, finishTripSketch } from "@/lib/trip-repository";
 
-// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
-export const maxDuration = 60;
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
 
 // Draws the first rough plan from the host's description, and redraws it for the
 // whole group once everyone has shared preferences and dates. The current draft

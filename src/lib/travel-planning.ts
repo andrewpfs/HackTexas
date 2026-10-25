@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { chosenFlights, shortCity } from "./flight-legs";
 import type { Booking, BookingItem, Trip } from "./trip-types";
 import type { HotelSearch } from "./travel-search";
 import { hotelShareForTraveler } from "./travel-display";
@@ -67,13 +68,12 @@ function confirmationCode(prefix: string) {
 // What one traveler books: their own flight, plus the hotel if they are the one booking it.
 export function buildBooking(trip: Trip, travelerId: string): { booking: Booking } | { error: string } {
   const items: BookingItem[] = [];
-  const flights = trip.travel?.flights?.[travelerId];
-  const flight = flights?.options.find((option) => option.id === flights.selectedId);
-  if (flight) {
+  // One ticket per leg the traveler picked (home, between cities, and home again).
+  for (const { leg, flight } of chosenFlights(trip.travel?.flights?.[travelerId], trip.itinerary)) {
     items.push({
       kind: "flight",
       label: `${flight.airline}, ${flight.departAirport} to ${flight.arriveAirport}`,
-      detail: `Round trip · leaves ${flight.departTime}${flight.stops ? ` · ${flight.stops} stop${flight.stops === 1 ? "" : "s"}` : " · nonstop"}`,
+      detail: `${leg.roundTrip ? "Round trip" : "One way"} · ${shortCity(leg.from)} to ${shortCity(leg.to)} · leaves ${flight.departTime}${flight.stops ? ` · ${flight.stops} stop${flight.stops === 1 ? "" : "s"}` : " · nonstop"}`,
       amount: flight.price,
       confirmationCode: confirmationCode("FLT"),
     });
@@ -110,7 +110,7 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
   }
 
   if (items.length === 0) {
-    return { error: "Choose a priced flight or hotel for demo checkout. Check unpriced hotel results on the provider's site." };
+    return { error: "Choose a priced flight or hotel to check out. Check unpriced hotel results on the provider's site." };
   }
 
   return {

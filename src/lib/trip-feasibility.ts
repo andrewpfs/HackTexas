@@ -96,7 +96,7 @@ export function checkFeasibility(input: FeasibilityInput): FeasibilityWarning[] 
     warnings.push({ code: "budget_below_fare", title: "Budget may not cover the flight", detail: `Real fares for these dates leave little or nothing for the trip: ${fareShort.join("; ")}.` });
   }
   if (roughShort.length > 0) {
-    warnings.push({ code: "tight_budget", title: "Tight budget", detail: `Rough estimate, not live prices: ${roughShort.join("; ")}. Check real fares or raise the budget.` });
+    warnings.push({ code: "tight_budget", title: "Tight budget", detail: `${roughShort.join("; ")}. Check fares or raise the budget.` });
   }
 
   if (input.notFreeNames.length > 0) {

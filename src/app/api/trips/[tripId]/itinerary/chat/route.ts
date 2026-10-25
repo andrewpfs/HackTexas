@@ -8,8 +8,10 @@ import { getSerpApiKey, searchPlaces } from "@/lib/serpapi-places";
 import { appendChatMessage, changePersonalOverride, getTripById, saveItineraryProposal, saveItineraryRevision } from "@/lib/trip-repository";
 import { logError, logWarn } from "@/lib/server-log";
 
-// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
-export const maxDuration = 60;
+
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
 
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/itinerary/chat">) {
   const { tripId } = await context.params;

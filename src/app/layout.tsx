@@ -3,8 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "HackTX Trip Planner",
-    template: "%s | HackTX Trip Planner",
+    default: "TravelSync",
+    template: "%s | TravelSync",
   },
   description:
     "Plan a group trip around everyone's schedules, budgets, and preferences.",

@@ -64,7 +64,6 @@ export function ManualStopEditor(props: Props) {
         <h4 className="font-bold">⚠ Long Travel Detected</h4>
         {preview.warnings.map((warning) => <p className="mt-2 text-sm" key={warning.segment}>About {formatMinutes(warning.minutes)} driving {warning.segment === "previous" ? "from the previous activity" : "to the next activity"}: {warning.title}.</p>)}
         <p className="mt-2 text-sm">Consider replacing a nearby stop, moving this activity to another day, or removing another activity to make room.</p>
-        <p className="mt-2 text-xs">Approximate driving estimate from coordinates, not a routed journey.</p>
       </div> : null}
       <div className="flex flex-wrap gap-2"><button className="button-secondary" disabled={busy} onClick={() => setPreview(null)} type="button">Go Back</button><button className="button-primary" disabled={busy} onClick={() => submit(true)} type="button">{busy ? "Saving…" : preview.warnings.length ? action === "replace" ? "Replace Anyway" : "Add Anyway" : "Save Shared Stop"}</button></div>
     </div> : <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault(); submit(false); }}>

@@ -5,7 +5,16 @@ import type { Trip } from "./trip-types";
 import type { TripStore } from "./trip-store";
 
 const tableName = "trips";
-const maximumUpdateAttempts = 5;
+// Several phones save the same trip at once (votes, each traveler's flight search,
+// a hotel search per city, photos), so a save can lose the race a few times in a row.
+const maximumUpdateAttempts = 12;
+
+// Wait a little longer after each lost race, with randomness so the phones stop
+// colliding in lockstep: about 50ms, 100ms, 200ms ... up to about 1 second.
+function conflictDelay(attempt: number) {
+  const base = Math.min(1000, 50 * 2 ** attempt);
+  return new Promise((resolve) => setTimeout(resolve, base * (0.5 + Math.random())));
+}
 
 type TripRow = {
   id: string;
@@ -48,7 +57,8 @@ function fail(action: string, message: string): never {
   throw new Error(`Supabase could not ${action}: ${message}`);
 }
 
-function createSupabaseTripStore(client: SupabaseClient): TripStore {
+// Exported for tests, which pass a fake client.
+export function createSupabaseTripStore(client: SupabaseClient): TripStore {
   async function readRow(tripId: string) {
     const { data, error } = await withRetry(() =>
       client.from(tableName).select("id, data, version").eq("id", tripId).maybeSingle<TripRow>(),
@@ -132,10 +142,13 @@ function createSupabaseTripStore(client: SupabaseClient): TripStore {
           fail("update the trip", error.message);
         }
         if (data && data.length > 0) {
+          if (attempt > 0) console.log(`[store] saved trip ${tripId} after ${attempt} conflicts`);
           return result;
         }
+        await conflictDelay(attempt);
       }
 
+      console.error(`[store] gave up saving trip ${tripId} after ${maximumUpdateAttempts} conflicts`);
       fail("update the trip", "too many people changed it at once. Please try again.");
     },
   };

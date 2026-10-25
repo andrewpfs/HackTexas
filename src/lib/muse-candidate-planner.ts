@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getDatesInRange } from "./date-utils";
+import { addDays, getDatesInRange, isValidISODate } from "./date-utils";
 import type { CandidatePlanner } from "./candidate-planner";
 import type { PlanningContext } from "./planning-context";
 import type { CandidateTripOption } from "./trip-types";
@@ -8,7 +8,7 @@ import { tripStylePromptRule } from "./trip-style";
 
 export { MusePlannerError } from "./muse-client";
 
-type MuseCandidate = {
+export type MuseCandidate = {
   title: string;
   destination: string;
   summary: string;
@@ -104,13 +104,14 @@ const systemPrompt = [
   "You are the consensus engine for a GROUP trip planner.",
   "Create exactly 3 candidate trip options for the whole group, not for one person.",
   "Rules:",
-  "- Follow the host's trip description in trip.prompt. If it names places (for example \"Tokyo and Osaka\"), every option should include them unless the dates or budgets make that impossible, and say so in considerations. trip.sketch, when present, is the first rough plan the group already saw: build on it, and let the three options differ in pace and emphasis.",
+  "- Follow the host's trip description in trip.prompt. If it names places (for example \"Tokyo and Osaka\"), every option should include them unless the dates or budgets make that impossible, and say so in considerations. Let the three options differ in pace and emphasis.",
   "- Use only dates listed in groupAvailability.sharedDates. A candidate's whole date range must be consecutive shared dates.",
   "- Each traveler departs from their own departureLocation. Consider all of them when choosing destinations.",
   "- Stay within the group's budgets. The lowest maximum budget is the binding constraint.",
   "- Balance different interests and lodging preferences, and explain the tradeoffs in rationale and considerations.",
   "- If planningMode is known_destination, all three options use that destination and differ in approach. When the destination is a region or the trip style is multi-stop, the three options are different routes through it.",
   tripStylePromptRule,
+  "- Many places have no airport of their own (Niagara Falls, Yosemite, Banff, Cinque Terre, small towns). Then the group flies into the nearest major airport (for example Buffalo, BUF, for Niagara Falls) and drives or takes a shuttle or train the rest of the way. Name that airport, and plan the transfer as a Travel activity on Day 1 and before the flight home on the last day.",
   "- If trip.confirmedDates is present, the group agreed on exactly those dates: every option starts on its startDate and ends on its endDate. Some travelers in travelersNotFreeOnEveryDay may arrive late or leave early; mention it in considerations.",
   "- trip.feasibilityWarnings lists problems the group was warned about (too short for the flights, tight budgets, too many places). Plan around them and say in considerations how each option handles them.",
   "- If planningMode is unknown_destination, recommend three different destinations that fit the group.",
@@ -134,6 +135,37 @@ function isShared(candidate: MuseCandidate, sharedDates: Set<string>) {
   return range.length > 0 && range.every((date) => sharedDates.has(date));
 }
 
+// With more travelers there are fewer shared days, and Muse sometimes slips a day
+// outside them (or misreads the agreed dates). Instead of failing the whole request,
+// move the option into the best shared window and re-date its days.
+export function fitCandidateToSharedDates(candidate: MuseCandidate, context: PlanningContext): MuseCandidate | null {
+  const shared = new Set(context.groupAvailability.sharedDates);
+  if (isValidISODate(candidate.suggestedStartDate) && isValidISODate(candidate.suggestedEndDate) && candidate.suggestedStartDate <= candidate.suggestedEndDate && isShared(candidate, shared)) {
+    return candidate;
+  }
+  const windows = context.groupAvailability.sharedWindows;
+  if (windows.length === 0) return null;
+
+  const wantedDays = Math.max(1, candidate.days.length || candidate.estimatedDurationDays || 1);
+  const start = isValidISODate(candidate.suggestedStartDate) ? candidate.suggestedStartDate : "";
+  // Prefer the window that contains Muse's start date, then one long enough, then the longest.
+  const window =
+    windows.find((item) => start >= item.startDate && start <= item.endDate) ??
+    windows.find((item) => item.dayCount >= wantedDays) ??
+    [...windows].sort((a, b) => b.dayCount - a.dayCount)[0];
+  const length = Math.min(wantedDays, window.dayCount);
+  const firstDay = start >= window.startDate && addDays(start, length - 1) <= window.endDate ? start : window.startDate;
+  const days = candidate.days.slice(0, length).map((day, index) => ({ ...day, dayNumber: index + 1, date: addDays(firstDay, index) }));
+  const finalLength = Math.max(1, days.length);
+  return {
+    ...candidate,
+    suggestedStartDate: firstDay,
+    suggestedEndDate: addDays(firstDay, finalLength - 1),
+    estimatedDurationDays: finalLength,
+    days,
+  };
+}
+
 export function parseMuseCandidates(
   output: unknown,
   context: PlanningContext,
@@ -141,13 +173,12 @@ export function parseMuseCandidates(
 ): CandidateTripOption[] {
   const parsed = (output ?? {}) as { candidates?: MuseCandidate[] };
 
-  if (!Array.isArray(parsed.candidates) || parsed.candidates.length !== 3) {
-    throw new MusePlannerError("Muse did not return exactly 3 candidate options.");
+  // Extra options are dropped; too few is retried by the planner.
+  if (!Array.isArray(parsed.candidates) || parsed.candidates.length < 3) {
+    throw new MusePlannerError(`Muse returned ${Array.isArray(parsed.candidates) ? parsed.candidates.length : "no"} options instead of 3.`);
   }
 
-  const sharedDates = new Set(context.groupAvailability.sharedDates);
-
-  return parsed.candidates.map((candidate, index) => {
+  return parsed.candidates.slice(0, 3).map((candidate, index) => {
     if (
       !candidate ||
       typeof candidate.suggestedStartDate !== "string" ||
@@ -157,11 +188,13 @@ export function parseMuseCandidates(
       throw new MusePlannerError(`Muse candidate ${index + 1} was malformed.`);
     }
 
-    if (!isShared(candidate, sharedDates)) {
+    const fitted = fitCandidateToSharedDates(candidate, context);
+    if (!fitted || fitted.days.length === 0) {
       throw new MusePlannerError(
         `Muse candidate ${index + 1} used dates outside the group's shared availability (${candidate.suggestedStartDate} to ${candidate.suggestedEndDate}; allowed ${context.groupAvailability.sharedDates[0] ?? "none"} to ${context.groupAvailability.sharedDates.at(-1) ?? "none"}).`,
       );
     }
+    candidate = fitted;
 
     if (context.planningMode === "known_destination" && context.trip.destination) {
       candidate = { ...candidate, destination: context.trip.destination };
@@ -174,14 +207,24 @@ export function parseMuseCandidates(
 export class MuseCandidatePlanner implements CandidatePlanner {
   constructor(private config: MuseConfig) {}
 
+  // If Muse's answer can't be used, ask once more and say what was wrong.
   async generateCandidates(context: PlanningContext): Promise<CandidateTripOption[]> {
-    const output = await requestMuseJson(this.config, {
-      systemPrompt,
-      userPrompt: buildUserPrompt(context),
-      schemaName: "trip_candidates",
-      schema: responseSchema,
-    });
-
-    return parseMuseCandidates(output, context);
+    let problem = "";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const output = await requestMuseJson(this.config, {
+        systemPrompt,
+        userPrompt: buildUserPrompt(context) + (problem ? `\n\nYour previous answer could not be used: ${problem} Return exactly 3 complete options using only groupAvailability.sharedDates.` : ""),
+        schemaName: "trip_candidates",
+        schema: responseSchema,
+      });
+      try {
+        return parseMuseCandidates(output, context);
+      } catch (error) {
+        if (!(error instanceof MusePlannerError) || attempt === 1) throw error;
+        problem = error.message;
+        console.warn(`Muse options were unusable (${problem}); asking again.`);
+      }
+    }
+    throw new MusePlannerError("Muse could not plan usable options.");
   }
 }

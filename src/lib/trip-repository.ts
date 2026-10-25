@@ -565,19 +565,23 @@ export async function selectStayHotel(tripId: string, travelerId: string, stayIn
   return result ?? { status: "not-found" as const };
 }
 
-export async function claimFlightSearch(tripId: string, travelerId: string, from: string, force = false) {
+// legsKey names the route (see flightLegsKey); a different route means a new search.
+export async function claimFlightSearch(tripId: string, travelerId: string, from: string, legsKey: string, force = false) {
   const result = await getStore().update<ClaimResult<NonNullable<NonNullable<Trip["travel"]>["flights"]>[string]>>(tripId, (trip) => {
     if (!trip.itinerary) {
       return { save: false, result: { status: "no-itinerary" as const } };
     }
     const current = trip.travel?.flights?.[travelerId];
-    if (current && !force && current.from === from && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+    if (current && !force && current.from === from && current.legsKey === legsKey && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+      return { save: false, result: { status: "skip" as const, current } };
+    }
+    if (current && !force && isFreshPending(current.status, current.startedAt)) {
       return { save: false, result: { status: "skip" as const, current } };
     }
 
     trip.travel = {
       ...trip.travel,
-      flights: { ...trip.travel?.flights, [travelerId]: { status: "pending", startedAt: new Date().toISOString(), from, options: [] } },
+      flights: { ...trip.travel?.flights, [travelerId]: { status: "pending", startedAt: new Date().toISOString(), from, legsKey, options: [] } },
     };
     return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
   });
@@ -601,9 +605,19 @@ export async function finishFlightSearch(
 }
 
 // A traveler picks their own flight. Picking it again un-picks it.
-export async function selectFlight(tripId: string, travelerId: string, flightId: string) {
+// Picks (or un-picks) a flight. Multi-city trips pick one flight per leg.
+export async function selectFlight(tripId: string, travelerId: string, flightId: string, legIndex?: number) {
   const result = await getStore().update<{ status: "updated" | "not-found" }>(tripId, (trip) => {
     const search = trip.travel?.flights?.[travelerId];
+    if (search?.legs) {
+      const leg = typeof legIndex === "number" ? search.legs[legIndex] : undefined;
+      if (!leg?.options.some((option) => option.id === flightId)) {
+        return { save: false, result: { status: "not-found" as const } };
+      }
+      const legs = search.legs.map((item, index) => (index === legIndex ? { ...item, selectedId: item.selectedId === flightId ? undefined : flightId } : item));
+      trip.travel = { ...trip.travel, flights: { ...trip.travel?.flights, [travelerId]: { ...search, legs } } };
+      return { save: true, result: { status: "updated" as const } };
+    }
     if (!search?.options.some((option) => option.id === flightId)) {
       return { save: false, result: { status: "not-found" as const } };
     }
@@ -805,7 +819,7 @@ export async function finishTripSketch(tripId: string, basis: SketchBasis, outco
     if (outcome.ok) {
       const wasGroupUpdate = basis.stage === "group" && sketchHasContent(current);
       trip.sketch = { status: "done", ...outcome.draft, source: outcome.source, generatedAt: new Date().toISOString(), basisKey: basis.key, stage: basis.stage };
-      if (wasGroupUpdate) pushNotification(trip, "Muse updated the first draft with everyone's preferences and dates.", tripPath(trip));
+      if (wasGroupUpdate) pushNotification(trip, "Everyone shared their preferences, so Muse drew a new first draft for the group.", tripPath(trip));
     } else if (current && sketchHasContent(current)) {
       current.refreshing = undefined;
       current.failedBasisKey = basis.key;

@@ -122,7 +122,7 @@ test("rejects the wrong number of candidates", async () => {
   await assert.rejects(planner.generateCandidates(makeContext()), MusePlannerError);
 });
 
-test("rejects dates outside shared availability", async () => {
+test("moves options with dates outside shared availability back inside them", async () => {
   const bad = {
     candidates: [
       makeCandidate("2026-12-03", "2026-12-04"),
@@ -133,7 +133,14 @@ test("rejects dates outside shared availability", async () => {
   const { impl } = fakeFetch(bad);
   const planner = new MuseCandidatePlanner({ apiKey: "test-key", fetchImpl: impl });
 
-  await assert.rejects(planner.generateCandidates(makeContext()), MusePlannerError);
+  const context = makeContext();
+  const shared = new Set(context.groupAvailability.sharedDates);
+  const options = await planner.generateCandidates(context);
+  assert.equal(options.length, 3);
+  for (const option of options) {
+    assert.ok(shared.has(option.suggestedStartDate) && shared.has(option.suggestedEndDate));
+    for (const day of option.days) assert.ok(shared.has(day.date));
+  }
 });
 
 test("rejects malformed JSON and HTTP errors", async () => {

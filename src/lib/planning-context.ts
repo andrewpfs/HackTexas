@@ -480,15 +480,6 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
               },
             }
           : {}),
-        ...(trip.sketch?.status === "done"
-          ? {
-              sketch: {
-                summary: trip.sketch.summary,
-                places: trip.sketch.places.map((place) => place.name),
-                days: trip.sketch.days.map((day) => `Day ${day.dayNumber}: ${day.title}`),
-              },
-            }
-          : {}),
       },
       groupAvailability: {
         sharedDates: confirmedWindow ? getDatesInRange(confirmedWindow.startDate, confirmedWindow.endDate) : [...readiness.sharedDates],

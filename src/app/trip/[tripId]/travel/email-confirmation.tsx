@@ -28,7 +28,7 @@ export function EmailConfirmation({ tripId, travelerId, tripName, booking, hotel
   }
   const text = bookingConfirmationText(tripName, booking, hotelShare);
   return <div className="mt-5 rounded-2xl border border-[#397bb3]/20 bg-[#eef6ff] p-4"><h3 className="font-bold text-[#173f50]">Confirmation Receipt</h3>
-    <p className="mt-3 text-sm text-[#53666f]">Email this confirmation to yourself. Demo items are simulated.</p>
+    <p className="mt-3 text-sm text-[#53666f]">Email this confirmation to yourself.</p>
     <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault(); void sendEmail(); }}>
       <label className="form-label" htmlFor="confirmation-email">Email Address</label><input autoComplete="email" className="form-control" id="confirmation-email" onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required type="email" value={email} />
       <div className="flex flex-wrap gap-2"><button className="button-dark" disabled={sending} type="submit">{sending ? "Sending…" : "Send Confirmation Email"}</button><button className="button-secondary" onClick={async () => { try { await navigator.clipboard.writeText(text); setCopyStatus("Confirmation copied."); } catch { setCopyStatus("Could not copy. Select the confirmation below."); } }} type="button">Copy Confirmation</button></div>

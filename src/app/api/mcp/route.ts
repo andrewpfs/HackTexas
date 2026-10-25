@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       return result(message.id, {
         protocolVersion: supportedVersions.includes(requested) ? requested : supportedVersions[0],
         capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "hacktx-trip-planner", title: "HackTX Trip Planner", version: "1.0.0" },
+        serverInfo: { name: "hacktx-trip-planner", title: "TravelSync", version: "1.0.0" },
         instructions: `You are connected to ${traveler.name}'s group trip. You can read their itinerary and booking checklist and record bookings they approved. Never pay for anything without the traveler's explicit approval.`,
       });
     }

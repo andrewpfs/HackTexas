@@ -59,7 +59,8 @@ test("sketch duration follows preferred days and the usable shared window", () =
   trip.preferredDurationDays = undefined;
   assert.equal(getSketchRequest(trip).days, 2);
   trip.travelers[1].availableDates = [];
-  assert.equal(getSketchRequest(trip).days, 0);
+  // No shared dates yet: keep drawing at the trip window's length (capped at 14) instead of an empty sketch.
+  assert.equal(getSketchRequest(trip).days, 14);
   trip.travelers[0].availabilityComplete = false;
   trip.travelers[1].availabilityComplete = false;
   trip.earliestPossibleDate = "2026-12-17";

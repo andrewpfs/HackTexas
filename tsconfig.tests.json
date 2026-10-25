@@ -10,6 +10,8 @@
   },
   "include": [
     "src/lib/date-utils.ts",
+    "src/lib/supabase-trip-store.ts",
+    "tests/trip-store-concurrency.test.ts",
     "src/lib/candidate-generation.ts",
     "src/lib/candidate-planner.ts",
     "src/lib/candidate-validation.ts",

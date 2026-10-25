@@ -140,6 +140,17 @@ test("chat, proposals and repository writes remain safe without provider calls",
       const personal = await ask(after!, "@muse I will skip lunch", { kind: "personal", reply: "A personal coffee break.", changes: [], days: null, personal: { dayNumber: 1, stopTitle: "Lunch", title: "Coffee", location: "Nearby", note: "Meet back later" } });
       assert.ok(personal.trip.itinerary?.overrides?.some((item) => item.title === "Coffee"));
       assert.equal(personal.trip.itinerary?.days[0].activities[1].title, "Lunch");
+
+      // "I'd rather..." is about the sender only: even if Muse rewrites the shared day,
+      // it becomes a personal plan and no vote opens.
+      const myDays = structuredClone(personal.trip.itinerary!.days);
+      const firstStop = myDays[0].activities[0];
+      myDays[0].activities[0] = { ...firstStop, title: "Arcade", location: "Akihabara", description: "Games" };
+      const mine = await ask(personal.trip, "@muse I'd rather go to the arcade instead", { kind: "shared_minor", reply: "Swapping in the arcade.", changes: ["Arcade"], days: myDays });
+      assert.equal(mine.trip.pendingItineraryProposal?.status === "pending", false);
+      assert.equal(mine.trip.itinerary?.days[0].activities[0].title, firstStop.title);
+      assert.ok(mine.trip.itinerary?.overrides?.some((item) => item.title === "Arcade" && item.stopTitle === firstStop.title));
+      assert.match(mine.trip.chat?.at(-1)?.text ?? "", /personal plan/);
     });
     await suite.test("destination changes are proposals even when Muse labels them minor", async () => {
       const trip = await propose();
@@ -237,7 +248,7 @@ test("chat, proposals and repository writes remain safe without provider calls",
     await suite.test("old hotel and flight responses cannot refill searches after an approved move", async () => {
       const original = await savedTrip();
       const oldHotels = await repository.claimHotelSearch(original.id, 0, true);
-      const oldFlights = await repository.claimFlightSearch(original.id, "Jay", "Austin");
+      const oldFlights = await repository.claimFlightSearch(original.id, "Jay", "Austin", "");
       assert.equal(oldHotels.status, "claimed"); assert.equal(oldFlights.status, "claimed");
       if (oldHotels.status !== "claimed" || oldFlights.status !== "claimed") return;
       const proposed = (await ask(original, "@muse move", majorResult(original))).trip;
@@ -343,7 +354,7 @@ test("flight badges include ties; hotel owed share stays separate from a travele
   assert.equal(result.booking.items.length, 1);
   const confirmation = bookingConfirmationText("Tokyo Winter", result.booking);
   assert.ok(confirmation.includes("You owe Jay about $300.00"));
-  assert.ok(confirmation.includes("Amount paid (simulated): $500.00"));
+  assert.ok(confirmation.includes("Total: $500.00"));
   trip.travelers[1].preferences!.lodgingType = "No need";
   assert.equal(hotelShareForTraveler(trip, "Tin"), undefined);
 });

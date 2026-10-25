@@ -16,6 +16,8 @@ export type CompromiseContext = {
   votes: CompromiseVote[];
   tallies: { optionNumber: number; voteCount: number }[];
   leadingOptionNumbers: number[];
+  // Set on a second try: why the first itinerary couldn't be used.
+  previousAttemptProblems?: string[];
 };
 
 export type ItineraryDraft = Omit<GroupItinerary, "id" | "source" | "generatedAt">;
