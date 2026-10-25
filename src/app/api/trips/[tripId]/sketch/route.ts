@@ -24,6 +24,10 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   }
 
   const sketchRequest = getSketchRequest(claim.trip);
+  if (sketchRequest.days === 0) {
+    await finishTripSketch(tripId, { status: "done", summary: "No shared dates are available yet. Change availability before drawing a trip sketch.", places: [], days: [], suggestions: [], source: "mock", generatedAt: new Date().toISOString() });
+    return NextResponse.json({ status: "done" });
+  }
   const selection = selectSketchPlanner();
   try {
     let draft;

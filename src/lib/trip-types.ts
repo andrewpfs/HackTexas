@@ -285,6 +285,7 @@ export type PersonalOverride = {
   stopTitle: string;
   title: string;
   location: string;
+  place?: PlaceSuggestion;
   note: string;
   joinedBy: string[];
   createdAt: string;

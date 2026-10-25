@@ -33,6 +33,7 @@
     "src/lib/travel-search.ts",
     "src/lib/travel-planning.ts",
     "src/lib/trip-sketch.ts",
+    "src/lib/selected-place.ts",
     "src/lib/phone-auth.ts",
     "src/lib/assistant-connector.ts",
     "src/lib/trip-validation.ts",

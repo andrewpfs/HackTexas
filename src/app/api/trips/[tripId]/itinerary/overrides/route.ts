@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { changePersonalOverride, type OverrideAction } from "@/lib/trip-repository";
+import { readSelectedPlace } from "@/lib/selected-place";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -33,6 +34,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
       stopTitle: text(body.stopTitle, 200),
       title,
       location: text(body.location, 160),
+      place: readSelectedPlace(body.place) ?? undefined,
       note: text(body.note, 300),
     };
   } else if (body.action === "remove" || body.action === "join" || body.action === "leave") {

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { activityIcon } from "@/lib/activity-icons";
 import { ManualStopEditor } from "./manual-stop-editor";
+import { PlaceAutocomplete } from "./place-autocomplete";
 import { useRouter } from "next/navigation";
 import { ProposalCard, type ChatState } from "./proposal-card";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -72,8 +73,11 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [view, setView] = useState<"group" | "mine">("group");
   const [editing, setEditing] = useState<{ dayNumber: number; stopIndex: number } | null>(null);
   const [planDraft, setPlanDraft] = useState({ title: "", location: "", note: "" });
+  const [planPlace, setPlanPlace] = useState<PlaceSuggestion | null>(null);
+  const [planPlaceSearchUnavailable, setPlanPlaceSearchUnavailable] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState("");
+  const updatePlanPlaceSearchUnavailable = useCallback((unavailable: boolean) => setPlanPlaceSearchUnavailable(unavailable), []);
   const [draft, setDraft] = useState("");
   const [aboutStop, setAboutStop] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -220,6 +224,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
       }
       applyState(data.itinerary, data.messages ?? messages);
       setPlanDraft({ title: "", location: "", note: "" });
+      setPlanPlace(null);
     } catch {
       setPlanError("We couldn't reach the server. Please try again.");
     } finally {
@@ -382,11 +387,15 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 setPlanError("Say what you'd rather do.");
                 return;
               }
-              changePlan({ action: "add", dayNumber, stopTime: stop.time, stopTitle: stop.title, ...planDraft });
+              if (planDraft.location.trim() && !planPlace && !planPlaceSearchUnavailable) {
+                setPlanError("Choose a real place from the suggestions.");
+                return;
+              }
+              changePlan({ action: "add", dayNumber, stopTime: stop.time, stopTitle: stop.title, ...planDraft, place: planPlace });
             }}
           >
-            <input aria-label="What you'd rather do" className="form-control !py-2.5 text-sm" maxLength={120} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} placeholder="example: Arcade in Akihabara" value={planDraft.title} />
-            <input aria-label="Where" className="form-control !py-2.5 text-sm" maxLength={160} onChange={(event) => setPlanDraft({ ...planDraft, location: event.target.value })} placeholder="example: Akihabara, Tokyo" value={planDraft.location} />
+            <label className="block text-sm font-semibold">Activity Title<input className="form-control mt-1 !py-2.5 text-sm" maxLength={120} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} placeholder="Arcade In Akihabara" value={planDraft.title} /></label>
+            <PlaceAutocomplete tripId={tripId} value={planDraft.location} place={planPlace} onChange={(location, place) => { setPlanDraft({ ...planDraft, location }); setPlanPlace(place); }} onUnavailable={updatePlanPlaceSearchUnavailable} label="Location / Address" placeholder="Search For A Place Or Address" maxLength={160} />
             <button className="w-full rounded-full bg-[#7a5ea8] px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-60" disabled={planBusy} type="submit">
               {planBusy ? "Saving…" : "Do My Own Thing Here"}
             </button>

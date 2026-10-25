@@ -96,19 +96,18 @@ async function fetchReviews(config: SerpApiConfig, place: SerpPlace): Promise<Pl
 }
 
 // Finds the top Google Maps result for a search, or null if nothing matched.
-export async function lookupPlace(config: SerpApiConfig, query: string): Promise<PlaceSuggestion | null> {
+export async function searchPlaces(config: SerpApiConfig, query: string): Promise<PlaceSuggestion[]> {
   const body = await serpGet(config, { engine: "google_maps", type: "search", q: query, hl: "en" });
 
   // A broad search returns local_results; a search that names one exact place
   // returns place_results instead.
   const localResults = Array.isArray(body.local_results) ? (body.local_results as SerpPlace[]) : [];
-  const place = localResults[0] ?? (body.place_results as SerpPlace | undefined);
-
-  if (!place?.title) {
-    return null;
-  }
-
-  return {
+  const exact = body.place_results as SerpPlace | undefined;
+  const results = localResults.length > 0 ? localResults.slice(0, 5) : exact ? [exact] : [];
+  const suggestions: PlaceSuggestion[] = [];
+  for (const place of results) {
+    if (!place.title) continue;
+    suggestions.push({
     name: place.title,
     rating: typeof place.rating === "number" ? place.rating : null,
     reviewCount: typeof place.reviews === "number" ? place.reviews : null,
@@ -120,7 +119,14 @@ export async function lookupPlace(config: SerpApiConfig, query: string): Promise
     longitude: typeof place.gps_coordinates?.longitude === "number" ? place.gps_coordinates.longitude : undefined,
     mapsUrl: makeMapsUrl(place),
     reviews: await fetchReviews(config, place),
-  };
+    });
+  }
+  return suggestions;
+}
+
+export async function lookupPlace(config: SerpApiConfig, query: string): Promise<PlaceSuggestion | null> {
+  const places = await searchPlaces(config, query);
+  return places[0] ?? null;
 }
 
 export function getPlaceSearchQuery(activity: ItineraryActivity, destination: string) {

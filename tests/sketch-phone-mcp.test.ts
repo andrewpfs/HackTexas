@@ -45,6 +45,30 @@ test("the sketch keeps the requested number of days and the places the host name
   assert.throws(() => parseSketch({ summary: "" }, 4));
 });
 
+test("sketch duration follows preferred days and the usable shared window", () => {
+  const trip = makeTrip();
+  trip.preferredDurationDays = 2;
+  assert.equal(getSketchRequest(trip).days, 2);
+  trip.preferredDurationDays = 6;
+  trip.travelers[0].availabilityComplete = true;
+  trip.travelers[0].availableDates = ["2026-12-17", "2026-12-18", "2026-12-20"];
+  trip.travelers[1].availabilityComplete = true;
+  trip.travelers[1].availableDates = ["2026-12-17", "2026-12-18"];
+  assert.equal(getSketchRequest(trip).days, 2);
+  trip.preferredDurationDays = undefined;
+  assert.equal(getSketchRequest(trip).days, 2);
+  trip.travelers[1].availableDates = [];
+  assert.equal(getSketchRequest(trip).days, 0);
+  trip.travelers[0].availabilityComplete = false;
+  trip.travelers[1].availabilityComplete = false;
+  trip.earliestPossibleDate = "2026-12-17";
+  trip.latestPossibleDate = "2026-12-18";
+  trip.preferredDurationDays = 6;
+  assert.equal(getSketchRequest(trip).days, 2);
+  trip.latestPossibleDate = "2026-12-31";
+  assert.equal(getSketchRequest(trip).days, 6);
+});
+
 test("phone numbers are normalized to international format", () => {
   assert.equal(normalizePhone("(512) 555-0134"), "+15125550134");
   assert.equal(normalizePhone("1 512 555 0134"), "+15125550134");

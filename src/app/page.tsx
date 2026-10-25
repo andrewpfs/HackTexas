@@ -11,9 +11,9 @@ const groupNeeds = [
 ];
 
 const exampleTravelers = [
-  { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "Dec 17–21", request: "I really want one free afternoon.", hotel: "" },
-  { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife", "Sightseeing"], budget: "$1,500", available: "Dec 18–23", request: "I want to stay near public transit.", hotel: "4★ hotel" },
-  { name: "Jordan", icon: "👨🏼", interests: ["Outdoors"], budget: "$900", available: "Dec 17–19", request: "No super early mornings.", hotel: "" },
+  { name: "Ryan", icon: "🧑🏽", interests: ["Food", "Museums"], budget: "$1,200", available: "5 days", request: "I really want one free afternoon.", hotel: "" },
+  { name: "Tin", icon: "👩🏻", interests: ["Shopping", "Nightlife", "Sightseeing"], budget: "$1,500", available: "6 days", request: "I want to stay near public transit.", hotel: "4★ hotel" },
+  { name: "Jordan", icon: "👨🏼", interests: ["Outdoors"], budget: "$900", available: "3 days", request: "No super early mornings.", hotel: "" },
 ];
 
 const interestColors: Record<string, string> = {
@@ -111,7 +111,7 @@ export default function Home() {
       <section className="px-5 py-16 sm:px-8 sm:py-20 lg:px-10">
         <div className="mx-auto max-w-6xl">
           <div className="text-center"><p className="eyebrow">Different Travelers, One Shared Plan</p><h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">See The Common Ground Clearly.</h2></div>
-          <div className="mx-auto mt-9 max-w-4xl space-y-4">
+          <div className="mx-auto mt-9 grid max-w-6xl gap-4 lg:grid-cols-3">
             {exampleTravelers.map((traveler) => <article className="ticket-card p-5 sm:p-6" key={traveler.name}>
               <div className="flex items-start gap-4"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#edf5f2] text-2xl" aria-hidden="true">{traveler.icon}</span>
                 <div className="min-w-0 flex-1"><h3 className="text-lg font-bold">{traveler.name}</h3><div className="mt-2 flex flex-wrap gap-1.5">{traveler.interests.map((interest) => <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${interestColors[interest]}`} key={interest}>{interest}</span>)}</div>

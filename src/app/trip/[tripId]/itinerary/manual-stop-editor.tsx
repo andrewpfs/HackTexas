@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import type { ChatMessage, GroupItinerary, ItineraryActivity } from "@/lib/trip-types";
+import { useCallback, useState } from "react";
+import type { ChatMessage, GroupItinerary, ItineraryActivity, PlaceSuggestion } from "@/lib/trip-types";
 import type { TravelWarning } from "@/lib/manual-itinerary";
 import { formatMinutes } from "@/lib/travel-time";
+import { PlaceAutocomplete } from "./place-autocomplete";
 
 type Preview = { token: string; activity: ItineraryActivity; warnings: TravelWarning[]; placeNote: string };
 type Props = {
@@ -16,7 +17,8 @@ export function ManualStopEditor(props: Props) {
   const old = baseItinerary.days.find((day) => day.dayNumber === props.dayNumber)!.activities[props.stopIndex];
   const [action, setAction] = useState<"replace" | "before" | "after" | "">("");
   const [draft, setDraft] = useState({ title: "", location: "", time: "", description: "" });
-  const [matchPlace, setMatchPlace] = useState(true);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceSuggestion | null>(null);
+  const [placeSearchUnavailable, setPlaceSearchUnavailable] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +27,7 @@ export function ManualStopEditor(props: Props) {
     setBusy(true);
     setError("");
     try {
-      let body: Record<string, unknown> = { ...draft, matchPlace, action, mode: "preview", travelerId: props.travelerId, itineraryId: baseItinerary.id, expectedRevision: baseItinerary.revision ?? 0, dayNumber: props.dayNumber, stopIndex: props.stopIndex };
+      let body: Record<string, unknown> = { ...draft, place: selectedPlace, placeSearchUnavailable, action, mode: "preview", travelerId: props.travelerId, itineraryId: baseItinerary.id, expectedRevision: baseItinerary.revision ?? 0, dayNumber: props.dayNumber, stopIndex: props.stopIndex };
       if (save && preview) body = { mode: "save", token: preview.token, allowLongTravel: preview.warnings.length > 0 };
       const response = await fetch(`/api/trips/${props.tripId}/itinerary/manual`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await response.json();
@@ -38,9 +40,12 @@ export function ManualStopEditor(props: Props) {
 
   function choose(next: "replace" | "before" | "after") {
     setAction(next);
-    if (next === "replace") setDraft({ title: old.title, location: old.location, time: old.time, description: old.description });
+    if (next === "replace") setDraft({ title: old.title, location: old.place?.name ?? old.location, time: old.time, description: old.description });
     else setDraft({ title: "", location: "", time: "", description: "" });
+    setSelectedPlace(next === "replace" ? old.place ?? null : null);
   }
+
+  const updateUnavailable = useCallback((unavailable: boolean) => setPlaceSearchUnavailable(unavailable), []);
 
   return <div aria-label={`Edit shared stop: ${old.title}`} className="mb-3 rounded-2xl border-2 border-[#397bb3]/40 bg-[#eef6fd] p-4">
     <h3 className="font-bold text-[#173f50]">Edit Shared Stop</h3>
@@ -54,7 +59,7 @@ export function ManualStopEditor(props: Props) {
       <p className="text-sm">{preview.activity.location}</p>
       <p className="text-sm">{preview.activity.description}</p>
       {preview.activity.place ? <div className="rounded-xl bg-white p-3 text-sm"><b>Matched place: {preview.activity.place.name}</b><p>{preview.activity.place.address}</p><a className="underline" href={preview.activity.place.mapsUrl} rel="noopener noreferrer" target="_blank">Check On Google Maps ↗</a></div> : null}
-      <p className="text-xs text-[#53666f]">{preview.placeNote} Go back and turn off place matching to save without this match.</p>
+      <p className="text-xs text-[#53666f]">{preview.placeNote}</p>
       {preview.warnings.length ? <div className="rounded-xl border-2 border-[#c87325] bg-[#fff2da] p-4 text-[#71420f]" role="alert">
         <h4 className="font-bold">⚠ Long Travel Detected</h4>
         {preview.warnings.map((warning) => <p className="mt-2 text-sm" key={warning.segment}>About {formatMinutes(warning.minutes)} driving {warning.segment === "previous" ? "from the previous activity" : "to the next activity"}: {warning.title}.</p>)}
@@ -65,10 +70,9 @@ export function ManualStopEditor(props: Props) {
     </div> : <form className="mt-3 space-y-3" onSubmit={(event) => { event.preventDefault(); submit(false); }}>
       <p className="text-sm font-bold">{action === "replace" ? "Replace" : action === "before" ? "Add Before" : "Add After"}: {old.title}</p>
       <label className="block text-sm">Stop Title<input autoFocus className="form-control mt-1" maxLength={160} onChange={(event) => setDraft({ ...draft, title: event.target.value })} required value={draft.title} /></label>
-      <label className="block text-sm">Location / Place (Optional)<input className="form-control mt-1" maxLength={200} onChange={(event) => setDraft({ ...draft, location: event.target.value })} value={draft.location} /></label>
+      <PlaceAutocomplete tripId={props.tripId} value={draft.location} place={selectedPlace} onChange={(location, place) => { setDraft({ ...draft, location }); setSelectedPlace(place); }} onUnavailable={updateUnavailable} label="Location / Real Place (Optional)" placeholder="Search for a real place or address" />
       <label className="block text-sm">Time (Optional)<input className="form-control mt-1" maxLength={20} onChange={(event) => setDraft({ ...draft, time: event.target.value })} placeholder="2:30 PM or 14:30" value={draft.time} /></label>
       <label className="block text-sm">Description (Optional)<textarea className="form-control mt-1" maxLength={600} onChange={(event) => setDraft({ ...draft, description: event.target.value })} value={draft.description} /></label>
-      <label className="flex gap-2 text-xs leading-5"><input checked={matchPlace} onChange={(event) => setMatchPlace(event.target.checked)} type="checkbox" />Find a real place to preview and estimate travel, when search is available.</label>
       <p className="text-xs text-[#53666f]">Timed stops are ordered by clock time. Untimed stops stay at your chosen before/after position.</p>
       <button className="button-primary" disabled={busy} type="submit">{busy ? "Checking…" : "Review Stop"}</button>
     </form>}

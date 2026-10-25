@@ -9,6 +9,7 @@ import { discoverHotels, expediaHotelOptions, normalizeExpediaUrl } from "../src
 import { hotelPage, hotelProviderLabel, hotelPriceTotal } from "../src/lib/hotel-display";
 import { inviteCopyText } from "../src/lib/invite-copy";
 import { activityIcon } from "../src/lib/activity-icons";
+import { readSelectedPlace } from "../src/lib/selected-place";
 import { validateRevisedDays } from "../src/lib/itinerary-revision";
 import { buildBooking } from "../src/lib/travel-planning";
 import { hotelShareForTraveler } from "../src/lib/travel-display";
@@ -173,6 +174,20 @@ test("signed previews bind to trip and exact edit and reject tampering", () => {
   assert.deepEqual(readManualPreview(trip.id, token), change);
   assert.throws(() => readManualPreview("other", token));
   assert.throws(() => readManualPreview(trip.id, token + "x"));
+});
+
+test("selected place keeps its address and coordinates through a manual edit", () => {
+  const trip = makeTrip();
+  const change = edit(trip);
+  const selected = { ...place(35.66, 139.7), name: "Shibuya Sky", address: "2 Chome-24-12 Shibuya, Tokyo", mapsUrl: "https://www.google.com/maps/search/?api=1&query=Shibuya+Sky" };
+  change.activity.place = readSelectedPlace(selected)!;
+  const token = signManualPreview(trip.id, change);
+  const savedEdit = readManualPreview(trip.id, token);
+  assert.equal(applyManualEdit(trip, savedEdit, false).saved, true);
+  assert.deepEqual(trip.itinerary!.days[0].activities[0].place, selected);
+  assert.equal(readSelectedPlace({ name: "Fake", mapsUrl: "javascript:bad" }), null);
+  const legacy = makeTrip().itinerary!.overrides![0];
+  assert.equal(legacy.place, undefined);
 });
 
 test("invite copy distinguishes code and absolute link", () => {

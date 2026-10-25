@@ -11,6 +11,7 @@ import type {
   ItineraryProposal,
   GroupItinerary,
   PlannerSource,
+  PlaceSuggestion,
   Traveler,
   TravelerPreferences,
   Trip,
@@ -154,6 +155,7 @@ export async function updateTravelerAvailability(
 
     traveler.availableDates = availableDates;
     traveler.availabilityComplete = true;
+    trip.sketch = undefined;
     clearPlanningOutputs(trip);
     return { save: true, result: { status: "updated" as const, traveler } };
   });
@@ -569,7 +571,7 @@ export async function saveBooking(tripId: string, booking: Booking, expectedItin
 // ---------- personal overrides ----------
 
 export type OverrideAction =
-  | { action: "add"; travelerId: string; dayNumber: number; stopTime: string; stopTitle: string; title: string; location: string; note: string }
+  | { action: "add"; travelerId: string; dayNumber: number; stopTime: string; stopTitle: string; title: string; location: string; note: string; place?: PlaceSuggestion }
   | { action: "remove" | "join" | "leave"; travelerId: string; overrideId: string };
 
 type OverrideResult = { status: "updated"; trip: Trip } | { status: "not-found" | "no-itinerary" | "not-allowed" };
@@ -611,6 +613,7 @@ export async function changePersonalOverride(tripId: string, change: OverrideAct
           stopTitle: change.stopTitle,
           title: change.title,
           location: change.location,
+          place: change.place,
           note: change.note,
           joinedBy: [],
           createdAt: new Date().toISOString(),
