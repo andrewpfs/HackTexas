@@ -4,6 +4,7 @@ import {
   buildPlanningContext,
   calculatePlanningReadiness,
 } from "../src/lib/planning-context";
+import { describeTripDates, suggestTripDates } from "../src/lib/date-suggestions";
 import type {
   Traveler,
   TravelerPreferences,
@@ -72,7 +73,9 @@ function makeReadyTrip() {
     ["2026-12-04", "2026-12-03", "2026-12-05"],
   );
 
-  return makeTrip([guest, host]);
+  const trip = makeTrip([guest, host]);
+  trip.confirmedDates = { startDate: "2026-12-03", endDate: "2026-12-05", confirmedAt: "2026-10-25T00:00:00.000Z", confirmedByName: "Host Person" };
+  return trip;
 }
 
 test("missing preferences creates a named blocker", () => {
@@ -225,4 +228,35 @@ test("an old trip without availability fields remains readable but not ready", (
   assert.equal(readiness.readyForCandidateGeneration, false);
   assert.equal(readiness.availabilityCompleteCount, 0);
   assert.equal(contextResult.success, false);
+});
+
+test("options wait until the host confirms dates the whole group shares", () => {
+  const trip = makeReadyTrip();
+  trip.confirmedDates = undefined;
+  assert.equal(calculatePlanningReadiness(trip).blockers[0]?.code, "dates_not_confirmed");
+
+  trip.confirmedDates = { startDate: "2026-12-04", endDate: "2026-12-06", confirmedAt: "", confirmedByName: "Host Person" };
+  assert.match(calculatePlanningReadiness(trip).blockers[0]?.message ?? "", /again/);
+
+  trip.itinerary = {} as Trip["itinerary"];
+  assert.equal(calculatePlanningReadiness(trip).readyForCandidateGeneration, true);
+});
+
+test("confirmed dates narrow what Muse may plan", () => {
+  const trip = makeReadyTrip();
+  trip.confirmedDates = { startDate: "2026-12-04", endDate: "2026-12-05", confirmedAt: "", confirmedByName: "Host Person" };
+  const result = buildPlanningContext(trip);
+  assert.equal(result.success, true);
+  if (!result.success) return;
+  assert.deepEqual(result.context.groupAvailability.sharedDates, ["2026-12-04", "2026-12-05"]);
+  assert.equal(result.context.trip.hostPreferredDurationDays, 2);
+});
+
+test("date suggestions dodge holiday peaks and pricey weekend flights", () => {
+  const picks = suggestTripDates([{ startDate: "2026-12-08", endDate: "2026-12-30", dayCount: 23 }], 4);
+  assert.equal(picks.length, 3);
+  for (const pick of picks) assert.equal(pick.endDate < "2026-12-19", true);
+  assert.match(describeTripDates("2026-12-23", "2026-12-27").notes[0], /Christmas/);
+  assert.match(describeTripDates("2026-11-24", "2026-11-28").notes[0], /Thanksgiving/);
+  assert.match(describeTripDates("2026-12-08", "2026-12-11").notes.join(" "), /Tue/);
 });

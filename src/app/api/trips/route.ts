@@ -1,6 +1,8 @@
 import { createTravelerProof, travelerCookieName, travelerCookieOptions } from "@/lib/trip-browser-identity";
 import { randomInt, randomUUID } from "node:crypto";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { verifyCity } from "@/lib/city-search";
 import { inviteCodeExists, saveTrip } from "@/lib/trip-repository";
 import type { Trip } from "@/lib/trip-types";
@@ -39,6 +41,12 @@ export async function POST(request: Request) {
     requestBody = await request.json();
   } catch {
     return NextResponse.json({ error: "Please provide valid trip details." }, { status: 400 });
+  }
+
+  // A verified phone is the sign-in for every traveler, hosts included.
+  const session = readSessionValue((await cookies()).get(sessionCookieName)?.value);
+  if (!session) {
+    return NextResponse.json({ error: "Verify your phone number before creating a trip." }, { status: 401 });
   }
 
   const validationResult = validateCreateTripInput(requestBody);
@@ -80,6 +88,9 @@ export async function POST(request: Request) {
           preferencesComplete: false,
           availabilityComplete: false,
           availableDates: [],
+          phoneHash: session.phoneHash,
+          phoneLast4: session.last4,
+          phoneVotingVerified: true,
         },
       ],
     };

@@ -67,7 +67,7 @@ export function ReadinessNotes({ tripId, blockers, warnings, travelers }: Readin
           {groupBlockers.map((blocker) => (
             <p className="mt-3 flex gap-2 rounded-xl bg-[#fbe4d9] p-3 text-sm font-semibold text-[#a34532]" key={blocker.code}>
               <InfoIcon />
-              <span>{blocker.message}{blocker.code === "no_shared_dates" ? " Edit availability before generating trip options." : ""}</span>
+              <span>{blocker.message}{blocker.code === "no_shared_dates" ? " Edit availability before generating trip options." : blocker.code === "dates_not_confirmed" ? " See Confirm The Trip Dates." : ""}</span>
             </p>
           ))}
         </div>

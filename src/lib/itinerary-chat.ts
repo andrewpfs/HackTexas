@@ -1,5 +1,5 @@
 import { getChangedStopKeys } from "./itinerary-diff";
-import { buildRevisionRequest, carryOverPlaces, makeChatMessage, mentionsMuse, validateRevisedDays, type RevisionRequest, type RevisionResult } from "./itinerary-revision";
+import { buildRevisionRequest, carryOverPlaces, makeChatMessage, mentionsMuse, repairRevisedDays, validateRevisedDays, type RevisionRequest, type RevisionResult } from "./itinerary-revision";
 import { createItineraryProposal, isMajorRevision } from "./itinerary-proposals";
 import { buildPlanningContext } from "./planning-context";
 import type { ChatMessage } from "./trip-types";
@@ -34,20 +34,36 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
   if (!mentionsMuse(input.text)) return { trip: current, changedStops: [] };
   if (current.pendingItineraryProposal?.status === "pending") return reply("Please finish voting on the open proposal first, then ask me to change the plan.");
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // Errors from Muse's last answer, sent back once so it can correct itself.
+  let fixErrors: string[] = [];
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     const itinerary = current.itinerary;
     const planning = buildPlanningContext(current);
     if (!itinerary || !planning.success) return reply("Please complete the group's preferences and dates before asking me to edit the plan.");
-    const result = await dependencies.revise(buildRevisionRequest(planning.context, itinerary, current.chat ?? [], message));
+    const request = buildRevisionRequest(planning.context, itinerary, current.chat ?? [], message);
+    if (fixErrors.length > 0) {
+      request.message.text += `\n\n(Your previous answer was rejected for these reasons: ${fixErrors.join(" ")} Answer again with every day and every stop fixed.)`;
+    }
+    const result = await dependencies.revise(request);
     const museMessage = makeChatMessage({ role: "muse", authorName: "Muse", text: result.reply });
 
     if (result.days) {
-      const validation = validateRevisedDays(itinerary, result.days, planning.context.groupAvailability.sharedDates, itinerary.basedOnCandidateId);
-      if (!validation.valid) return reply("My proposed edit did not fit the trip dates or schedule, so nothing changed. Could you say it another way?");
+      result.days = repairRevisedDays(itinerary, result.days);
+      // A revision keeps the itinerary's own days, so check against those dates
+      // (the same rule used when the group approves a proposal).
+      const validation = validateRevisedDays(itinerary, result.days, itinerary.days.map((day) => day.date), itinerary.basedOnCandidateId);
+      if (!validation.valid) {
+        console.warn("Muse revision rejected:", validation.errors);
+        if (fixErrors.length === 0) {
+          fixErrors = [...new Set(validation.errors)];
+          continue;
+        }
+        return reply(`My proposed edit still didn't fit the trip (${validation.errors[0]}), so nothing changed. Could you say it another way?`);
+      }
       const days = carryOverPlaces(itinerary.days, result.days);
       if (isMajorRevision(itinerary, result)) {
         const proposal = createItineraryProposal(current, traveler.id, { ...result, days });
-        museMessage.text = "I've prepared a major trip change for the group to review. It has not been applied. Everyone who joined must vote, and a majority must approve.";
+        museMessage.text = "I've prepared a major trip change for the group to review. It has not been applied. Everyone who joined votes with the Approve or Reject buttons on the proposal card, and a majority must approve.";
         museMessage.changes = result.changes;
         const saved = await dependencies.saveItineraryProposal(tripId, proposal, museMessage);
         if (saved.status === "saved" || saved.status === "already-open") return { trip: saved.trip, changedStops: [] };

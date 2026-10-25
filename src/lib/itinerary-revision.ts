@@ -104,6 +104,61 @@ export function carryOverPlaces(oldDays: ItineraryDay[], newDays: ItineraryDay[]
   }));
 }
 
+function clockToMinutes(value: string) {
+  const match = value.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([AP])\.?\s*M\.?$/i) ?? value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  let hour = Number(match[1]);
+  const minute = Number(match[2] ?? 0);
+  if (minute > 59) return null;
+  if (match[3]) {
+    if (hour < 1 || hour > 12) return null;
+    hour = (hour % 12) + (match[3].toUpperCase() === "P" ? 12 : 0);
+  } else if (hour > 23) return null;
+  return hour * 60 + minute;
+}
+
+function minutesToClock(minutes: number) {
+  const hour = Math.floor(minutes / 60) % 24;
+  return `${hour % 12 || 12}:${String(minutes % 60).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
+}
+
+// Fixes harmless formatting slips in Muse's answer before it is validated:
+// "9am" or "14:30" style times, stops listed out of order or at the same minute,
+// and day numbers or dates that drifted from the original trip days.
+export function repairRevisedDays(itinerary: GroupItinerary, days: ItineraryDay[]): ItineraryDay[] {
+  if (!Array.isArray(days)) return days;
+  return days.map((day, index) => {
+    const original = days.length === itinerary.days.length ? itinerary.days[index] : undefined;
+    const activities = Array.isArray(day?.activities) ? day.activities : [];
+    const timed: { activity: ItineraryDay["activities"][number]; minutes: number }[] = [];
+    const untimed: ItineraryDay["activities"] = [];
+    for (const activity of activities) {
+      if (!activity || typeof activity.time !== "string") continue;
+      const minutes = activity.time.trim() === "" ? null : clockToMinutes(activity.time);
+      if (minutes === null) {
+        // Untimed stops the group kept are allowed; a new untimed stop is dropped instead of failing the plan.
+        if (isPreservedUntimedStop(itinerary.days, original?.dayNumber ?? day.dayNumber, activity)) untimed.push(activity);
+        continue;
+      }
+      timed.push({ activity, minutes });
+    }
+    timed.sort((a, b) => a.minutes - b.minutes);
+    let previous = -1;
+    const fixed = timed.map(({ activity, minutes }) => {
+      const at = Math.min(Math.max(minutes, previous + 5), 23 * 60 + 59);
+      previous = at;
+      return { ...activity, time: minutesToClock(at) };
+    });
+    return {
+      ...day,
+      dayNumber: original?.dayNumber ?? day.dayNumber,
+      date: original?.date ?? day.date,
+      title: day.title?.trim() ? day.title : original?.title ?? day.title,
+      activities: [...fixed, ...untimed],
+    };
+  });
+}
+
 export function validateRevisedDays(
   itinerary: GroupItinerary,
   days: ItineraryDay[],

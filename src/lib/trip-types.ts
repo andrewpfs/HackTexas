@@ -367,6 +367,16 @@ export type Trip = {
   sketch?: TripSketch;
   pendingItineraryProposal?: ItineraryProposal;
   lastApprovedItineraryProposal?: ItineraryProposal;
+  // The exact dates the host approved before options are generated. Muse only plans inside them.
+  confirmedDates?: { startDate: string; endDate: string; confirmedAt: string; confirmedByName: string };
+  // Real round-trip fares the host looked up for a few date choices (SerpApi Google Flights).
+  datePriceCheck?: DatePriceCheck;
+};
+
+export type DatePriceCheck = {
+  checkedAt: string;
+  destination: string;
+  windows: { startDate: string; endDate: string; fares: { from: string; lowestUsd: number | null }[] }[];
 };
 
 export type CreateTripInput = {

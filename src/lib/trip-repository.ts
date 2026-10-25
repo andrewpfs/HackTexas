@@ -35,7 +35,7 @@ export async function editSharedStop(tripId: string, edit: ManualStopEdit, allow
 
 type JoinResult =
   | { status: "duplicate" }
-  | { status: "joined"; tripId: string; travelerId: string };
+  | { status: "joined" | "already-joined"; tripId: string; travelerId: string };
 type TravelerUpdateResult =
   | { status: "traveler-not-found" }
   | { status: "updated"; traveler: Traveler };
@@ -85,7 +85,10 @@ export async function getTripByInviteCode(inviteCode: string) {
   return getStore().getByInviteCode(normalizedInviteCode);
 }
 
-export async function addTravelerToTrip(inviteCode: string, travelerName: string, departureLocation: string) {
+// The verified phone that is joining. Joining twice with the same phone returns the existing traveler.
+export type JoiningPhone = { phoneHash: string; last4: string };
+
+export async function addTravelerToTrip(inviteCode: string, travelerName: string, departureLocation: string, phone?: JoiningPhone) {
   const trip = await getTripByInviteCode(inviteCode);
   if (!trip) {
     return { status: "not-found" as const };
@@ -93,6 +96,10 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
 
   const normalizedTravelerName = travelerName.trim().toLowerCase();
   const result = await getStore().update<JoinResult>(trip.id, (current) => {
+    const existing = phone ? current.travelers.find((traveler) => traveler.phoneHash === phone.phoneHash) : undefined;
+    if (existing) {
+      return { save: false, result: { status: "already-joined" as const, tripId: current.id, travelerId: existing.id } };
+    }
     for (const traveler of current.travelers) {
       if (traveler.name.trim().toLowerCase() === normalizedTravelerName) {
         return { save: false, result: { status: "duplicate" as const } };
@@ -107,6 +114,7 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
       preferencesComplete: false,
       availabilityComplete: false,
       availableDates: [],
+      ...(phone ? { phoneHash: phone.phoneHash, phoneLast4: phone.last4, phoneVotingVerified: true } : {}),
     };
 
     current.travelers.push(traveler);
@@ -738,4 +746,23 @@ export async function unlinkTravelerPhone(tripId: string, travelerId: string, ph
     return { save: true, result: { status: "unlinked" as const } };
   });
   return result ?? { status: "not-linked" as const };
+}
+
+// The host approves the exact trip dates before options are generated.
+export async function confirmTripDates(tripId: string, hostTravelerId: string, startDate: string, endDate: string) {
+  const result = await getStore().update<{ status: "confirmed" | "not-host" | "already-planned"; trip?: Trip }>(tripId, (trip) => {
+    const host = trip.travelers.find((traveler) => traveler.id === hostTravelerId);
+    if (!host?.isHost) return { save: false, result: { status: "not-host" as const } };
+    if (trip.candidateOptions?.length || trip.itinerary) return { save: false, result: { status: "already-planned" as const } };
+    trip.confirmedDates = { startDate, endDate, confirmedAt: new Date().toISOString(), confirmedByName: host.name };
+    return { save: true, result: { status: "confirmed" as const, trip } };
+  });
+  return result ?? { status: "not-host" as const };
+}
+
+export async function saveDatePriceCheck(tripId: string, check: NonNullable<Trip["datePriceCheck"]>) {
+  await getStore().update(tripId, (trip) => {
+    trip.datePriceCheck = check;
+    return { save: true, result: null };
+  });
 }

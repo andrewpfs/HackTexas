@@ -1,6 +1,8 @@
 import { createTravelerProof, travelerCookieName, travelerCookieOptions } from "@/lib/trip-browser-identity";
 import { verifyCity } from "@/lib/city-search";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { addTravelerToTrip, getTripByInviteCode } from "@/lib/trip-repository";
 import type { JoinTripPreview, Trip } from "@/lib/trip-types";
 import { normalizeInviteCode, validateJoinTripInput } from "@/lib/trip-validation";
@@ -51,6 +53,12 @@ export async function POST(request: Request) {
     );
   }
 
+  // A verified phone is the sign-in for every traveler.
+  const session = readSessionValue((await cookies()).get(sessionCookieName)?.value);
+  if (!session) {
+    return NextResponse.json({ error: "Verify your phone number before joining." }, { status: 401 });
+  }
+
   const validationResult = validateJoinTripInput(requestBody);
   if (!validationResult.valid) {
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
@@ -65,6 +73,7 @@ export async function POST(request: Request) {
       validationResult.data.inviteCode,
       validationResult.data.travelerName,
       validationResult.data.departureLocation,
+      { phoneHash: session.phoneHash, last4: session.last4 },
     );
 
     if (result.status === "not-found") {
@@ -81,7 +90,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = NextResponse.json({ tripId: result.tripId, travelerId: result.travelerId }, { status: 201 });
+    const response = NextResponse.json({ tripId: result.tripId, travelerId: result.travelerId, alreadyJoined: result.status === "already-joined" }, { status: result.status === "already-joined" ? 200 : 201 });
     response.cookies.set(travelerCookieName(result.tripId), createTravelerProof(result.tripId, result.travelerId), travelerCookieOptions);
     return response;
   } catch (error) {

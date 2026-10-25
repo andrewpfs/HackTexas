@@ -667,8 +667,14 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
               </div>
             ) : (
               <div className="flex h-[40rem] max-h-[85dvh] flex-col"><p className="border-b border-[#172733]/8 p-4 text-xs font-semibold text-[#53666f]">{travelers.map((traveler) => traveler.name).join(" · ")} · <span className="rounded-full bg-[#fff8dc] px-2 py-1 text-[#6f5a16]">✦ Muse AI</span></p>
+                {/* An open vote stays pinned above the messages so it never scrolls out of sight. */}
+                {proposal?.status === "pending" ? (
+                  <div className="max-h-[45%] shrink-0 overflow-y-auto border-b border-[#172733]/8 p-3">
+                    <ProposalCard onUpdate={applyProposalState} proposal={proposal} travelerId={travelerId} travelers={travelers} tripId={tripId} />
+                  </div>
+                ) : null}
                 <div className="flex-1 space-y-3 overflow-y-auto p-5" ref={messageListRef}>
-                  {proposal ? <ProposalCard onUpdate={applyProposalState} proposal={proposal} travelerId={travelerId} travelers={travelers} tripId={tripId} /> : null}
+                  {proposal && proposal.status !== "pending" ? <ProposalCard onUpdate={applyProposalState} proposal={proposal} travelerId={travelerId} travelers={travelers} tripId={tripId} /> : null}
                   {messages.length === 0 ? (
                     <p className="rounded-2xl bg-[#f7f7f3] p-4 text-sm leading-6 text-[#718087]">
                       Message your group here. For help with the plan, try &ldquo;@muse make day 3 more relaxed.&rdquo; Major changes go to a group vote.

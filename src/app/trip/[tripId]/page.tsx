@@ -13,6 +13,9 @@ import { LiveRefresh } from "./live-refresh";
 import { ProgressNav } from "./progress-nav";
 import { TripSketchCard } from "./trip-sketch-card";
 import { getVotingSummary } from "@/lib/voting";
+import { confirmedDatesStillShared, suggestTripDates } from "@/lib/date-suggestions";
+import { getSerpApiKey } from "@/lib/serpapi-places";
+import { ConfirmDatesCard } from "./confirm-dates-card";
 
 export const instant = false;
 
@@ -85,6 +88,13 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const currentStep = itineraryReady ? (bookedCount > 0 ? 3 : 2) : candidatesAvailable ? 1 : 0;
   const stepHeadings = ["Get Ready", "Itinerary Options & Vote", "Shared Itinerary Ready", "Book Travel"];
   const statusLabels = ["Collecting Preferences", "Itinerary Options & Vote", "Itinerary Ready", "Booking"];
+
+  // Once everyone has sent dates, the host confirms exact days before options are generated.
+  const host = trip.travelers.find((traveler) => traveler.isHost);
+  const showDateConfirmation = !candidatesAvailable && !itineraryReady && trip.travelers.length > 0 &&
+    completedAvailabilityCount === trip.travelers.length && planningReadiness.sharedDates.length > 0;
+  const dateSuggestions = showDateConfirmation ? suggestTripDates(sharedWindows, preferredDurationDays) : [];
+  const confirmedDates = confirmedDatesStillShared(trip.confirmedDates, planningReadiness.sharedDates) ? trip.confirmedDates! : null;
 
   const completedAvailabilityLabel =
     completedAvailabilityCount === trip.travelers.length
@@ -184,6 +194,19 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 <span className="font-bold text-[#173f50]">{longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}{longestSharedWindow && preferredDurationDays !== undefined && longestSharedWindow.dayCount < preferredDurationDays ? <span className="ml-2 text-sm font-normal text-[#718087]">shorter than the preferred {preferredDurationDays} days</span> : null}</span>
               </div>
             </section>
+            {showDateConfirmation ? (
+              <ConfirmDatesCard
+                confirmed={confirmedDates}
+                destination={trip.destination?.trim() || null}
+                faresConfigured={getSerpApiKey() !== null}
+                hostId={host?.id ?? ""}
+                hostName={host?.name ?? "The host"}
+                priceCheck={trip.datePriceCheck ?? null}
+                sharedDates={planningReadiness.sharedDates}
+                suggestions={dateSuggestions}
+                tripId={trip.id}
+              />
+            ) : null}
             {!candidatesAvailable && !itineraryReady ? <TripSketchCard destination={trip.destination || "Your Group Trip"} origin={trip.origin} dateLabel={travelWindow} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
           <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />

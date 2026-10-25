@@ -44,6 +44,7 @@ function makeContext(destination?: string) {
     status: "collecting_preferences",
     createdAt: "2026-10-24T00:00:00.000Z",
     travelers: [makeTraveler("a", "Alex", true), makeTraveler("b", "Jordan", false)],
+    confirmedDates: { startDate: "2026-12-03", endDate: "2026-12-06", confirmedAt: "2026-10-25T00:00:00.000Z", confirmedByName: "Alex" },
   };
   const result = buildPlanningContext(trip);
   assert.equal(result.success, true);

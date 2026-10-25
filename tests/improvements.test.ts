@@ -93,6 +93,31 @@ test("chat, proposals and repository writes remain safe without provider calls",
       }
       assert.equal((await ask(await savedTrip(), "Ask @muse later", majorResult(makeTrip("unused")))).calls, 0);
     });
+    await suite.test("messy Muse times are repaired so a city change still becomes a group vote", async () => {
+      const trip = await savedTrip();
+      const result = majorResult(trip);
+      result.days![0].activities.reverse();
+      result.days![0].activities[0].time = "14:30";
+      result.days![0].activities[result.days![0].activities.length - 1].time = "9am";
+      const response = await ask(trip, "@muse move us to Kyoto", result);
+      assert.equal(response.trip.pendingItineraryProposal?.status, "pending");
+      const times = response.trip.pendingItineraryProposal!.proposedDays[0].activities.map((stop) => stop.time);
+      assert.equal(times[0], "9:00 AM");
+      assert.equal(response.trip.itinerary?.destination, trip.itinerary?.destination);
+    });
+    await suite.test("an invalid Muse answer is sent back once with the errors before giving up", async () => {
+      const trip = await savedTrip();
+      const good = majorResult(trip);
+      const broken = { ...good, days: good.days!.slice(0, 1) };
+      const texts: string[] = [];
+      const response = await handleItineraryChat(trip.id, { travelerId: "Jay", text: "@muse move us to Kyoto" }, {
+        ...repository,
+        async revise(request) { texts.push(request.message.text); return texts.length === 1 ? broken : good; },
+      });
+      assert.equal(texts.length, 2);
+      assert.match(texts[1], /previous answer was rejected/);
+      assert.equal(response.trip.pendingItineraryProposal?.status, "pending");
+    });
     await suite.test("minor shared revisions apply and personal overrides still work", async () => {
       const trip = await savedTrip();
       const days = structuredClone(trip.itinerary!.days);

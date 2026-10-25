@@ -12,8 +12,10 @@ import {
 import {
   findSharedDates,
   getContiguousDateWindows,
+  getDatesInRange,
   type DateWindow,
 } from "./date-utils";
+import { confirmedDatesStillShared } from "./date-suggestions";
 
 export type PlanningMode = "known_destination" | "unknown_destination";
 
@@ -25,7 +27,8 @@ export type PlanningIssue = {
     | "departure_location_missing"
     | "no_shared_dates"
     | "fewer_travelers_than_expected"
-    | "shared_window_shorter_than_preferred";
+    | "shared_window_shorter_than_preferred"
+    | "dates_not_confirmed";
   message: string;
   travelerName?: string;
 };
@@ -253,6 +256,18 @@ export function calculatePlanningReadiness(trip: Trip): PlanningReadiness {
     });
   }
 
+  // Before Muse plans options, the host reviews and confirms the exact dates.
+  // Trips that already have options or an itinerary keep working without it.
+  const plannedAlready = Boolean(trip.candidateOptions?.length || trip.itinerary);
+  if (blockers.length === 0 && !plannedAlready && !confirmedDatesStillShared(trip.confirmedDates, sharedDates)) {
+    blockers.push({
+      code: "dates_not_confirmed",
+      message: trip.confirmedDates
+        ? "Availability changed, so the host needs to confirm the trip dates again."
+        : "The host needs to review and confirm the trip dates.",
+    });
+  }
+
   return {
     planningMode: getPlanningMode(trip),
     readyForCandidateGeneration: blockers.length === 0,
@@ -409,6 +424,12 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
     planningTravelers.push(normalizeTraveler(trip, traveler, traveler.preferences));
   }
 
+  // Confirmed dates narrow the plan to exactly those days.
+  const confirmed = confirmedDatesStillShared(trip.confirmedDates, readiness.sharedDates) ? trip.confirmedDates! : null;
+  const confirmedWindow: DateWindow | null = confirmed
+    ? { startDate: confirmed.startDate, endDate: confirmed.endDate, dayCount: getDatesInRange(confirmed.startDate, confirmed.endDate).length }
+    : null;
+
   const destination = trip.destination && trip.destination.trim() !== ""
     ? trip.destination.trim()
     : null;
@@ -424,7 +445,7 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
         destination,
         earliestPossibleDate: trip.earliestPossibleDate,
         latestPossibleDate: trip.latestPossibleDate,
-        hostPreferredDurationDays: trip.preferredDurationDays || null,
+        hostPreferredDurationDays: confirmedWindow?.dayCount ?? (trip.preferredDurationDays || null),
         expectedTravelerCount: trip.expectedTravelerCount || null,
         joinedTravelerCount: trip.travelers.length,
         ...(trip.sketch?.status === "done"
@@ -438,9 +459,9 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
           : {}),
       },
       groupAvailability: {
-        sharedDates: [...readiness.sharedDates],
-        sharedWindows: readiness.sharedWindows.map((window) => ({ ...window })),
-        viableWindows: readiness.viableWindows.map((window) => ({ ...window })),
+        sharedDates: confirmedWindow ? getDatesInRange(confirmedWindow.startDate, confirmedWindow.endDate) : [...readiness.sharedDates],
+        sharedWindows: confirmedWindow ? [{ ...confirmedWindow }] : readiness.sharedWindows.map((window) => ({ ...window })),
+        viableWindows: confirmedWindow ? [{ ...confirmedWindow }] : readiness.viableWindows.map((window) => ({ ...window })),
         submittedTravelerCount: readiness.availabilityCompleteCount,
         totalTravelerCount: readiness.travelerCount,
       },

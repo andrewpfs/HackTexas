@@ -70,6 +70,7 @@ function makeTrip(destination: string | undefined, preferredDurationDays = 3): T
       makeTraveler("host-id", "Alex", true, sharedDates),
       makeTraveler("guest-id", "Jordan", false, sharedDates),
     ],
+    confirmedDates: { startDate: "2026-12-03", endDate: "2026-12-06", confirmedAt: "2026-10-25T00:00:00.000Z", confirmedByName: "Alex" },
   };
 }
 
@@ -145,14 +146,13 @@ test("the same context produces substantively stable mock output", async () => {
   );
 });
 
-test("a shorter shared window is used and explained", async () => {
+test("confirmed dates shorter than the preferred length are used exactly", async () => {
   const candidates = await planTrip(makeTrip("Seattle", 7));
 
   for (const candidate of candidates) {
     assert.equal(candidate.estimatedDurationDays, 4);
     assert.equal(candidate.suggestedStartDate, "2026-12-03");
     assert.equal(candidate.suggestedEndDate, "2026-12-06");
-    assert.match(candidate.rationale, /shorter shared window/);
   }
 });
 
