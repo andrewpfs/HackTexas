@@ -40,6 +40,21 @@ export function expediaHotelOptions(results: unknown[]): HotelOption[] {
   return options;
 }
 
+// Each refresh shows a different feed instead of the same list again:
+// Expedia pages first, then priced Google Hotels by lowest price, then by rating.
+export async function discoverHotelFeed(config: TravelSearchConfig, search: HotelSearch, feed = 0) {
+  const step = feed % 3;
+  if (step === 0) return { ...(await discoverHotels(config, search)), feedLabel: "Expedia and Google Hotels" };
+  const sortBy = step === 1 ? "3" : "8";
+  const options = await searchHotels(config, { ...search, sortBy });
+  return {
+    options,
+    expediaSearchUrl: expediaSearchUrl(),
+    feedLabel: step === 1 ? "Lowest price first" : "Highest rated first",
+    providerNote: `Google Hotels via SerpApi, ${step === 1 ? "lowest price first" : "highest rated first"}. Refresh again for a different list.`,
+  };
+}
+
 export async function discoverHotels(config: TravelSearchConfig, search: HotelSearch) {
   const organic: unknown[] = [];
   let failedPages = 0;

@@ -14,7 +14,7 @@ function sketchSections(plan: string) {
 }
 
 // The first rough plan, drawn from the host's description before anyone votes.
-export function TripSketchCard({ tripId, sketch, hostId, destination, origin, dateLabel }: { tripId: string; sketch: TripSketch | null; hostId: string; destination: string; origin: string; dateLabel: string }) {
+export function TripSketchCard({ tripId, sketch, hostId, destination, origin, dateLabel, preferenceCount }: { tripId: string; sketch: TripSketch | null; hostId: string; destination: string; origin: string; dateLabel: string; preferenceCount: number }) {
   const router = useRouter();
   const { travelerId } = useTravelerIdentity(tripId);
   const isHostView = travelerId === hostId;
@@ -35,6 +35,8 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
   }
 
   const pending = !sketch || sketch.status === "pending" || busy;
+  // More people have shared preferences since this draft was drawn.
+  const newPreferences = sketch?.status === "done" ? preferenceCount - (sketch.preferenceCount ?? 0) : 0;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-[#397bb3]/20 bg-gradient-to-br from-white via-white to-[#eaf3fb] p-6 shadow-sm" aria-labelledby="sketch-heading">
@@ -46,7 +48,7 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
           <p className="mt-1 text-sm text-[#53666f]">{dateLabel}</p>
         </div>
         <p className="text-sm text-[#738087]">
-          {sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
+          {sketch?.preferenceCount ? `Drawn from the description and ${sketch.preferenceCount} ${sketch.preferenceCount === 1 ? "traveler's" : "travelers'"} preferences` : sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
         </p>
       </div>
 
@@ -103,6 +105,12 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
             </div>
           ) : null}
 
+          {newPreferences > 0 ? (
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#fff8dc] p-4 text-sm text-[#6f5a16] sm:flex-row sm:items-center sm:justify-between">
+              <p><b>{newPreferences} more {newPreferences === 1 ? "traveler has" : "travelers have"} shared preferences</b> since this draft.</p>
+              {isHostView ? <button className="button-secondary !min-h-10 !text-sm" onClick={redraw} type="button">Redraw With Everyone&apos;s Preferences</button> : <span className="text-xs">The host can redraw it.</span>}
+            </div>
+          ) : null}
           <p className="mt-5 text-xs text-[#879196]">
             A starting point only. Once everyone shares preferences and dates, Muse builds three full options from this.
             {isHostView ? (

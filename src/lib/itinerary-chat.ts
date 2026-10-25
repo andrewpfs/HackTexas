@@ -1,12 +1,13 @@
-import { getChangedStopKeys } from "./itinerary-diff";
 import { buildRevisionRequest, carryOverPlaces, makeChatMessage, mentionsMuse, repairRevisedDays, validateRevisedDays, type RevisionRequest, type RevisionResult } from "./itinerary-revision";
 import { createItineraryProposal, isMajorRevision } from "./itinerary-proposals";
 import { buildPlanningContext } from "./planning-context";
-import type { ChatMessage } from "./trip-types";
+import type { ChatMessage, PlaceSuggestion } from "./trip-types";
 
 // Inject storage and Muse so tests never call providers or write real trip data.
 type ChatDependencies = Pick<typeof import("./trip-repository"), "getTripById" | "appendChatMessage" | "changePersonalOverride" | "saveItineraryRevision" | "saveItineraryProposal"> & {
   revise: (request: RevisionRequest) => Promise<RevisionResult>;
+  // Real places for "show me other options" requests. Missing in tests and without SerpApi.
+  findPlaces?: (query: string) => Promise<PlaceSuggestion[]>;
 };
 
 export class ChatError extends Error {
@@ -61,23 +62,40 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
         return reply(`My proposed edit still didn't fit the trip (${validation.errors[0]}), so nothing changed. Could you say it another way?`);
       }
       const days = carryOverPlaces(itinerary.days, result.days);
-      if (isMajorRevision(itinerary, result)) {
-        const proposal = createItineraryProposal(current, traveler.id, { ...result, days });
-        museMessage.text = "I've prepared a major trip change for the group to review. It has not been applied. Everyone who joined votes with the Approve or Reject buttons on the proposal card, and a majority must approve.";
-        museMessage.changes = result.changes;
-        const saved = await dependencies.saveItineraryProposal(tripId, proposal, museMessage);
-        if (saved.status === "saved") return { trip: saved.trip, changedStops: [], proposalOpened: true };
-        if (saved.status === "already-open") return { trip: saved.trip, changedStops: [] };
-      } else {
-        museMessage.changes = result.changes;
-        const saved = await dependencies.saveItineraryRevision(tripId, itinerary.id, itinerary.revision ?? 0, days, museMessage);
-        if (saved.status === "saved") return { trip: saved.trip, changedStops: getChangedStopKeys(itinerary.days, days) };
-      }
+      // Muse never edits the shared plan directly: every group change goes to a vote.
+      // If the group says no to a small change, it becomes the requester's personal plan.
+      const major = isMajorRevision(itinerary, result);
+      const proposal = createItineraryProposal(current, traveler.id, { ...result, days });
+      museMessage.text = major
+        ? `${result.reply} This is a big change, so it goes to a group vote. Nothing changes until a majority approves.`
+        : `${result.reply} I've put it to a group vote. If the group says no, ${traveler.name} can still do it as a personal plan.`;
+      museMessage.changes = result.changes;
+      const saved = await dependencies.saveItineraryProposal(tripId, proposal, museMessage);
+      if (saved.status === "saved") return { trip: saved.trip, changedStops: [], proposalOpened: true };
+      if (saved.status === "already-open") return { trip: saved.trip, changedStops: [] };
       const refreshed = await dependencies.getTripById(tripId);
       if (!refreshed) throw new ChatError("Trip not found.", 404);
       current = refreshed;
       if (current.pendingItineraryProposal?.status === "pending") return { trip: current, changedStops: [] };
       continue;
+    }
+
+    if (result.alternatives) {
+      const wanted = result.alternatives;
+      const day = itinerary.days.find((item) => item.dayNumber === wanted.dayNumber);
+      const stop = day?.activities.find((item) => item.title.trim().toLowerCase() === wanted.stopTitle.toLowerCase());
+      let places: PlaceSuggestion[] = [];
+      if (day && stop && dependencies.findPlaces) {
+        try { places = (await dependencies.findPlaces(wanted.searchQuery)).slice(0, 3); }
+        catch (error) { console.error("Place options failed:", error); }
+      }
+      if (day && stop && places.length > 0) {
+        museMessage.placeOptions = { requestedByTravelerId: traveler.id, dayNumber: day.dayNumber, stopTime: stop.time, stopTitle: stop.title, places };
+      } else {
+        museMessage.text = `${result.reply} I couldn't load real options for that stop right now, so try asking again in a moment.`;
+      }
+      const added = await dependencies.appendChatMessage(tripId, museMessage);
+      return { trip: added.status === "added" ? added.trip : current, changedStops: [] };
     }
 
     if (result.personal) {

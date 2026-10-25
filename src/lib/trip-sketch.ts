@@ -11,7 +11,39 @@ export type SketchRequest = {
   days: number;
   window: string;
   origin: string;
+  // What the travelers who answered so far want. Missing until someone fills in preferences.
+  group?: SketchGroupPreferences;
 };
+
+export type SketchGroupPreferences = {
+  travelersWhoAnswered: number;
+  interests: { interest: string; travelers: number }[];
+  budgetRangeUsd: { lowest: number; highest: number };
+  destinationIdeas: string[];
+  activityIdeas: string[];
+  lodging: string[];
+};
+
+// A summary of everyone's submitted preferences, so the first draft reflects the
+// group and not only the host's description.
+export function summarizeGroupPreferences(trip: Trip): SketchGroupPreferences | undefined {
+  const answered = trip.travelers.filter((traveler) => traveler.preferencesComplete && traveler.preferences);
+  if (answered.length === 0) return undefined;
+  const counts = new Map<string, number>();
+  for (const traveler of answered) {
+    for (const interest of traveler.preferences!.activityInterests) counts.set(interest, (counts.get(interest) ?? 0) + 1);
+  }
+  const budgets = answered.map((traveler) => traveler.preferences!.maximumBudget);
+  const text = (values: (string | undefined)[]) => [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))].map((value) => value.slice(0, 200));
+  return {
+    travelersWhoAnswered: answered.length,
+    interests: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([interest, travelers]) => ({ interest, travelers })),
+    budgetRangeUsd: { lowest: Math.min(...budgets), highest: Math.max(...budgets) },
+    destinationIdeas: text(answered.map((traveler) => traveler.preferences!.destinationPreferences)),
+    activityIdeas: text(answered.map((traveler) => traveler.preferences!.activityDetails)),
+    lodging: text(answered.map((traveler) => traveler.preferences!.lodgingType)),
+  };
+}
 
 export interface SketchPlanner {
   sketch(request: SketchRequest): Promise<SketchDraft>;
@@ -44,6 +76,7 @@ export function getSketchRequest(trip: Trip): SketchRequest {
     days: getSketchDuration(trip),
     window: `${trip.earliestPossibleDate} to ${trip.latestPossibleDate}`,
     origin: trip.origin,
+    group: summarizeGroupPreferences(trip),
   };
 }
 
@@ -74,7 +107,8 @@ const sketchSchema = {
 };
 
 const systemPrompt = [
-  "You help a group start planning a trip. The host wrote a short description; nobody has shared preferences yet.",
+  "You help a group start planning a trip. The host wrote a short description. When group is present, some travelers have also shared preferences.",
+  "- If group is present, shape the whole sketch around it: lead with interests many travelers share, keep the plan realistic for the lowest budget, and work in their destination and activity ideas. Mention in summary that it reflects the group's preferences. Never quote what an individual wrote.",
   "Draw a first rough sketch the whole group can react to:",
   "- summary: 1-2 friendly sentences on the shape of the trip.",
   "- places: the cities or areas the description asks for, in a sensible travel order, each with a short reason. Never drop a place the host named.",

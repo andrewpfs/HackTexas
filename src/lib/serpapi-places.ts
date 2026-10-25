@@ -98,14 +98,14 @@ async function fetchReviews(config: SerpApiConfig, place: SerpPlace): Promise<Pl
 }
 
 // Finds the top Google Maps result for a search, or null if nothing matched.
-export async function searchPlaces(config: SerpApiConfig, query: string): Promise<PlaceSuggestion[]> {
+export async function searchPlaces(config: SerpApiConfig, query: string, limit = 5): Promise<PlaceSuggestion[]> {
   const body = await serpGet(config, { engine: "google_maps", type: "search", q: query, hl: "en" });
 
   // A broad search returns local_results; a search that names one exact place
   // returns place_results instead.
   const localResults = Array.isArray(body.local_results) ? (body.local_results as SerpPlace[]) : [];
   const exact = body.place_results as SerpPlace | undefined;
-  const results = localResults.length > 0 ? localResults.slice(0, 5) : exact ? [exact] : [];
+  const results = localResults.length > 0 ? localResults.slice(0, limit) : exact ? [exact] : [];
   const suggestions: PlaceSuggestion[] = [];
   for (const place of results) {
     if (!place.title) continue;

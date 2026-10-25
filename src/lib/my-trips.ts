@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Trip } from "./trip-types";
+import { tripDestinationLabel } from "./trip-destination";
 
 export type MyTrip = {
   tripId: string;
@@ -22,8 +23,8 @@ export function summarizeTripsForPhone(trips: Trip[], phoneHash: string): MyTrip
         tripId: trip.id,
         travelerId: traveler.id,
         travelerName: traveler.name,
-        tripName: trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip"),
-        destination: trip.destination ?? null,
+        tripName: trip.name || (tripDestinationLabel(trip) ? `${tripDestinationLabel(trip)} Trip` : "Group Trip"),
+        destination: tripDestinationLabel(trip),
         window: `${trip.earliestPossibleDate} to ${trip.latestPossibleDate}`,
         isHost: traveler.isHost,
       });

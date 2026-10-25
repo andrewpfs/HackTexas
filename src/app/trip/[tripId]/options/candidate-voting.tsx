@@ -44,6 +44,14 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
   const votedCount = travelers.filter((traveler) => traveler.votedCandidateId).length;
   const allVoted = travelers.length > 0 && votedCount === travelers.length;
 
+  // A tie at the top means Muse decides between the tied options, so the group is warned first.
+  const voteCounts = options.map((option) => ({ option, count: travelers.filter((traveler) => traveler.votedCandidateId === option.id).length }));
+  const topCount = Math.max(0, ...voteCounts.map((item) => item.count));
+  const tiedOptions = topCount > 0 ? voteCounts.filter((item) => item.count === topCount).map((item) => item.option) : [];
+  const tieWarning = allVoted && tiedOptions.length > 1
+    ? `It's a tie between Options ${tiedOptions.map((option) => option.optionNumber).join(tiedOptions.length > 2 ? ", " : " and ").replace(/, (\d+)$/, " and $1")} (${topCount} ${topCount === 1 ? "vote" : "votes"} each). Muse will pick the one that fits the whole group best and blend in ideas from the ${tiedOptions.length > 2 ? "others" : "other"}, so the plan may not match any single option.`
+    : "";
+
   async function handleVote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -84,6 +92,9 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
 
   async function handleFinalize() {
     if (!currentTraveler) {
+      return;
+    }
+    if (tieWarning && !window.confirm(`${tieWarning}\n\nCreate the shared itinerary anyway?`)) {
       return;
     }
 
@@ -194,11 +205,16 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
           {travelers.map((traveler) => {
             const option = options.find((item) => item.id === traveler.votedCandidateId);
             return (
-              <li className="flex items-center justify-between gap-3 py-3 text-sm" key={traveler.id}>
-                <span className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</span>
-                <span className={option ? "font-bold text-[#276655]" : "text-[#778388]"}>
-                  {option ? `Option ${option.optionNumber} ✓` : "Waiting"}
+              <li className="py-3 text-sm" key={traveler.id}>
+                <span className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</span>
+                  <span className={option ? "font-bold text-[#276655]" : "text-[#778388]"}>
+                    {option ? `Option ${option.optionNumber} ✓` : "Waiting"}
+                  </span>
                 </span>
+                {option && traveler.feedback ? (
+                  <span className="mt-1.5 block rounded-xl bg-[#f7f7f3] px-3 py-2 text-[#53666f]">&ldquo;{traveler.feedback}&rdquo;</span>
+                ) : null}
               </li>
             );
           })}
@@ -210,6 +226,7 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
               <p>Once everyone who joined has voted, the host can create one shared itinerary.</p>
             ) : currentTraveler?.isHost ? (
               <>
+                {tieWarning ? <p className="mb-3 rounded-xl bg-[#fff8dc] p-3 font-semibold text-[#6f5a16]" role="status">⚖️ {tieWarning}</p> : null}
                 <p>Everyone voted. Muse will build one plan from the strongest option and work in the group&apos;s feedback.</p>
                 <button
                   className={`button-dark mt-4 w-full ${isFinalizing ? "cursor-not-allowed opacity-60" : ""}`}
@@ -221,7 +238,10 @@ export function CandidateVoting({ tripId, options, travelers, itineraryReady }: 
                 </button>
               </>
             ) : (
-              <p>Everyone voted. Waiting for the host to create the shared itinerary.</p>
+              <>
+                {tieWarning ? <p className="mb-3 rounded-xl bg-[#fff8dc] p-3 font-semibold text-[#6f5a16]" role="status">⚖️ {tieWarning}</p> : null}
+                <p>Everyone voted. Waiting for the host to create the shared itinerary.</p>
+              </>
             )}
           </div>
         ) : null}

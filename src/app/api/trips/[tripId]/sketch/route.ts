@@ -4,7 +4,7 @@ import { MusePlannerError } from "@/lib/muse-client";
 import { getSketchRequest, MockSketchPlanner } from "@/lib/trip-sketch";
 import { claimTripSketch, finishTripSketch } from "@/lib/trip-repository";
 
-// Draws the first rough plan from the host's trip description.
+// Draws the first rough plan from the host's trip description and any preferences shared so far.
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/sketch">) {
   const { tripId } = await context.params;
 
@@ -40,7 +40,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
       source = "mock-fallback";
     }
 
-    await finishTripSketch(tripId, { status: "done", ...draft, source, generatedAt: new Date().toISOString() });
+    await finishTripSketch(tripId, { status: "done", ...draft, source, generatedAt: new Date().toISOString(), preferenceCount: sketchRequest.group?.travelersWhoAnswered ?? 0 });
     return NextResponse.json({ status: "done" });
   } catch (error) {
     console.error("Trip sketch failed:", error);

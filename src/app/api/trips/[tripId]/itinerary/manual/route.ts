@@ -4,6 +4,8 @@ import { prepareManualEdit, type ManualStopEdit } from "@/lib/manual-itinerary";
 import { readManualPreview, signManualPreview } from "@/lib/manual-edit-preview";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { readSelectedPlace } from "@/lib/selected-place";
+import { lookupDestinationArea } from "@/lib/city-search";
+import { personalLocationError } from "@/lib/personal-location";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -44,7 +46,14 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
     const selectedPlace = readSelectedPlace(body.place);
     if (selectedPlace && edit.activity.location !== selectedPlace.name) return NextResponse.json({ error: "Choose the place again." }, { status: 400 });
     if (selectedPlace) edit.activity.place = selectedPlace;
-    prepareManualEdit(trip, edit);
+    const prepared = prepareManualEdit(trip, edit);
+    // Group stops follow the same rule as personal plans: the place has to fit the
+    // trip (same country, within about 2 hours of that day's other stops).
+    if (selectedPlace) {
+      const area = await lookupDestinationArea(trip.itinerary.destination);
+      const locationError = personalLocationError(trip.itinerary, edit.dayNumber, prepared.old.time, prepared.old.title, selectedPlace, area);
+      if (locationError) return NextResponse.json({ error: locationError }, { status: 400 });
+    }
     let placeNote = "No place selected; travel time cannot be estimated for this stop.";
     if (selectedPlace) placeNote = "Selected real place.";
     if (!selectedPlace && getSerpApiKey() && body.placeSearchUnavailable !== true && text(body.location)) return NextResponse.json({ error: "Choose a real place from the suggestions." }, { status: 400 });

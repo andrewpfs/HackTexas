@@ -2,25 +2,31 @@
 
 import Image from "next/image";
 import { flightHighlights } from "@/lib/travel-display";
-import { hotelPage, hotelProviderLabel, expediaSearchUrl, hotelPriceTotal } from "@/lib/hotel-display";
+import { hotelPriceTotal } from "@/lib/hotel-display";
+import type { StayPlan } from "@/lib/hotel-stays";
+import { StayHotels } from "./stay-hotels";
 import { EmailConfirmation } from "./email-confirmation";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Booking, FlightSearchResult, HotelSearchResult } from "@/lib/trip-types";
+
+type HotelShare = NonNullable<Booking["hotelShare"]>;
 import { useTravelerIdentity } from "@/lib/use-traveler-identity";
 
-type TravelerInfo = { id: string; name: string; isHost: boolean; departure: string; needsLodging: boolean };
+type TravelerInfo = { id: string; name: string; isHost: boolean; departure: string; needsLodging: boolean; solo: boolean };
 
 type TravelWorkspaceProps = {
   tripId: string;
   tripName: string;
   destination: string;
-  nights: number;
   lodgingCount: number;
   lowestBudgetPerNight: number | null;
   searchConfigured: boolean;
   travelers: TravelerInfo[];
-  hotels: HotelSearchResult | null;
+  // One hotel search per city the group sleeps in.
+  stays: { plan: StayPlan; nights: number; result: HotelSearchResult | null }[];
+  // What each traveler owes whoever booked the group hotels.
+  shares: Record<string, HotelShare | undefined>;
   flights: Record<string, FlightSearchResult>;
   bookings: Record<string, Booking>;
 };
@@ -54,7 +60,7 @@ async function post(url: string, method: string, body: unknown) {
 }
 
 export function TravelWorkspace(props: TravelWorkspaceProps) {
-  const { tripId, travelers, hotels, flights, bookings } = props;
+  const { tripId, travelers, stays, flights, bookings } = props;
   const router = useRouter();
   const { browserReady, travelerId } = useTravelerIdentity(tripId);
   const me = travelers.find((traveler) => traveler.id === travelerId);
@@ -62,17 +68,16 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
   const myBooking = me ? bookings[me.id] : undefined;
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [hotelPageNumber, setHotelPageNumber] = useState(1);
-  const pagedHotels = hotelPage(hotels?.options ?? [], hotelPageNumber);
   const startedHotels = useRef(false);
   const startedFlights = useRef(false);
 
   // Start the paid searches only once, and only when they have not run yet.
+  const unsearchedStays = stays.map((stay, index) => (stay.result ? -1 : index)).filter((index) => index >= 0).join(",");
   useEffect(() => {
-    if (!props.searchConfigured || hotels || startedHotels.current) return;
+    if (!props.searchConfigured || unsearchedStays === "" || startedHotels.current) return;
     startedHotels.current = true;
-    post(`/api/trips/${tripId}/travel/hotels`, "POST", {}).finally(() => router.refresh());
-  }, [props.searchConfigured, hotels, tripId, router]);
+    Promise.all(unsearchedStays.split(",").map((index) => post(`/api/trips/${tripId}/travel/hotels`, "POST", { stayIndex: Number(index) }))).finally(() => router.refresh());
+  }, [props.searchConfigured, unsearchedStays, tripId, router]);
 
   useEffect(() => {
     if (!props.searchConfigured || !me || myFlights || startedFlights.current) return;
@@ -89,16 +94,23 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
     setBusy("");
   }
 
-  const selectedHotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
-  const hotelBooker = travelers.find((traveler) => traveler.id === hotels?.selectedByTravelerId);
   const myFlight = myFlights?.options.find((option) => option.id === myFlights.selectedId);
-  const hotelTotal = selectedHotel ? hotelPriceTotal(selectedHotel, props.nights) : null;
-  const hotelShare = hotelTotal !== null ? hotelTotal / Math.max(1, props.lodgingCount) : null;
-  const iBookHotel = Boolean(me && selectedHotel && hotels?.selectedByTravelerId === me.id);
   const highlights = flightHighlights(myFlights?.options ?? []);
-  const owedShare = myBooking?.hotelShare ?? (me?.needsLodging && selectedHotel && hotelBooker && !iBookHotel && hotelShare !== null ? { bookerName: hotelBooker.name, hotelName: selectedHotel.name, amount: hotelShare, confirmationCode: bookings[hotelBooker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode } : undefined);
-  const owedCopy = owedShare ? `You owe ${owedShare.bookerName} about ${money(owedShare.amount)} for your hotel share.` : "";
-  const myTotal = (myFlight?.price ?? 0) + (iBookHotel ? hotelTotal ?? 0 : 0);
+  // What I pick in each city: the group hotel (if I'm the one booking it) or my own place.
+  const myStays = stays.map(({ plan, nights, result }) => {
+    const groupHotel = result?.options.find((option) => option.token === result.selectedToken);
+    const ownHotel = me?.solo ? result?.options.find((option) => option.token === result?.soloPicks?.[me.id]) : undefined;
+    const hotel = me?.solo ? ownHotel : groupHotel;
+    const iBook = Boolean(hotel && (me?.solo || result?.selectedByTravelerId === me?.id));
+    const total = hotel ? hotelPriceTotal(hotel, nights) : null;
+    const booker = travelers.find((traveler) => traveler.id === result?.selectedByTravelerId);
+    return { plan, hotel, iBook, total, booker };
+  });
+  const missingHotels = me?.needsLodging ? myStays.filter((stay) => !stay.hotel).map((stay) => stay.plan.city.split(",")[0]) : [];
+  const missingList = missingHotels.join(" and ");
+  const owedShare = myBooking?.hotelShare ?? (me ? props.shares[me.id] : undefined);
+  const owedCopy = owedShare ? `You owe ${owedShare.bookerName} about ${money(owedShare.amount)} for your share of ${owedShare.hotelName}.` : "";
+  const myTotal = (myFlight?.price ?? 0) + myStays.reduce((sum, stay) => sum + (stay.iBook ? stay.total ?? 0 : 0), 0);
 
   if (!props.searchConfigured) {
     return (
@@ -112,101 +124,25 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
     <div className="mt-6 space-y-6">
       {error ? <p className="rounded-2xl bg-[#fff0ec] p-4 text-sm font-semibold text-[#a34532]" role="alert">{error}</p> : null}
 
-      {/* ---------- hotels ---------- */}
-      <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="stay-heading">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="eyebrow">Where You&apos;ll Stay</p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight" id="stay-heading">Hotels In {props.destination}</h2>
-            <p className="mt-1 text-sm text-[#718087]">
-              {props.nights} night{props.nights === 1 ? "" : "s"} for {props.lodgingCount} traveler{props.lodgingCount === 1 ? "" : "s"} · Expedia discovery with Google Hotels fallback via SerpApi
-            </p>
-          </div>
-          {selectedHotel ? (
-            <p className="rounded-full bg-[#daf0ea] px-4 py-2 text-sm font-bold text-[#276655]">Group hotel: {selectedHotel.name}</p>
-          ) : (
-            <p className="text-sm font-semibold text-[#879196]">{me?.isHost ? "Pick one for the group." : "The host picks the group hotel."}</p>
-          )}
-        </div>
-
-        {hotels?.providerNote ? <p className="mt-3 text-xs leading-5 text-[#53666f]">{hotels.providerNote}</p> : null}
-        {hotels?.status === "done" && !selectedHotel ? (
-          <button className="mt-3 rounded-full border border-[#173f50]/20 px-4 py-2 text-xs font-bold text-[#173f50] hover:bg-[#edf5fb] disabled:opacity-50" disabled={busy !== ""} onClick={() => { setHotelPageNumber(1); act("hotel-refresh", `/api/trips/${tripId}/travel/hotels`, "POST", { retry: true }); }} type="button">
-            {busy === "hotel-refresh" ? "Searching…" : "Refresh Hotels"}
-          </button>
-        ) : null}
-
-        {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} <span className="block font-normal">Separate from your own flight charge.</span></p> : null}
-        {!hotels || hotels.status === "pending" ? (
-          <div className="mt-6">
-            <p className="flex items-center gap-2 text-sm font-semibold text-[#276655]" role="status"><Spinner /> Searching hotels for your dates…</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {[0, 1, 2].map((index) => <div className="h-72 animate-pulse rounded-2xl bg-[#efede7]" key={index} />)}
-            </div>
-          </div>
-        ) : hotels.status === "failed" ? (
-          <div className="mt-6 flex flex-col gap-3 rounded-2xl bg-[#fff0ec] p-4 text-sm font-semibold text-[#8f3f30] sm:flex-row sm:items-center sm:justify-between" role="alert">
-            <p>{hotels.error || "We couldn't load hotels."}</p>
-            <button className="button-secondary" onClick={() => act("hotel-retry", `/api/trips/${tripId}/travel/hotels`, "POST", { retry: true })} type="button">Try Again</button>
-          </div>
-        ) : hotels.options.length === 0 ? (
-          <p className="mt-6 rounded-2xl bg-[#f7f7f3] p-4 text-sm text-[#718087]">No hotels matched these dates and the group&apos;s price level.</p>
-        ) : (
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {pagedHotels.options.map((hotel) => {
-              const picked = hotel.token === hotels.selectedToken;
-              const perPerson = hotel.pricePerNight !== null ? hotel.pricePerNight / Math.max(1, props.lodgingCount) : null;
-              const fits = perPerson !== null && props.lowestBudgetPerNight !== null && perPerson <= props.lowestBudgetPerNight;
-              return (
-                <article className={`flex flex-col overflow-hidden rounded-2xl border-2 bg-white transition ${picked ? "border-[#276655] shadow-[0_12px_30px_rgba(39,102,85,0.18)]" : "border-[#172733]/8"}`} key={hotel.token}>
-                  <div className="relative h-40 bg-[#efede7]">
-                    {hotel.thumbnail ? <Image alt="" className="object-cover" fill sizes="(min-width: 1280px) 30vw, (min-width: 640px) 45vw, 100vw" src={hotel.thumbnail} unoptimized /> : null}
-                    {picked ? <span className="absolute left-3 top-3 rounded-full bg-[#276655] px-3 py-1 text-xs font-bold text-white">Group Hotel</span> : null}
-                    {fits ? <span className="absolute right-3 top-3 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#276655]">Fits everyone&apos;s budget</span> : null}
-                  </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <p className="font-bold leading-snug text-[#173f50]">{hotel.name}</p>
-                    <p className="mt-2 text-xs font-bold text-[#397bb3]">{hotelProviderLabel(hotel)}{hotel.provider === "expedia" ? " · Expedia ↗" : ""}</p>
-                    <p className="mt-1 text-sm text-[#718087]">
-                      {hotel.rating !== null ? <span className="font-bold text-[#b0661c]">★ {hotel.rating.toFixed(1)}</span> : null}
-                      {hotel.reviewCount !== null ? ` · ${hotel.reviewCount.toLocaleString("en-US")} reviews` : ""}
-                      {hotel.hotelClass ? ` · ${hotel.hotelClass}` : ""}
-                    </p>
-                    {hotel.amenities.length > 0 ? <p className="mt-2 line-clamp-2 text-xs text-[#879196]">{hotel.amenities.join(" · ")}</p> : null}
-                    <div className="mt-auto pt-4">
-                      {hotel.pricePerNight !== null ? (
-                        <p className="text-sm text-[#53666f]">
-                          <span className="text-xl font-extrabold text-[#173f50]">{money(hotel.pricePerNight)}</span> / night
-                          {perPerson !== null ? <span className="block text-xs text-[#879196]">about {money(perPerson)} per person per night</span> : null}
-                        </p>
-                      ) : <p className="text-sm font-semibold text-[#53666f]">{hotel.provider === "expedia" ? "See Current Price On Expedia" : "Price not listed"}</p>}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {me?.isHost ? (
-                          <button
-                            className={`rounded-full px-4 py-2 text-sm font-bold transition ${picked ? "bg-[#276655] text-white" : "bg-[#173f50] text-white hover:-translate-y-0.5"}`}
-                            disabled={busy !== ""}
-                            onClick={() => act(`hotel-${hotel.token}`, `/api/trips/${tripId}/travel/hotels`, "PUT", { travelerId: me.id, token: hotel.token })}
-                            type="button"
-                          >
-                            {busy === `hotel-${hotel.token}` ? "Saving…" : picked ? "Picked ✓" : "Pick For The Group"}
-                          </button>
-                        ) : null}
-                        <a className="rounded-full border border-[#172733]/15 px-4 py-2 text-sm font-bold text-[#173f50] hover:bg-[#f7f7f3]" href={hotel.link} rel="noopener noreferrer" target="_blank">{hotel.provider === "expedia" ? "View On Expedia ↗" : "View On Provider ↗"}</a>
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-        {pagedHotels.totalPages > 1 ? <nav aria-label="Hotel pages" className="mt-6 flex flex-wrap justify-center gap-2">
-          <button className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" disabled={pagedHotels.page === 1} onClick={() => setHotelPageNumber(pagedHotels.page - 1)} type="button">Previous</button>
-          {Array.from({ length: pagedHotels.totalPages }, (_, index) => index + 1).map((number) => <button aria-current={pagedHotels.page === number ? "page" : undefined} className={`rounded-lg border px-3 py-2 text-sm font-bold ${pagedHotels.page === number ? "bg-[#173f50] text-white" : "bg-white"}`} key={number} onClick={() => setHotelPageNumber(number)} type="button">{number}</button>)}
-          <button className="rounded-lg border px-3 py-2 text-sm disabled:opacity-40" disabled={pagedHotels.page === pagedHotels.totalPages} onClick={() => setHotelPageNumber(pagedHotels.page + 1)} type="button">Next</button>
-        </nav> : null}
-        {hotels?.status === "done" && (pagedHotels.page === pagedHotels.totalPages || pagedHotels.totalPages === 0) ? <a className="mt-5 block text-center text-sm font-bold text-[#173f50] underline underline-offset-4" href={hotels.expediaSearchUrl || expediaSearchUrl()} rel="noopener noreferrer" target="_blank">View More On Expedia ↗</a> : null}
-      </section>
+      {/* ---------- hotels: one section per city the group sleeps in ---------- */}
+      {owedCopy ? <p className="rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} <span className="block font-normal">Separate from your own flight charge.</span></p> : null}
+      {me?.solo ? <p className="rounded-2xl bg-[#f4f1fb] p-4 text-sm text-[#4b3d8a]"><b>You&apos;re booking your own place.</b> You said you&apos;d prefer separate lodging, so pick your own hotel in each city below. You won&apos;t be charged a share of the group hotel.</p> : null}
+      {stays.map((stay, index) => (
+        <StayHotels
+          act={act}
+          busy={busy}
+          key={`${stay.plan.city}-${stay.plan.checkIn}`}
+          lodgingCount={props.lodgingCount}
+          lowestBudgetPerNight={props.lowestBudgetPerNight}
+          me={me ? { id: me.id, isHost: me.isHost, solo: me.solo } : null}
+          nights={stay.nights}
+          plan={stay.plan}
+          result={stay.result ?? undefined}
+          stayCount={stays.length}
+          stayIndex={index}
+          tripId={tripId}
+        />
+      ))}
 
       {/* ---------- flights ---------- */}
       <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="flight-heading">
@@ -324,27 +260,30 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   <span><span className="font-bold text-[#173f50]">Your flight</span><span className="block text-[#718087]">{myFlight ? `${myFlight.airline}, ${myFlight.departAirport} → ${myFlight.arriveAirport}` : "Choose a flight above"}</span></span>
                   <b>{myFlight ? money(myFlight.price) : "—"}</b>
                 </li>
-                <li className="flex items-center justify-between gap-4 rounded-2xl bg-[#f7f7f3] px-4 py-3">
-                  <span>
-                    <span className="font-bold text-[#173f50]">Group hotel</span>
-                    <span className="block text-[#718087]">
-                      {!selectedHotel
-                        ? "The host hasn't picked one yet"
-                        : iBookHotel
-                          ? `${selectedHotel.name} · you book it for the group`
-                          : `${selectedHotel.name} · ${hotelBooker?.name ?? "The host"} books it; ${owedCopy}`}
+                {me.needsLodging ? myStays.map((stay) => (
+                  <li className="flex items-center justify-between gap-4 rounded-2xl bg-[#f7f7f3] px-4 py-3" key={`${stay.plan.city}-${stay.plan.checkIn}`}>
+                    <span>
+                      <span className="font-bold text-[#173f50]">{me.solo ? "Your hotel" : "Group hotel"} in {stay.plan.city}</span>
+                      <span className="block text-[#718087]">
+                        {!stay.hotel
+                          ? me.solo ? "Pick your own hotel above" : "The host hasn't picked one yet"
+                          : stay.iBook
+                            ? `${stay.hotel.name} · ${me.solo ? "just for you" : "you book it for the group"}`
+                            : `${stay.hotel.name} · ${stay.booker?.name ?? "The host"} books it`}
+                      </span>
                     </span>
-                  </span>
-                  <b>{selectedHotel && hotelTotal === null ? "Price on provider" : iBookHotel ? money(hotelTotal ?? 0) : "—"}</b>
-                </li>
+                    <b>{stay.hotel && stay.total === null ? "Price on provider" : stay.iBook ? money(stay.total ?? 0) : "—"}</b>
+                  </li>
+                )) : null}
               </ul>
-              {selectedHotel && hotelTotal === null ? <p className="mt-3 text-sm text-[#53666f]">This hotel has no listed price. View current pricing and availability on its provider site; it is excluded from simulated charges and hotel shares.</p> : null}
+              {myStays.some((stay) => stay.hotel && stay.total === null) ? <p className="mt-3 text-sm text-[#53666f]">A hotel with no listed price can&apos;t be booked here. Check its provider site, or refresh for a priced list.</p> : null}
+              {missingHotels.length > 0 ? <p className="mt-4 rounded-2xl bg-[#f7f7f3] p-4 text-sm font-semibold text-[#53666f]" role="status">{me.solo ? `Pick your own hotel in ${missingList} above to confirm.` : me.isHost ? `Pick the group hotel in ${missingList} above, then everyone can confirm.` : `You can confirm once the host picks the group hotel in ${missingList}.`}</p> : null}
               {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} This is not part of your simulated charge.</p> : null}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-lg font-extrabold text-[#173f50]">Estimated total {money(myTotal)}</p>
                 <button
-                  className={`button-primary ${myTotal === 0 || busy !== "" ? "cursor-not-allowed opacity-60" : ""}`}
-                  disabled={myTotal === 0 || busy !== ""}
+                  className={`button-primary ${myTotal === 0 || missingHotels.length > 0 || busy !== "" ? "cursor-not-allowed opacity-60" : ""}`}
+                  disabled={myTotal === 0 || missingHotels.length > 0 || busy !== ""}
                   onClick={() => act("book", `/api/trips/${tripId}/travel/book`, "POST", { travelerId: me.id })}
                   type="button"
                 >
