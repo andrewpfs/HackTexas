@@ -1,4 +1,5 @@
 import { addDays, getDatesInRange, type DateWindow } from "./date-utils";
+import type { ConfirmedTripDates, Trip } from "./trip-types";
 
 // Free, rough fare hints for picking trip dates. These are well-known US travel
 // peaks and day-of-week patterns, not live prices (live fares come from SerpApi).
@@ -129,4 +130,29 @@ export function confirmedDatesStillShared(confirmed: { startDate: string; endDat
   if (!confirmed || confirmed.startDate > confirmed.endDate) return false;
   const shared = new Set(sharedDates);
   return getDatesInRange(confirmed.startDate, confirmed.endDate).every((date) => shared.has(date));
+}
+
+// The dates the host set, while they still apply. Dates the host picked from the
+// shared days stop applying if availability changes; dates the host chose on
+// purpose outside them (an override) stay until the host changes them.
+export function activeConfirmedDates(confirmed: ConfirmedTripDates | undefined, sharedDates: string[]) {
+  if (!confirmed || confirmed.startDate > confirmed.endDate) return null;
+  if (confirmed.outsideSharedDates) return confirmed;
+  return confirmedDatesStillShared(confirmed, sharedDates) ? confirmed : null;
+}
+
+// Everyone except the host has to say "I'm in" before Muse plans options.
+export function travelersYetToAgree(trip: Pick<Trip, "travelers">, confirmed: ConfirmedTripDates) {
+  if (!confirmed.agreedTravelerIds) return [];
+  const agreed = new Set(confirmed.agreedTravelerIds);
+  return trip.travelers.filter((traveler) => !traveler.isHost && !agreed.has(traveler.id));
+}
+
+// Travelers who did not mark every one of these days as free.
+export function travelersNotFreeOn(trip: Pick<Trip, "travelers">, startDate: string, endDate: string) {
+  const days = getDatesInRange(startDate, endDate);
+  return trip.travelers.filter((traveler) => {
+    const free = new Set(traveler.availableDates ?? []);
+    return days.some((day) => !free.has(day));
+  });
 }

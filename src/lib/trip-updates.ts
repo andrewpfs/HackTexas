@@ -43,8 +43,8 @@ export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   trip.latestPossibleDate = input.latestPossibleDate;
   trip.preferredDurationDays = input.preferredDurationDays;
   trip.expectedTravelerCount = input.expectedTravelerCount;
-  // The sketch is drawn from these details, so it is redrawn after an edit.
-  trip.sketch = undefined;
+  // The sketch is drawn from these details. It stays on screen and is redrawn in
+  // the background because its inputs changed (see sketchNeedsRedraw).
   clearPlanningOutputs(trip);
 
   return affectedTravelerCount;

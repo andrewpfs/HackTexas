@@ -52,6 +52,7 @@
     "tests/travel.test.ts",
     "tests/sketch-phone-mcp.test.ts",
     "tests/improvements.test.ts",
-    "tests/manual-hotel.test.ts"
+    "tests/manual-hotel.test.ts",
+    "tests/group-dates-sketch.test.ts"
   ]
 }

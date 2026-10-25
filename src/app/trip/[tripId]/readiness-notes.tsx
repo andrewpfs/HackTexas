@@ -15,6 +15,7 @@ const missingLabels: Record<string, string> = {
   preferences_incomplete: "Preferences",
   availability_incomplete: "Availability",
   departure_location_missing: "Departure city",
+  dates_not_agreed: "Confirm dates",
 };
 
 function InfoIcon() {

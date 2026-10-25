@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { confirmedDatesStillShared } from "@/lib/date-suggestions";
+import { isValidISODate } from "@/lib/date-utils";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
-import { calculatePlanningReadiness, getTravelerDepartureLocation } from "@/lib/planning-context";
+import { getTravelerDepartureLocation } from "@/lib/planning-context";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 import { findCityFlightId, searchFlights } from "@/lib/travel-search";
@@ -30,12 +30,12 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   const destination = trip.destination?.trim();
   if (!destination) return NextResponse.json({ error: "Fares need a destination. Muse picks one when it plans options." }, { status: 409 });
 
-  const sharedDates = calculatePlanningReadiness(trip).sharedDates;
+  // The host may override availability, so any real date range can be priced.
   const windows = (Array.isArray(body.windows) ? body.windows : [])
     .filter((window): window is { startDate: string; endDate: string } => typeof window?.startDate === "string" && typeof window?.endDate === "string")
-    .filter((window) => confirmedDatesStillShared(window, sharedDates))
+    .filter((window) => isValidISODate(window.startDate) && isValidISODate(window.endDate) && window.startDate <= window.endDate)
     .slice(0, maximumWindows);
-  if (windows.length === 0) return NextResponse.json({ error: "Pick dates the whole group is free." }, { status: 400 });
+  if (windows.length === 0) return NextResponse.json({ error: "Pick a start date and an end date." }, { status: 400 });
 
   const origins = [...new Set(trip.travelers.map((traveler) => getTravelerDepartureLocation(trip, traveler)).filter(Boolean))].slice(0, maximumOrigins);
   const [toId, ...fromIds] = await Promise.all([findCityFlightId(destination), ...origins.map((origin) => findCityFlightId(origin))]);

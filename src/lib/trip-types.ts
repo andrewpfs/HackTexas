@@ -308,6 +308,15 @@ export type TripSketch = {
   source?: PlannerSource;
   generatedAt?: string;
   error?: string;
+  // Which planning inputs this draft was drawn from. When they change, a new draft is
+  // drawn in the background while this one stays on screen.
+  basisKey?: string;
+  // "host": from the host's description only. "group": also everyone's preferences and dates.
+  stage?: "host" | "group";
+  // Set while a newer draft is being drawn.
+  refreshing?: { startedAt: string; basisKey: string };
+  // A redraw for these inputs failed, so it isn't retried automatically.
+  failedBasisKey?: string;
 };
 
 export type ChatMessage = {
@@ -370,9 +379,21 @@ export type Trip = {
   pendingItineraryProposal?: ItineraryProposal;
   lastApprovedItineraryProposal?: ItineraryProposal;
   // The exact dates the host approved before options are generated. Muse only plans inside them.
-  confirmedDates?: { startDate: string; endDate: string; confirmedAt: string; confirmedByName: string };
+  confirmedDates?: ConfirmedTripDates;
   // Real round-trip fares the host looked up for a few date choices (SerpApi Google Flights).
   datePriceCheck?: DatePriceCheck;
+};
+
+export type ConfirmedTripDates = {
+  startDate: string;
+  endDate: string;
+  confirmedAt: string;
+  confirmedByName: string;
+  // Travelers who said "I'm in" for these dates. The host is added when they set them.
+  // Missing on trips confirmed before everyone had to agree; those count as agreed.
+  agreedTravelerIds?: string[];
+  // True when the host picked days that not everyone marked free.
+  outsideSharedDates?: boolean;
 };
 
 export type DatePriceCheck = {

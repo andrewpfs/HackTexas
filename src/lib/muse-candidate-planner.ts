@@ -4,6 +4,7 @@ import type { CandidatePlanner } from "./candidate-planner";
 import type { PlanningContext } from "./planning-context";
 import type { CandidateTripOption } from "./trip-types";
 import { MusePlannerError, requestMuseJson, type MuseConfig } from "./muse-client";
+import { tripStylePromptRule } from "./trip-style";
 
 export { MusePlannerError } from "./muse-client";
 
@@ -108,7 +109,10 @@ const systemPrompt = [
   "- Each traveler departs from their own departureLocation. Consider all of them when choosing destinations.",
   "- Stay within the group's budgets. The lowest maximum budget is the binding constraint.",
   "- Balance different interests and lodging preferences, and explain the tradeoffs in rationale and considerations.",
-  "- If planningMode is known_destination, all three options use that destination and differ in approach.",
+  "- If planningMode is known_destination, all three options use that destination and differ in approach. When the destination is a region or the trip style is multi-stop, the three options are different routes through it.",
+  tripStylePromptRule,
+  "- If trip.confirmedDates is present, the group agreed on exactly those dates: every option starts on its startDate and ends on its endDate. Some travelers in travelersNotFreeOnEveryDay may arrive late or leave early; mention it in considerations.",
+  "- trip.feasibilityWarnings lists problems the group was warned about (too short for the flights, tight budgets, too many places). Plan around them and say in considerations how each option handles them.",
   "- If planningMode is unknown_destination, recommend three different destinations that fit the group.",
   "- Count travel days. Estimate each traveler's flight time from their departureLocation; trip.flightTimes gives estimates when the destination is known. Day 1 is the arrival day and the last day is the flight home. Long flights (over about 9 hours, like the US to Japan) leave little of those days, and flying from the Americas to Asia lands a calendar day later. Keep Day 1 light (arrive, check in, a nearby dinner) and plan the last day around getting to the airport.",
   "- Never suggest a trip so short that flying takes most of it. Treat trip.flightTimes.recommendedMinimumDays as the shortest sensible length whenever the shared dates allow it. If the shared dates are shorter than that, still use them but say plainly in considerations how much time the flights eat.",
