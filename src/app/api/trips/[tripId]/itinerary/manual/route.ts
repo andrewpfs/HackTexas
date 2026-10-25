@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { editSharedStop, getTripById } from "@/lib/trip-repository";
 import { prepareManualEdit, type ManualStopEdit } from "@/lib/manual-itinerary";
 import { readManualPreview, signManualPreview } from "@/lib/manual-edit-preview";
-import { getSerpApiKey, lookupPlace } from "@/lib/serpapi-places";
+import { getSerpApiKey } from "@/lib/serpapi-places";
+import { readSelectedPlace } from "@/lib/selected-place";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -40,20 +41,14 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
         placeSearchQuery: "",
       },
     };
+    const selectedPlace = readSelectedPlace(body.place);
+    if (selectedPlace && edit.activity.location !== selectedPlace.name) return NextResponse.json({ error: "Choose the place again." }, { status: 400 });
+    if (selectedPlace) edit.activity.place = selectedPlace;
     prepareManualEdit(trip, edit);
     let placeNote = "No place selected; travel time cannot be estimated for this stop.";
-    const apiKey = getSerpApiKey();
-    if (body.matchPlace === true && apiKey) {
-      try {
-        const place = await lookupPlace({ apiKey, includeReviews: false }, `${edit.activity.title} ${edit.activity.location || trip.itinerary.destination}`);
-        if (place) {
-          edit.activity.place = place;
-          placeNote = "Check this place match before saving.";
-        }
-      } catch {
-        placeNote = "Place search is unavailable. You can still save this freeform stop.";
-      }
-    }
+    if (selectedPlace) placeNote = "Selected real place.";
+    if (!selectedPlace && getSerpApiKey() && body.placeSearchUnavailable !== true && text(body.location)) return NextResponse.json({ error: "Choose a real place from the suggestions." }, { status: 400 });
+    if (!selectedPlace) placeNote = "Place search is unavailable or no location was entered. Travel time cannot be estimated.";
     const preview = prepareManualEdit(trip, edit);
     return NextResponse.json({ token: signManualPreview(tripId, edit), activity: edit.activity, warnings: preview.warnings, placeNote });
   } catch (error) {

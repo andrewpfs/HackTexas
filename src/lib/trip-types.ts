@@ -142,6 +142,10 @@ export type PlaceReview = {
 
 // A real place found through SerpApi (Google Maps) for one itinerary activity.
 export type PlaceSuggestion = {
+  placeId?: string;
+  countryCode?: string;
+  region?: string;
+  selectionToken?: string;
   name: string;
   rating: number | null;
   reviewCount: number | null;
@@ -285,6 +289,7 @@ export type PersonalOverride = {
   stopTitle: string;
   title: string;
   location: string;
+  place?: PlaceSuggestion;
   note: string;
   joinedBy: string[];
   createdAt: string;

@@ -11,6 +11,7 @@ import type {
   ItineraryProposal,
   GroupItinerary,
   PlannerSource,
+  PlaceSuggestion,
   Traveler,
   TravelerPreferences,
   Trip,
@@ -23,6 +24,7 @@ import { jsonTripStore, type TripStore } from "./trip-store";
 import { getSupabaseTripStore } from "./supabase-trip-store";
 import { applyProposalVote, proposalMatchesBase } from "./itinerary-proposals";
 import { applyManualEdit, type ManualStopEdit, type TravelWarning } from "./manual-itinerary";
+import { personalLocationError, type DestinationArea } from "./personal-location";
 
 export async function editSharedStop(tripId: string, edit: ManualStopEdit, allowLongTravel: boolean) {
   return getStore().update<{ saved: boolean; warnings: TravelWarning[]; trip: Trip }>(tripId, (trip) => {
@@ -55,6 +57,11 @@ function getStore(): TripStore {
 
 export async function saveTrip(trip: Trip) {
   await getStore().insert(trip);
+}
+
+// Removes the whole trip for everyone. Callers must check that the requester is the host.
+export async function deleteTrip(tripId: string) {
+  return getStore().delete(tripId);
 }
 
 export async function getTripById(tripId: string) {
@@ -154,6 +161,7 @@ export async function updateTravelerAvailability(
 
     traveler.availableDates = availableDates;
     traveler.availabilityComplete = true;
+    trip.sketch = undefined;
     clearPlanningOutputs(trip);
     return { save: true, result: { status: "updated" as const, traveler } };
   });
@@ -569,10 +577,10 @@ export async function saveBooking(tripId: string, booking: Booking, expectedItin
 // ---------- personal overrides ----------
 
 export type OverrideAction =
-  | { action: "add"; travelerId: string; dayNumber: number; stopTime: string; stopTitle: string; title: string; location: string; note: string }
+  | { action: "add"; travelerId: string; dayNumber: number; stopTime: string; stopTitle: string; title: string; location: string; note: string; place?: PlaceSuggestion; destinationArea?: DestinationArea; expectedDestination?: string; requireSelectedPlace?: boolean }
   | { action: "remove" | "join" | "leave"; travelerId: string; overrideId: string };
 
-type OverrideResult = { status: "updated"; trip: Trip } | { status: "not-found" | "no-itinerary" | "not-allowed" };
+type OverrideResult = { status: "updated"; trip: Trip } | { status: "invalid-location"; error: string } | { status: "not-found" | "no-itinerary" | "not-allowed" };
 
 export async function changePersonalOverride(tripId: string, change: OverrideAction) {
   const result = await getStore().update<OverrideResult>(tripId, (trip) => {
@@ -593,6 +601,15 @@ export async function changePersonalOverride(tripId: string, change: OverrideAct
         return { save: false, result: { status: "not-found" as const } };
       }
 
+      if (change.expectedDestination && change.expectedDestination !== itinerary.destination) return { save: false, result: { status: "invalid-location" as const, error: "The destination changed. Select your place again." } };
+      // The manual API requires a selected real place. Muse's existing internal
+      // text-only alternatives remain compatible with its current workflow.
+      let locationError: string | null = null;
+      if (change.place || change.requireSelectedPlace) {
+        locationError = personalLocationError(itinerary, change.dayNumber, change.stopTime, change.stopTitle, change.place, change.destinationArea);
+      }
+      if (locationError) return { save: false, result: { status: "invalid-location" as const, error: locationError } };
+
       // One plan per person per stop: a new one replaces the old one, and they leave any plan they had joined.
       const others = overrides
         .filter((item) => !(item.travelerId === change.travelerId && item.dayNumber === change.dayNumber && item.stopTime === change.stopTime && item.stopTitle === change.stopTitle))
@@ -610,7 +627,8 @@ export async function changePersonalOverride(tripId: string, change: OverrideAct
           stopTime: change.stopTime,
           stopTitle: change.stopTitle,
           title: change.title,
-          location: change.location,
+          location: change.place?.address || change.place?.name || change.location,
+          place: change.place,
           note: change.note,
           joinedBy: [],
           createdAt: new Date().toISOString(),
@@ -707,4 +725,17 @@ export async function setAssistantToken(tripId: string, travelerId: string, toke
     return { save: true, result: { status: "saved" as const } };
   });
   return result ?? { status: "traveler-not-found" as const };
+}
+
+// Takes a trip off a phone's "My Trips" list. The traveler stays in the trip.
+export async function unlinkTravelerPhone(tripId: string, travelerId: string, phoneHash: string) {
+  const result = await getStore().update<{ status: "unlinked" | "not-linked" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler || traveler.phoneHash !== phoneHash) return { save: false, result: { status: "not-linked" as const } };
+    traveler.phoneHash = undefined;
+    traveler.phoneLast4 = undefined;
+    traveler.phoneVotingVerified = undefined;
+    return { save: true, result: { status: "unlinked" as const } };
+  });
+  return result ?? { status: "not-linked" as const };
 }

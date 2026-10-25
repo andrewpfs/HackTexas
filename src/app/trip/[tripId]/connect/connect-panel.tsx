@@ -37,7 +37,7 @@ function CopyBlock({ label, value }: { label: string; value: string }) {
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      <pre className="mt-2 overflow-x-auto rounded-2xl bg-[#173f50] p-4 font-mono text-xs leading-6 text-white">{value}</pre>
+      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-2xl bg-[#173f50] p-4 font-mono text-xs leading-6 text-white">{value}</pre>
     </div>
   );
 }
@@ -79,6 +79,7 @@ export function ConnectPanel({ tripId, connectedIds }: { tripId: string; connect
 
   const shownToken = token ?? "YOUR_TOKEN";
   const config = JSON.stringify({ mcpServers: { "trip-planner": { url: serverUrl, headers: { Authorization: `Bearer ${shownToken}` } } } }, null, 2);
+  const museMessage = `Add a custom MCP connector named "TravelSync". It is a remote Streamable HTTP server at ${serverUrl}. It uses an API key sent as a Bearer token in the Authorization header. My key is ${shownToken}`;
   const curl = `curl -X POST ${serverUrl} \\\n  -H "Authorization: Bearer ${shownToken}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_my_bookings","arguments":{}}}'`;
 
   return (
@@ -112,7 +113,23 @@ export function ConnectPanel({ tripId, connectedIds }: { tripId: string; connect
         </div>
         {error ? <p className="mt-3 text-sm font-semibold text-[#a34532]" role="alert">{error}</p> : null}
 
-        <div className="mt-8 space-y-5">
+        <div className="mt-8 rounded-2xl border border-[#397bb3]/20 bg-[#eef6ff] p-5">
+          <h3 className="font-bold text-[#173f50]">Set Up In The Muse App</h3>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-[#53666f]">
+            <li>Create a connection token above and keep this page open.</li>
+            <li>In the Muse app, open <b>Settings → Connectors → Add custom connector</b>.</li>
+            <li>Name it <b>TravelSync</b> and paste the Server URL below.</li>
+            <li>For sign-in, choose <b>API key</b> (Bearer token) and paste your connection token.</li>
+            <li>Ask Muse: &ldquo;What&apos;s on my trip checklist?&rdquo;</li>
+          </ol>
+          {/localhost|127\.0\.0\.1/.test(origin) ? (
+            <p className="mt-3 rounded-xl bg-[#fff8dc] p-3 text-xs font-semibold leading-5 text-[#6f5a16]">Muse can&apos;t reach localhost. Open this page on your deployed site (for example www.travelsync.tech) so the Server URL is public.</p>
+          ) : null}
+          <p className="mt-3 text-xs leading-5 text-[#718087]">No Connectors menu? Paste the message below into a Muse chat instead and it will set the connector up for you.</p>
+          <div className="mt-4"><CopyBlock label="Message For Muse" value={museMessage} /></div>
+        </div>
+
+        <div className="mt-6 space-y-5">
           <CopyBlock label="Server URL" value={serverUrl} />
           <CopyBlock label="MCP Client Config" value={config} />
           <CopyBlock label="Quick Test" value={curl} />

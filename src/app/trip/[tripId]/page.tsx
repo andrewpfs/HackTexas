@@ -114,25 +114,25 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             <span>✦ Boarding pass · Group trip</span>
             <span className="rounded-full bg-[#f3c969] px-3 py-1 tracking-[0.12em] text-[#173f50]">{statusLabels[currentStep]}</span>
           </div>
-          <div className="grid md:grid-cols-[1fr_15rem]">
+          <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_15rem]">
             <div className="space-y-6 p-6 sm:p-8">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Trip</p>
-                <h1 className="mt-1 text-4xl font-semibold tracking-[-0.045em] text-[#102a38] sm:text-5xl">{displayName}</h1>
+                <h1 className="mt-1 break-words text-4xl font-semibold tracking-[-0.045em] text-[#102a38] sm:text-5xl">{displayName}</h1>
               </div>
               <div className="flex items-center gap-4">
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#879196]">From</p>
-                  <p className="mt-1 truncate text-xl font-bold text-[#173f50]">{trip.origin}</p>
+                  <p className="mt-1 break-words text-lg font-bold leading-tight text-[#173f50] sm:truncate sm:text-xl">{trip.origin}</p>
                 </div>
-                <div className="flex flex-1 items-center gap-2 text-[#e4664f]" aria-hidden="true">
+                <div className="flex min-w-12 flex-1 items-center gap-2 text-[#e4664f]" aria-hidden="true">
                   <span className="h-px flex-1 border-t-2 border-dashed border-[#e4664f]/50" />
                   <svg className="h-10 w-10 shrink-0" fill="currentColor" viewBox="0 0 24 24"><g transform="rotate(90 12 12)"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z" /></g></svg>
                   <span className="h-px flex-1 border-t-2 border-dashed border-[#e4664f]/50" />
                 </div>
                 <div className="min-w-0 text-right">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#879196]">To</p>
-                  <p className="mt-1 truncate text-xl font-bold text-[#173f50]">{trip.destination || "To be decided"}</p>
+                  <p className="mt-1 break-words text-lg font-bold leading-tight text-[#173f50] sm:truncate sm:text-xl">{trip.destination || "To be decided"}</p>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t-2 border-dashed border-[#173f50]/15 pt-5 text-sm sm:grid-cols-4">
@@ -144,8 +144,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               </dl>
             </div>
             <div className="relative flex flex-col justify-center border-t-2 border-dashed border-[#173f50]/25 bg-[#fffaf1] p-6 md:border-l-2 md:border-t-0">
-              <span className="absolute -top-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
-              <span className="absolute -bottom-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Invite Code</p>
               <p className="mt-2 text-xs leading-5 text-[#718087]">Share this code so friends can board.</p>
               <CopyInviteLink className="button-secondary mt-2 !min-h-10 !px-4 !text-sm" joinPath={joinPath} showCode />

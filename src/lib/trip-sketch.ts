@@ -1,5 +1,6 @@
 import { MusePlannerError, requestMuseJson, type MuseConfig } from "./muse-client";
 import type { Trip, TripSketch } from "./trip-types";
+import { findSharedDates, getContiguousDateWindows, getDatesInRange, isValidISODate } from "./date-utils";
 
 export type SketchDraft = Pick<TripSketch, "summary" | "places" | "days" | "suggestions">;
 
@@ -16,13 +17,31 @@ export interface SketchPlanner {
   sketch(request: SketchRequest): Promise<SketchDraft>;
 }
 
-// How many days to sketch: the host's preferred length, otherwise a typical 5.
+// Use the longest contiguous dates everyone has marked once all travelers have answered.
+export function getSketchDuration(trip: Trip) {
+  if (!isValidISODate(trip.earliestPossibleDate) || !isValidISODate(trip.latestPossibleDate) || trip.earliestPossibleDate > trip.latestPossibleDate) return 1;
+  const planningDays = getDatesInRange(trip.earliestPossibleDate, trip.latestPossibleDate).length;
+  let usableDays = planningDays;
+  if (trip.travelers.length > 0 && trip.travelers.every((traveler) => traveler.availabilityComplete)) {
+    const dates = trip.travelers.map((traveler) => traveler.availableDates ?? []);
+    const shared = findSharedDates(dates).filter((date) => date >= trip.earliestPossibleDate && date <= trip.latestPossibleDate);
+    const windows = getContiguousDateWindows(shared);
+    usableDays = 0;
+    for (const window of windows) {
+      if (window.dayCount > usableDays) usableDays = window.dayCount;
+    }
+  }
+  const preferred = trip.preferredDurationDays;
+  const requested = typeof preferred === "number" && Number.isFinite(preferred) && preferred > 0 ? Math.floor(preferred) : usableDays;
+  return Math.min(14, Math.max(0, Math.min(requested, usableDays)));
+}
+
 export function getSketchRequest(trip: Trip): SketchRequest {
   return {
     description: trip.prompt,
     destination: trip.destination?.trim() || null,
     tripName: trip.name?.trim() || null,
-    days: Math.min(14, Math.max(1, trip.preferredDurationDays ?? 5)),
+    days: getSketchDuration(trip),
     window: `${trip.earliestPossibleDate} to ${trip.latestPossibleDate}`,
     origin: trip.origin,
   };

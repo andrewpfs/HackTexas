@@ -8,12 +8,14 @@ export function Header() {
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3c969] text-[#173f50]" aria-hidden="true">✦</span>
           <span className="text-sm sm:text-base">HackTX Trip Planner</span>
         </Link>
-        <nav className="order-3 flex w-full items-center justify-between gap-1 border-t border-white/10 pt-2 sm:order-2 sm:w-auto sm:gap-2 sm:border-0 sm:pt-0" aria-label="Primary navigation">
+        {/* On phones the main button sits beside the logo so the links below fit on one line. */}
+        <Link className="order-2 whitespace-nowrap rounded-full bg-[#f3c969] px-3 py-2 text-xs font-bold text-[#173f50] transition hover:bg-[#f7d77f] sm:hidden" href="/create">Plan a Trip</Link>
+        <nav className="order-3 flex w-full items-center justify-between gap-1 border-t border-white/10 pt-2 sm:order-3 sm:w-auto sm:gap-2 sm:border-0 sm:pt-0" aria-label="Primary navigation">
           <Link className="nav-link" href="/">Home</Link>
           <Link className="nav-link" href="/join">Join a Trip</Link>
           <Link className="nav-link" href="/my-trips">My Trips</Link>
           <Link className="nav-link" href="/about">About</Link>
-          <Link className="rounded-full bg-[#f3c969] px-4 py-2 text-sm font-bold text-[#173f50] transition hover:bg-[#f7d77f]" href="/create">Plan a Trip</Link>
+          <Link className="hidden whitespace-nowrap rounded-full bg-[#f3c969] px-4 py-2 text-sm font-bold text-[#173f50] transition hover:bg-[#f7d77f] sm:inline-flex" href="/create">Plan a Trip</Link>
         </nav>
       </div>
     </header>

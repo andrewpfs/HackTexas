@@ -98,6 +98,14 @@ function createSupabaseTripStore(client: SupabaseClient): TripStore {
       }
     },
 
+    async delete(tripId) {
+      const { data, error } = await client.from(tableName).delete().eq("id", tripId).select("id");
+      if (error) {
+        fail("delete the trip", error.message);
+      }
+      return (data ?? []).length > 0;
+    },
+
     // Optimistic locking: the write only succeeds if nobody else saved the trip
     // since it was read. On a conflict the trip is re-read and the change retried,
     // so two travelers voting at the same moment never overwrite each other.
