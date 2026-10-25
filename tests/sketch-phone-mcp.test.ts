@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { addAssistantBooking, describeMyBookings, describeMyTrip, findTravelerByToken, hashAssistantToken } from "../src/lib/assistant-connector";
-import { checkCode, createSessionValue, normalizePhone, readSessionValue, sendCode } from "../src/lib/phone-auth";
+import { checkCode, createSessionValue, decryptPhone, encryptPhone, normalizePhone, readSessionValue, sendCode } from "../src/lib/phone-auth";
+import { textTravelers } from "../src/lib/group-texts";
 import { getSketchRequest, parseSketch } from "../src/lib/trip-sketch";
 import type { Trip } from "../src/lib/trip-types";
 
@@ -117,4 +118,51 @@ test("bookings recorded by an assistant replace the earlier record of the same k
   assert.equal(booking.items[0].confirmationCode, "DL7XQ2");
   assert.equal(booking.items[0].source, "assistant");
   assert.equal(booking.total, 1450);
+});
+
+test("phone numbers are stored only encrypted, and sessions carry the encrypted number", () => {
+  const sealed = encryptPhone("+15125550100");
+  assert.equal(sealed.includes("5550100"), false);
+  assert.equal(decryptPhone(sealed), "+15125550100");
+  const [iv, tag, data] = sealed.split(".");
+  const tampered = [iv, `${tag[0] === "A" ? "B" : "A"}${tag.slice(1)}`, data].join(".");
+  assert.equal(decryptPhone(tampered), null);
+  assert.equal(decryptPhone(readSessionValue(createSessionValue("+15125550100"))?.phoneEncrypted), "+15125550100");
+});
+
+test("group texts go to every signed-in traveler except whoever caused the update", async () => {
+  const originalFetch = globalThis.fetch;
+  const saved = { sid: process.env.TWILIO_ACCOUNT_SID, token: process.env.TWILIO_AUTH_TOKEN, from: process.env.TWILIO_FROM_NUMBER };
+  const sent: { to: string; body: string }[] = [];
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const params = new URLSearchParams(String(init.body));
+    sent.push({ to: params.get("To")!, body: params.get("Body")! });
+    return new Response("{}", { status: 201 });
+  }) as typeof fetch;
+  try {
+    const trip = {
+      id: "t", inviteCode: "ABC123", hostName: "Jay", prompt: "", origin: "Austin", earliestPossibleDate: "2026-12-01", latestPossibleDate: "2026-12-05",
+      status: "collecting_preferences", createdAt: "",
+      travelers: [
+        { id: "jay", name: "Jay", isHost: true, preferencesComplete: true, availabilityComplete: true, phoneEncrypted: encryptPhone("+15125550101") },
+        { id: "tin", name: "Tin", isHost: false, preferencesComplete: true, availabilityComplete: true, phoneEncrypted: encryptPhone("+15125550102") },
+        { id: "old", name: "Old", isHost: false, preferencesComplete: true, availabilityComplete: true },
+      ],
+    } as Trip;
+
+    delete process.env.TWILIO_FROM_NUMBER;
+    await textTravelers(trip, "hello", "jay");
+    assert.equal(sent.length, 0);
+
+    process.env.TWILIO_ACCOUNT_SID = "AC_test";
+    process.env.TWILIO_AUTH_TOKEN = "token";
+    process.env.TWILIO_FROM_NUMBER = "+13464604152";
+    await textTravelers(trip, "Vote here", "jay");
+    assert.deepEqual(sent, [{ to: "+15125550102", body: "TravelSync: Vote here" }]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of [["TWILIO_ACCOUNT_SID", saved.sid], ["TWILIO_AUTH_TOKEN", saved.token], ["TWILIO_FROM_NUMBER", saved.from]] as const) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
 });

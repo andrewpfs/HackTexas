@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { summarizeTripsForPhone } from "@/lib/my-trips";
-import { checkCode, createSessionValue, hashPhone, lastFour, normalizePhone, sessionCookieName, sessionMaxAgeSeconds } from "@/lib/phone-auth";
+import { checkCode, createSessionValue, encryptPhone, hashPhone, lastFour, normalizePhone, sessionCookieName, sessionMaxAgeSeconds } from "@/lib/phone-auth";
 import { findTripsByPhone, getTripById, linkTravelerPhone } from "@/lib/trip-repository";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     // while phone verification alone cannot grant a new voting identity.
     const verifiedPhone = { phoneHash, last4: lastFour(phone), expiresAt: Date.now() + 1000 };
     const votingProof = trip ? canActAsTraveler(trip, link.travelerId, proof, verifiedPhone) : false;
-    const linked = await linkTravelerPhone(link.tripId, link.travelerId, phoneHash, lastFour(phone), votingProof);
+    const linked = await linkTravelerPhone(link.tripId, link.travelerId, phoneHash, lastFour(phone), votingProof, encryptPhone(phone));
     if (linked.status === "taken") {
       return NextResponse.json({ error: "This traveler is already saved to a different phone." }, { status: 409 });
     }

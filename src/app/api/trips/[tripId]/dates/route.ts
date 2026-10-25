@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { datesConfirmedText, textTravelers } from "@/lib/group-texts";
 import { confirmedDatesStillShared } from "@/lib/date-suggestions";
 import { isValidISODate } from "@/lib/date-utils";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
@@ -36,5 +37,8 @@ export async function PUT(request: Request, context: RouteContext<"/api/trips/[t
   if (result.status !== "confirmed") {
     return NextResponse.json({ error: "Only the host can confirm the trip dates." }, { status: 403 });
   }
-  return NextResponse.json({ confirmedDates: result.trip?.confirmedDates });
+  const confirmedTrip = result.trip!;
+  const origin = new URL(request.url).origin;
+  after(() => textTravelers(confirmedTrip, datesConfirmedText(confirmedTrip, origin), hostTravelerId));
+  return NextResponse.json({ confirmedDates: confirmedTrip.confirmedDates });
 }

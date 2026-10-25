@@ -86,7 +86,7 @@ export async function getTripByInviteCode(inviteCode: string) {
 }
 
 // The verified phone that is joining. Joining twice with the same phone returns the existing traveler.
-export type JoiningPhone = { phoneHash: string; last4: string };
+export type JoiningPhone = { phoneHash: string; last4: string; phoneEncrypted?: string };
 
 export async function addTravelerToTrip(inviteCode: string, travelerName: string, departureLocation: string, phone?: JoiningPhone) {
   const trip = await getTripByInviteCode(inviteCode);
@@ -98,7 +98,10 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
   const result = await getStore().update<JoinResult>(trip.id, (current) => {
     const existing = phone ? current.travelers.find((traveler) => traveler.phoneHash === phone.phoneHash) : undefined;
     if (existing) {
-      return { save: false, result: { status: "already-joined" as const, tripId: current.id, travelerId: existing.id } };
+      // Older sign-ins had no encrypted number; fill it in so this traveler gets group texts.
+      const addNumber = !existing.phoneEncrypted && Boolean(phone?.phoneEncrypted);
+      if (addNumber) existing.phoneEncrypted = phone?.phoneEncrypted;
+      return { save: addNumber, result: { status: "already-joined" as const, tripId: current.id, travelerId: existing.id } };
     }
     for (const traveler of current.travelers) {
       if (traveler.name.trim().toLowerCase() === normalizedTravelerName) {
@@ -114,7 +117,7 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
       preferencesComplete: false,
       availabilityComplete: false,
       availableDates: [],
-      ...(phone ? { phoneHash: phone.phoneHash, phoneLast4: phone.last4, phoneVotingVerified: true } : {}),
+      ...(phone ? { phoneHash: phone.phoneHash, phoneLast4: phone.last4, phoneEncrypted: phone.phoneEncrypted, phoneVotingVerified: true } : {}),
     };
 
     current.travelers.push(traveler);
@@ -711,7 +714,7 @@ export async function findTripsByAssistantToken(assistantTokenHash: string) {
 }
 
 // Saves a trip to a phone. A traveler already saved to a different phone can't be taken over.
-export async function linkTravelerPhone(tripId: string, travelerId: string, phoneHash: string, last4: string, votingProof = false) {
+export async function linkTravelerPhone(tripId: string, travelerId: string, phoneHash: string, last4: string, votingProof = false, phoneEncrypted?: string) {
   const result = await getStore().update<{ status: "linked" | "taken" | "traveler-not-found" }>(tripId, (trip) => {
     const traveler = trip.travelers.find((item) => item.id === travelerId);
     if (!traveler) return { save: false, result: { status: "traveler-not-found" as const } };
@@ -720,6 +723,7 @@ export async function linkTravelerPhone(tripId: string, travelerId: string, phon
     else if (votingProof) traveler.phoneVotingVerified = true;
     traveler.phoneHash = phoneHash;
     traveler.phoneLast4 = last4;
+    if (phoneEncrypted) traveler.phoneEncrypted = phoneEncrypted;
     return { save: true, result: { status: "linked" as const } };
   });
   return result ?? { status: "traveler-not-found" as const };
@@ -742,6 +746,7 @@ export async function unlinkTravelerPhone(tripId: string, travelerId: string, ph
     if (!traveler || traveler.phoneHash !== phoneHash) return { save: false, result: { status: "not-linked" as const } };
     traveler.phoneHash = undefined;
     traveler.phoneLast4 = undefined;
+    traveler.phoneEncrypted = undefined;
     traveler.phoneVotingVerified = undefined;
     return { save: true, result: { status: "unlinked" as const } };
   });

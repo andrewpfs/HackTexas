@@ -90,6 +90,7 @@ export async function POST(request: Request) {
           availableDates: [],
           phoneHash: session.phoneHash,
           phoneLast4: session.last4,
+          phoneEncrypted: session.phoneEncrypted,
           phoneVotingVerified: true,
         },
       ],

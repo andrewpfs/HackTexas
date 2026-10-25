@@ -1,4 +1,5 @@
-﻿import { NextResponse } from "next/server";
+﻿import { after, NextResponse } from "next/server";
+import { textTravelers, voteOpenedText } from "@/lib/group-texts";
 import { isMockFallbackEnabled, selectItineraryReviser } from "@/lib/candidate-planner-factory";
 import { ChatError, handleItineraryChat } from "@/lib/itinerary-chat";
 import { MockItineraryReviser, validateChatInput } from "@/lib/itinerary-revision";
@@ -23,6 +24,11 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
         }
       },
     });
+    const opened = "proposalOpened" in result && result.proposalOpened ? result.trip.pendingItineraryProposal : undefined;
+    if (opened) {
+      const origin = new URL(request.url).origin;
+      after(() => textTravelers(result.trip, voteOpenedText(result.trip, opened, origin), input.data.travelerId));
+    }
     return NextResponse.json({ itinerary: result.trip.itinerary, messages: result.trip.chat ?? [], changedStops: result.changedStops, proposal: result.trip.pendingItineraryProposal ?? null, approvedProposal: result.trip.lastApprovedItineraryProposal ?? null });
   } catch (error) {
     if (error instanceof ChatError) return NextResponse.json({ error: error.message }, { status: error.status });

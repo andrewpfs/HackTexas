@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { textTravelers, voteDecidedText } from "@/lib/group-texts";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 import { getTripById, voteOnItineraryProposal } from "@/lib/trip-repository";
@@ -21,5 +22,11 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   const result = await voteOnItineraryProposal(tripId, body.proposalId, body.travelerId, body.choice);
   if (!("trip" in result)) return NextResponse.json({ error: "Trip not found." }, { status: 404 });
   if (result.status === "closed" || result.status === "not-allowed") return NextResponse.json({ error: "This proposal is closed. Refresh to see the current plan." }, { status: 409 });
+  // The last vote decides the change; let everyone know how it went.
+  const decided = result.status === "approved" || result.status === "rejected" ? result.trip.pendingItineraryProposal : undefined;
+  if (decided) {
+    const origin = new URL(request.url).origin;
+    after(() => textTravelers(result.trip, voteDecidedText(result.trip, decided, origin)));
+  }
   return NextResponse.json({ itinerary: result.trip.itinerary, messages: result.trip.chat ?? [], proposal: result.trip.pendingItineraryProposal, approvedProposal: result.trip.lastApprovedItineraryProposal ?? null });
 }

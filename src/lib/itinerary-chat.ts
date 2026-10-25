@@ -66,7 +66,8 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
         museMessage.text = "I've prepared a major trip change for the group to review. It has not been applied. Everyone who joined votes with the Approve or Reject buttons on the proposal card, and a majority must approve.";
         museMessage.changes = result.changes;
         const saved = await dependencies.saveItineraryProposal(tripId, proposal, museMessage);
-        if (saved.status === "saved" || saved.status === "already-open") return { trip: saved.trip, changedStops: [] };
+        if (saved.status === "saved") return { trip: saved.trip, changedStops: [], proposalOpened: true };
+        if (saved.status === "already-open") return { trip: saved.trip, changedStops: [] };
       } else {
         museMessage.changes = result.changes;
         const saved = await dependencies.saveItineraryRevision(tripId, itinerary.id, itinerary.revision ?? 0, days, museMessage);

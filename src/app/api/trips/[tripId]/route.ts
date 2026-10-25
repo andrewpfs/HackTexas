@@ -57,7 +57,7 @@ export async function PUT(
     // Never send phone or assistant-token hashes to the browser.
     const publicTrip = {
       ...result.trip,
-      travelers: result.trip.travelers.map((traveler) => ({ ...traveler, phoneHash: undefined, assistantTokenHash: undefined })),
+      travelers: result.trip.travelers.map((traveler) => ({ ...traveler, phoneHash: undefined, phoneEncrypted: undefined, assistantTokenHash: undefined })),
     };
     return NextResponse.json({
       trip: publicTrip,

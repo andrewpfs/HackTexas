@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       validationResult.data.inviteCode,
       validationResult.data.travelerName,
       validationResult.data.departureLocation,
-      { phoneHash: session.phoneHash, last4: session.last4 },
+      { phoneHash: session.phoneHash, last4: session.last4, phoneEncrypted: session.phoneEncrypted },
     );
 
     if (result.status === "not-found") {

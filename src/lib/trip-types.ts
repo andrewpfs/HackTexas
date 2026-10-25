@@ -73,6 +73,8 @@ export type Traveler = {
   avatar?: AvatarLook;
   // Set when the traveler saved this trip to their phone: a keyed hash, never the number itself.
   phoneHash?: string;
+  // The real number, encrypted on the server, used only for group update texts.
+  phoneEncrypted?: string;
   phoneLast4?: string;
   // False when an older unsigned identity first saves a phone. Saving/restoring
   // still works, but cannot create proof for a major-change vote by itself.

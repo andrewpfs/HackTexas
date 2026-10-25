@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { optionsReadyText, textTravelers } from "@/lib/group-texts";
 import { generateCandidateOptionsForTrip } from "@/lib/candidate-generation";
 import { validateCandidateOptions } from "@/lib/candidate-validation";
 import {
@@ -12,7 +13,7 @@ import { getTripById, saveCandidateOptions } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: RouteContext<"/api/trips/[tripId]/candidates/generate">,
 ) {
   const { tripId } = await context.params;
@@ -88,6 +89,8 @@ export async function POST(
     if (saveResult.status === "trip-not-found") {
       return NextResponse.json({ error: "Trip not found." }, { status: 404 });
     }
+    const origin = new URL(request.url).origin;
+    after(() => textTravelers(saveResult.trip, optionsReadyText(saveResult.trip, origin)));
 
     return NextResponse.json(
       {
