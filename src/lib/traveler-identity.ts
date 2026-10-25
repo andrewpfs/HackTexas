@@ -12,6 +12,14 @@ export function rememberTravelerId(tripId: string, travelerId: string) {
   }
 }
 
+export function forgetTravelerId(tripId: string) {
+  try {
+    window.localStorage.removeItem(getTravelerIdentityKey(tripId));
+  } catch {
+    // Nothing to forget if browser storage is unavailable.
+  }
+}
+
 export function getRememberedTravelerId(tripId: string) {
   try {
     return window.localStorage.getItem(getTravelerIdentityKey(tripId));

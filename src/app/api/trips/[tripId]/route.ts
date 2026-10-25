@@ -1,5 +1,8 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { getTripById, updateTripDetails } from "@/lib/trip-repository";
+import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
+import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
+import { deleteTrip, getTripById, updateTripDetails } from "@/lib/trip-repository";
 import { validateUpdateTripInput } from "@/lib/trip-validation";
 
 export async function PUT(
@@ -67,4 +70,38 @@ export async function PUT(
       { status: 500 },
     );
   }
+}
+
+// Deletes the trip for everyone. Only the host, proven by this browser's
+// traveler cookie or their signed-in phone, can do it.
+export async function DELETE(
+  request: Request,
+  context: RouteContext<"/api/trips/[tripId]">,
+) {
+  const { tripId } = await context.params;
+  const trip = await getTripById(tripId);
+  if (!trip) {
+    return NextResponse.json({ error: "We couldn't find that trip." }, { status: 404 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as { hostTravelerId?: unknown };
+  const hostTravelerId = typeof body.hostTravelerId === "string" ? body.hostTravelerId : "";
+  const host = trip.travelers.find((traveler) => traveler.id === hostTravelerId);
+  const cookieStore = await cookies();
+  const session = readSessionValue(cookieStore.get(sessionCookieName)?.value);
+  const proof = cookieStore.get(travelerCookieName(tripId))?.value;
+  if (!host?.isHost || !canActAsTraveler(trip, host.id, proof, session)) {
+    return NextResponse.json({ error: "Only the host can delete this trip." }, { status: 403 });
+  }
+
+  try {
+    await deleteTrip(tripId);
+  } catch (error) {
+    console.error("Failed to delete trip:", error);
+    return NextResponse.json({ error: "We could not delete the trip. Please try again." }, { status: 500 });
+  }
+
+  const response = NextResponse.json({ deleted: true });
+  response.cookies.delete(travelerCookieName(tripId));
+  return response;
 }

@@ -59,6 +59,11 @@ export async function saveTrip(trip: Trip) {
   await getStore().insert(trip);
 }
 
+// Removes the whole trip for everyone. Callers must check that the requester is the host.
+export async function deleteTrip(tripId: string) {
+  return getStore().delete(tripId);
+}
+
 export async function getTripById(tripId: string) {
   if (tripId.trim() === "") {
     return null;
@@ -720,4 +725,17 @@ export async function setAssistantToken(tripId: string, travelerId: string, toke
     return { save: true, result: { status: "saved" as const } };
   });
   return result ?? { status: "traveler-not-found" as const };
+}
+
+// Takes a trip off a phone's "My Trips" list. The traveler stays in the trip.
+export async function unlinkTravelerPhone(tripId: string, travelerId: string, phoneHash: string) {
+  const result = await getStore().update<{ status: "unlinked" | "not-linked" }>(tripId, (trip) => {
+    const traveler = trip.travelers.find((item) => item.id === travelerId);
+    if (!traveler || traveler.phoneHash !== phoneHash) return { save: false, result: { status: "not-linked" as const } };
+    traveler.phoneHash = undefined;
+    traveler.phoneLast4 = undefined;
+    traveler.phoneVotingVerified = undefined;
+    return { save: true, result: { status: "unlinked" as const } };
+  });
+  return result ?? { status: "not-linked" as const };
 }

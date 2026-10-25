@@ -310,7 +310,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
               </ul>
               <p className="mt-4 text-right text-lg font-extrabold text-[#173f50]">You Paid {money(myBooking.total)} {myBooking.items.every((item) => item.source !== "assistant") ? "(Simulated)" : "(Recorded)"}</p>
               {owedCopy ? <p className="mt-3 rounded-2xl bg-[#fff8dc] p-4 font-bold text-[#6f5a16]">{owedCopy} This is separate from the amount above.</p> : null}
-              <EmailConfirmation booking={myBooking} hotelShare={owedShare} tripName={props.tripName} />
+              <EmailConfirmation booking={myBooking} tripId={props.tripId} travelerId={me.id} hotelShare={owedShare} tripName={props.tripName} />
               <p className="mt-2 text-xs text-[#879196]">
                 {myBooking.items.some((item) => item.source === "assistant")
                   ? "Items marked “By your assistant” were recorded by your connected assistant. Demo items were not reserved and no card was charged."

@@ -14,6 +14,7 @@ export interface TripStore {
   insert(trip: Trip): Promise<void>;
   update<Result>(tripId: string, mutate: TripMutation<Result>): Promise<Result | null>;
   findByTraveler(match: { phoneHash?: string; assistantTokenHash?: string }): Promise<Trip[]>;
+  delete(tripId: string): Promise<boolean>;
 }
 
 const dataDirectory = path.join(process.cwd(), "data");
@@ -78,6 +79,18 @@ export const jsonTripStore: TripStore = {
         (match.assistantTokenHash !== undefined && traveler.assistantTokenHash === match.assistantTokenHash),
       ),
     );
+  },
+
+  async delete(tripId) {
+    return withWriteLock(async () => {
+      const trips = await readTrips();
+      const remaining = trips.filter((trip) => trip.id !== tripId);
+      if (remaining.length === trips.length) {
+        return false;
+      }
+      await writeTrips(remaining);
+      return true;
+    });
   },
 
   async update(tripId, mutate) {
