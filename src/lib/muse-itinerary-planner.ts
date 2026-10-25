@@ -32,10 +32,11 @@ const itinerarySchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["dayNumber", "date", "title", "activities"],
+        required: ["dayNumber", "date", "title", "city", "activities"],
         properties: {
           dayNumber: { type: "integer" },
           date: stringSchema,
+          city: stringSchema,
           title: stringSchema,
           activities: {
             type: "array",
@@ -68,6 +69,7 @@ const systemPrompt = [
   "- Explain the major compromises in compromiseExplanation (2-4 sentences) and list each concrete change in compromises, naming whose concern it addresses.",
   "- Use only dates in planning.groupAvailability.sharedDates. Keep startDate..endDate consecutive shared dates, normally the chosen option's dates.",
   "- Include one entry in days for every date from startDate to endDate.",
+  "- Set city on every day to the city where the group sleeps that night (for example \"Paris, France\"). On a multi-city trip the city changes on travel days, so the app can book a hotel in each city. The last day uses the city they leave from.",
   "- Use a flexible realistic schedule with chronological clock times, specific locations and short descriptions. Mix a few main activities with meals, transit, check-in/out, rest, free time, wandering and buffers. Avoid impossible back-to-back travel or major attractions every hour; do not force 3-5 attractions into each day.",
   "- Respect each traveler's departure city and the group's budgets. The lowest maximum budget is the binding constraint.",
   "- planning.trip.tripStyle, when present, says how the group wants to travel (for example backpacking across a region). Keep the chosen option's multi-stop route: give each city its own days, include the train, bus or flight legs between stops as Travel activities, and set placeSearchQuery for each stop in the right city.",

@@ -18,6 +18,7 @@ import { getSketchBasis, isGroupInputComplete, sketchNeedsRedraw } from "@/lib/t
 import { getTripFeasibility } from "@/lib/trip-feasibility";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { ConfirmDatesCard } from "./confirm-dates-card";
+import { tripDestinationLabel } from "@/lib/trip-destination";
 import { estimateGroupFlightTimes } from "@/lib/flight-time";
 import { getTravelerDepartureLocation } from "@/lib/planning-context";
 
@@ -71,7 +72,8 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
     notFound();
   }
 
-  const displayName = trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip");
+  const destinationLabel = tripDestinationLabel(trip);
+  const displayName = trip.name || (destinationLabel ? `${destinationLabel} Trip` : "Group Trip");
   const travelWindow = `${formatCalendarDate(trip.earliestPossibleDate)} – ${formatCalendarDate(trip.latestPossibleDate)}`;
   const travelerCount = trip.expectedTravelerCount
     ? `${trip.travelers.length} traveler(s) joined · ${trip.expectedTravelerCount} expected`
@@ -157,7 +159,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 </div>
                 <div className="min-w-0 text-right">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#879196]">To</p>
-                  <p className="mt-1 break-words text-lg font-bold leading-tight text-[#173f50] sm:truncate sm:text-xl">{trip.destination || "To be decided"}</p>
+                  <p className="mt-1 break-words text-lg font-bold leading-tight text-[#173f50] sm:truncate sm:text-xl">{destinationLabel || "To be decided"}</p>
                 </div>
               </div>
               <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t-2 border-dashed border-[#173f50]/15 pt-5 text-sm sm:grid-cols-4">

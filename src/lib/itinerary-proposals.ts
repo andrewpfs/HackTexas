@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { carryOverPlaces, makeChatMessage, validateRevisedDays, type RevisionResult } from "./itinerary-revision";
-import type { GroupItinerary, ItineraryDay, ItineraryProposal, Trip } from "./trip-types";
+import type { GroupItinerary, ItineraryDay, ItineraryProposal, PersonalOverride, Trip } from "./trip-types";
 
 export function destinationChanged(before: string, after: string) {
   return before.trim().toLowerCase() !== after.trim().toLowerCase();
@@ -29,6 +29,32 @@ export function isMajorRevision(itinerary: GroupItinerary, result: RevisionResul
     if (size > 0 && retained <= size / 2) rewrittenDays += 1;
   }
   return rewrittenDays >= 2 || wholeTripReplaced;
+}
+
+// When the group rejects a small change (same city, at most 3 stops), the person who
+// asked still gets it as their own plan for those stops. Bigger changes just stay rejected.
+export const maximumPersonalStopsFromRejection = 3;
+
+export function personalPlansFromProposal(itinerary: GroupItinerary, proposal: ItineraryProposal): PersonalOverride[] {
+  if (destinationChanged(itinerary.destination, proposal.proposedDestination)) return [];
+  const plans: PersonalOverride[] = [];
+  for (const newDay of proposal.proposedDays) {
+    const oldDay = itinerary.days.find((day) => day.dayNumber === newDay.dayNumber);
+    if (!oldDay) return [];
+    const count = Math.min(oldDay.activities.length, newDay.activities.length);
+    for (let index = 0; index < count; index += 1) {
+      const before = oldDay.activities[index];
+      const after = newDay.activities[index];
+      if (stopSignature(before) === stopSignature(after) || before.time === "") continue;
+      plans.push({
+        id: randomUUID(), travelerId: proposal.requestedByTravelerId,
+        dayNumber: oldDay.dayNumber, stopTime: before.time, stopTitle: before.title,
+        title: after.title.slice(0, 120), location: after.location.slice(0, 160), note: after.description.slice(0, 300),
+        joinedBy: [], createdAt: new Date().toISOString(),
+      });
+    }
+  }
+  return plans.length <= maximumPersonalStopsFromRejection ? plans : [];
 }
 
 export function createItineraryProposal(trip: Trip, travelerId: string, result: RevisionResult): ItineraryProposal {
@@ -70,7 +96,16 @@ export function applyProposalVote(trip: Trip, proposalId: string, travelerId: st
     else rejections += 1;
   }
   if (approvals <= rejections) {
-    finishProposal(trip, proposal, "rejected", "The group voted to keep the existing plan. The major change was rejected.");
+    const itinerary = trip.itinerary!;
+    const personal = personalPlansFromProposal(itinerary, proposal);
+    if (personal.length > 0) {
+      const replaced = (plan: PersonalOverride) => personal.some((item) => item.travelerId === plan.travelerId && item.dayNumber === plan.dayNumber && item.stopTime === plan.stopTime && item.stopTitle === plan.stopTitle);
+      itinerary.overrides = [...(itinerary.overrides ?? []).filter((plan) => !replaced(plan)), ...personal];
+      const list = personal.map((plan) => `Day ${plan.dayNumber}: ${plan.title} instead of ${plan.stopTitle}`).join("; ");
+      finishProposal(trip, proposal, "rejected", `The group kept the shared plan. ${proposal.requestedByName} can still do it: it's now their personal plan (${list}). Anyone can join it.`);
+    } else {
+      finishProposal(trip, proposal, "rejected", "The group voted to keep the existing plan, so the change was not applied.");
+    }
     return "rejected";
   }
 

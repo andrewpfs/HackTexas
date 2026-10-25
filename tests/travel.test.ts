@@ -120,3 +120,43 @@ test("Muse can give one traveler a personal plan instead of changing the group's
   const none = parseMuseRevision({ reply: "Sure.", changed: false, changes: [], days: [], personal: { applies: false, dayNumber: 0, stopTitle: "", title: "", location: "", description: "" } });
   assert.equal(none.personal, null);
 });
+
+test("a multi-city trip gets one hotel stay per city, and solo lodgers book their own", async () => {
+  const { planStays, getHotelStays } = await import("../src/lib/hotel-stays");
+  const trip = makeTrip();
+  trip.itinerary!.endDate = "2026-12-23";
+  trip.itinerary!.days = [
+    { dayNumber: 1, date: "2026-12-17", title: "Paris", city: "Paris, France", activities: [] },
+    { dayNumber: 2, date: "2026-12-18", title: "Paris", city: "Paris, France", activities: [] },
+    { dayNumber: 3, date: "2026-12-19", title: "Train", city: "Berlin, Germany", activities: [] },
+    { dayNumber: 4, date: "2026-12-20", title: "Berlin", city: "Berlin, Germany", activities: [] },
+    { dayNumber: 5, date: "2026-12-21", title: "Prague", city: "Prague, Czechia", activities: [] },
+    { dayNumber: 6, date: "2026-12-22", title: "Prague", city: "Prague, Czechia", activities: [] },
+    { dayNumber: 7, date: "2026-12-23", title: "Home", city: "Prague, Czechia", activities: [] },
+  ];
+  assert.deepEqual(planStays(trip.itinerary!), [
+    { city: "Paris, France", checkIn: "2026-12-17", checkOut: "2026-12-19" },
+    { city: "Berlin, Germany", checkIn: "2026-12-19", checkOut: "2026-12-21" },
+    { city: "Prague, Czechia", checkIn: "2026-12-21", checkOut: "2026-12-24" },
+  ]);
+  assert.equal(getHotelSearchInputs(trip, 1)?.destination, "Berlin, Germany");
+
+  // Henry prefers his own place: he isn't a group guest and must pick his own hotel per city.
+  trip.travelers[1].preferences!.groupLodgingPreference = "Prefer separate lodging";
+  assert.equal(getHotelSearchInputs(trip, 0)?.adults, 1);
+  const option = { token: "h", name: "Hotel", kind: "hotel", pricePerNight: 100, totalPrice: null, rating: null, reviewCount: null, hotelClass: null, thumbnail: null, amenities: [], link: "https://x" };
+  trip.travel = { hotelStays: planStays(trip.itinerary!).map((stay) => ({ ...stay, status: "done" as const, options: [option], selectedToken: "h", selectedByTravelerId: "jay" })) };
+  const blocked = buildBooking(trip, "henry");
+  assert.ok("error" in blocked && /Pick your own hotel/.test(blocked.error));
+  trip.travel.hotelStays = trip.travel.hotelStays!.map((stay) => ({ ...stay, soloPicks: { henry: "h" } }));
+  const henry = buildBooking(trip, "henry");
+  assert.ok("booking" in henry && henry.booking.items.length === 3 && henry.booking.total === 700);
+  assert.equal(getHotelStays(trip).length, 3);
+});
+
+test("travelers sharing the group hotel can't confirm until the host picks every city", () => {
+  const trip = makeTrip();
+  trip.travel = { hotelStays: [{ city: "Tokyo", checkIn: "2026-12-17", checkOut: "2026-12-20", status: "done", options: [] }] };
+  const result = buildBooking(trip, "henry");
+  assert.ok("error" in result && /host to pick the group hotel in Tokyo/.test(result.error));
+});

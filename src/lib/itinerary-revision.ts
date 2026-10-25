@@ -32,6 +32,8 @@ export type RevisionResult = {
   personal?: PersonalPlan | null;
   // The complete revised days, or null when the plan stays as it is.
   days: ItineraryDay[] | null;
+  // Set when the traveler asked for other options for one stop (like another restaurant).
+  alternatives?: { dayNumber: number; stopTitle: string; searchQuery: string } | null;
 };
 
 export function mentionsMuse(text: string) {

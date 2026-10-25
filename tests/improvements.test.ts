@@ -12,6 +12,7 @@ import { activityEmoji, groupCandidateDays } from "../src/lib/candidate-display"
 import { estimateTravel } from "../src/lib/travel-time";
 import { bookingConfirmationText, flightHighlights, hotelShareForTraveler } from "../src/lib/travel-display";
 import { buildBooking } from "../src/lib/travel-planning";
+import { getHotelStays } from "../src/lib/hotel-stays";
 import { addImagesToCandidateDays } from "../src/lib/place-images";
 import { canActAsTraveler, createTravelerProof } from "../src/lib/trip-browser-identity";
 import type { CandidateDay, FlightOption, Trip } from "../src/lib/trip-types";
@@ -118,16 +119,26 @@ test("chat, proposals and repository writes remain safe without provider calls",
       assert.match(texts[1], /previous answer was rejected/);
       assert.equal(response.trip.pendingItineraryProposal?.status, "pending");
     });
-    await suite.test("minor shared revisions apply and personal overrides still work", async () => {
+    await suite.test("even small Muse changes go to a vote, and a rejected one becomes the requester's personal plan", async () => {
       const trip = await savedTrip();
       const days = structuredClone(trip.itinerary!.days);
-      days[0].activities[0].title = "Forest walk";
-      const minor = await ask(trip, "@muse swap one stop", { kind: "shared_minor", reply: "Changed the morning walk.", changes: ["Garden to forest"], days });
-      assert.equal(minor.trip.itinerary?.revision, 1);
-      assert.equal(minor.trip.itinerary?.days[0].activities[0].title, "Forest walk");
-      assert.equal(minor.trip.pendingItineraryProposal, undefined);
-      const personal = await ask(minor.trip, "@muse I will skip lunch", { kind: "personal", reply: "A personal coffee break.", changes: [], days: null, personal: { dayNumber: 1, stopTitle: "Lunch", title: "Coffee", location: "Nearby", note: "Meet back later" } });
-      assert.equal(personal.trip.itinerary?.overrides?.[0].title, "Coffee");
+      const oldStop = days[0].activities[0];
+      days[0].activities[0] = { ...oldStop, title: "Forest walk", location: "Meiji Jingu" };
+      const minor = await ask(trip, "@muse swap one stop", { kind: "shared_minor", reply: "Proposing a forest walk.", changes: ["Garden to forest"], days });
+      assert.equal(minor.trip.pendingItineraryProposal?.status, "pending");
+      assert.equal(minor.trip.itinerary?.days[0].activities[0].title, oldStop.title);
+      for (const name of ["Jay", "Tin", "Ryan"]) await vote(minor.trip, name, name === "Jay" ? "approve" : "reject");
+      const after = await repository.getTripById(trip.id);
+      assert.equal(after?.pendingItineraryProposal?.status, "rejected");
+      assert.equal(after?.itinerary?.days[0].activities[0].title, oldStop.title);
+      const plan = after?.itinerary?.overrides?.[0];
+      assert.equal(plan?.travelerId, "Jay");
+      assert.equal(plan?.title, "Forest walk");
+      assert.equal(plan?.stopTitle, oldStop.title);
+      assert.match(after?.chat?.at(-1)?.text ?? "", /personal plan/);
+
+      const personal = await ask(after!, "@muse I will skip lunch", { kind: "personal", reply: "A personal coffee break.", changes: [], days: null, personal: { dayNumber: 1, stopTitle: "Lunch", title: "Coffee", location: "Nearby", note: "Meet back later" } });
+      assert.ok(personal.trip.itinerary?.overrides?.some((item) => item.title === "Coffee"));
       assert.equal(personal.trip.itinerary?.days[0].activities[1].title, "Lunch");
     });
     await suite.test("destination changes are proposals even when Muse labels them minor", async () => {
@@ -136,7 +147,7 @@ test("chat, proposals and repository writes remain safe without provider calls",
       assert.equal(trip.destination, "Tokyo");
       assert.equal(trip.itinerary?.destination, "Tokyo");
       assert.equal(trip.name, "Tokyo Winter");
-      assert.ok(trip.chat?.at(-1)?.text.includes("not been applied"));
+      assert.match(trip.chat?.at(-1)?.text ?? "", /group vote/);
       const again = await ask(trip, "@muse another change", majorResult(trip));
       assert.equal(again.calls, 0);
       assert.equal(again.trip.pendingItineraryProposal?.id, trip.pendingItineraryProposal?.id);
@@ -222,13 +233,14 @@ test("chat, proposals and repository writes remain safe without provider calls",
     });
     await suite.test("old hotel and flight responses cannot refill searches after an approved move", async () => {
       const original = await savedTrip();
-      const oldHotels = await repository.claimHotelSearch(original.id, "2026-12-17", "2026-12-19", true);
+      const oldHotels = await repository.claimHotelSearch(original.id, 0, true);
       const oldFlights = await repository.claimFlightSearch(original.id, "Jay", "Austin");
       assert.equal(oldHotels.status, "claimed"); assert.equal(oldFlights.status, "claimed");
       if (oldHotels.status !== "claimed" || oldFlights.status !== "claimed") return;
       const proposed = (await ask(original, "@muse move", majorResult(original))).trip;
       await vote(proposed, "Jay", "approve"); await vote(proposed, "Tin", "approve"); await vote(proposed, "Ryan", "approve");
-      await repository.finishHotelSearch(original.id, { status: "done", options: original.travel!.hotels!.options }, oldHotels.trip.travel?.hotels?.startedAt);
+      const oldStay = getHotelStays(oldHotels.trip)[0];
+      await repository.finishHotelSearch(original.id, oldStay.plan, { status: "done", options: original.travel!.hotels!.options }, oldStay.result?.startedAt);
       await repository.finishFlightSearch(original.id, "Jay", { status: "done", options: [] }, oldFlights.trip.travel?.flights?.Jay.startedAt);
       assert.equal((await repository.getTripById(original.id))?.travel, undefined);
       assert.equal((await repository.saveBooking(original.id, { travelerId: "Jay", total: 900, items: [], bookedAt: "now" }, { id: "itinerary", revision: 0 })).status, "stale");

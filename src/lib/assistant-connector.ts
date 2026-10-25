@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHmac, randomBytes } from "node:crypto";
-import { getNights } from "./travel-planning";
+import { getHotelStays, groupLodgers, isSoloLodger, selectedGroupHotel, stayNights } from "./hotel-stays";
 import type { Booking, BookingItem, Trip } from "./trip-types";
 
 function secret() {
@@ -60,12 +60,21 @@ export function describeMyTrip(trip: Trip, travelerId: string) {
 export function describeMyBookings(trip: Trip, travelerId: string) {
   const flights = trip.travel?.flights?.[travelerId];
   const flight = flights?.options.find((option) => option.id === flights.selectedId);
-  const hotels = trip.travel?.hotels;
-  const hotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
-  const booker = trip.travelers.find((traveler) => traveler.id === hotels?.selectedByTravelerId);
-  const lodgingCount = Math.max(1, trip.travelers.filter((traveler) => traveler.preferences?.lodgingType !== "No need").length);
-  const nights = hotels ? getNights(hotels.checkIn, hotels.checkOut) : 0;
-  const hotelTotal = hotel ? hotel.totalPrice ?? (hotel.pricePerNight ?? 0) * nights : null;
+  // One hotel per city the group sleeps in; solo lodgers have their own pick.
+  const me = trip.travelers.find((traveler) => traveler.id === travelerId);
+  const solo = me ? isSoloLodger(me) : false;
+  const lodgingCount = Math.max(1, groupLodgers(trip).length);
+  const stays = getHotelStays(trip).map(({ plan, result }) => {
+    const hotel = solo ? result?.options.find((option) => option.token === result.soloPicks?.[travelerId]) : selectedGroupHotel(result);
+    const nights = stayNights(plan);
+    const totalUsd = hotel ? hotel.totalPrice ?? (hotel.pricePerNight ?? 0) * nights : null;
+    return {
+      city: plan.city, checkIn: plan.checkIn, checkOut: plan.checkOut, nights,
+      chosen: hotel ? { name: hotel.name, totalUsd, yourShareUsd: totalUsd !== null ? Math.round(solo ? totalUsd : totalUsd / lodgingCount) : null } : null,
+      youBookThis: Boolean(hotel && (solo || result?.selectedByTravelerId === travelerId)),
+      bookedBy: solo ? "you" : trip.travelers.find((traveler) => traveler.id === result?.selectedByTravelerId)?.name ?? null,
+    };
+  });
   const booking = trip.travel?.bookings?.[travelerId];
   const bookedKinds = new Set(booking?.items.map((item) => item.kind));
 
@@ -80,10 +89,9 @@ export function describeMyBookings(trip: Trip, travelerId: string) {
       },
       {
         item: "hotel",
-        status: bookedKinds.has("hotel") ? "booked" : hotel ? "chosen by the group, not booked" : "not chosen yet",
-        chosen: hotel ? { name: hotel.name, checkIn: hotels!.checkIn, checkOut: hotels!.checkOut, nights, totalUsd: hotelTotal, yourShareUsd: hotelTotal !== null ? Math.round(hotelTotal / lodgingCount) : null } : null,
-        youBookThis: Boolean(hotel && hotels?.selectedByTravelerId === travelerId),
-        bookedBy: booker?.name ?? null,
+        status: bookedKinds.has("hotel") ? "booked" : stays.every((stay) => stay.chosen) ? "chosen, not booked" : "not chosen for every city yet",
+        stays,
+        bookingOwnPlace: solo,
       },
     ],
     confirmations: booking?.items.map((item) => ({ item: item.kind, code: item.confirmationCode, amountUsd: item.amount, source: item.source ?? "demo" })) ?? [],
@@ -104,20 +112,19 @@ export function describeBookingDetails(trip: Trip, travelerId: string, item: "fl
     };
   }
 
-  const hotels = trip.travel?.hotels;
-  const hotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
-  if (!hotel || !hotels) return { error: "The group hasn't picked a hotel yet." };
-  return {
-    name: hotel.name,
-    checkIn: hotels.checkIn,
-    checkOut: hotels.checkOut,
-    guests: Math.max(1, trip.travelers.filter((traveler) => traveler.preferences?.lodgingType !== "No need").length),
-    pricePerNightUsd: hotel.pricePerNight,
-    totalUsd: hotel.totalPrice,
-    rating: hotel.rating,
-    link: hotel.link,
-    youBookThis: hotels.selectedByTravelerId === travelerId,
-  };
+  const me = trip.travelers.find((traveler) => traveler.id === travelerId);
+  const solo = me ? isSoloLodger(me) : false;
+  const stays = getHotelStays(trip).map(({ plan, result }) => {
+    const hotel = solo ? result?.options.find((option) => option.token === result.soloPicks?.[travelerId]) : selectedGroupHotel(result);
+    return hotel ? {
+      city: plan.city, name: hotel.name, checkIn: plan.checkIn, checkOut: plan.checkOut,
+      guests: solo ? 1 : Math.max(1, groupLodgers(trip).length),
+      pricePerNightUsd: hotel.pricePerNight, totalUsd: hotel.totalPrice, rating: hotel.rating, link: hotel.link,
+      youBookThis: solo || result?.selectedByTravelerId === travelerId,
+    } : { city: plan.city, checkIn: plan.checkIn, checkOut: plan.checkOut, error: "No hotel picked for this city yet." };
+  });
+  if (stays.length === 0 || stays.every((stay) => "error" in stay)) return { error: "The group hasn't picked a hotel yet." };
+  return { stays };
 }
 
 // Records a booking the traveler's own assistant made. Replaces any earlier record of the same kind.

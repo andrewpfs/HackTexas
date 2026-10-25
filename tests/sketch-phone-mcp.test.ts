@@ -105,9 +105,10 @@ test("an assistant token reaches only its own traveler's view", () => {
 
   const bookings = describeMyBookings(trip, "jay");
   const hotel = bookings.items.find((item) => item.item === "hotel")!;
-  assert.equal(hotel.youBookThis, false);
-  assert.equal(hotel.bookedBy, "Henry");
-  assert.equal(hotel.chosen?.yourShareUsd, 100);
+  const stay = hotel.stays![0];
+  assert.equal(stay.youBookThis, false);
+  assert.equal(stay.bookedBy, "Henry");
+  assert.equal(stay.chosen?.yourShareUsd, 100);
 });
 
 test("bookings recorded by an assistant replace the earlier record of the same kind", () => {
@@ -166,3 +167,4 @@ test("group texts go to every signed-in traveler except whoever caused the updat
     }
   }
 });
+

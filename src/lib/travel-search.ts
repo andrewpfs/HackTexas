@@ -47,6 +47,8 @@ export type HotelSearch = {
   adults: number;
   // 2-5 stars, from the group's $ to $$$$ price level.
   hotelClass?: number;
+  // Google Hotels sort: 3 = lowest price, 8 = highest rating. Omitted = relevance.
+  sortBy?: "3" | "8";
 };
 
 export async function searchHotels(config: TravelSearchConfig, search: HotelSearch): Promise<HotelOption[]> {
@@ -63,6 +65,9 @@ export async function searchHotels(config: TravelSearchConfig, search: HotelSear
   };
   if (search.hotelClass) {
     params.hotel_class = String(search.hotelClass);
+  }
+  if (search.sortBy) {
+    params.sort_by = search.sortBy;
   }
 
   const body = await serpGet(config, params);

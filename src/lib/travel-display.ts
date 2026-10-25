@@ -1,5 +1,6 @@
 import type { Booking, FlightOption, Trip } from "./trip-types";
 import { hotelPriceTotal } from "./hotel-display";
+import { getHotelStays, groupLodgers, selectedGroupHotel, stayNights } from "./hotel-stays";
 
 export function flightHighlights(options: FlightOption[]) {
   let cheapest: number | null = null;
@@ -11,21 +12,26 @@ export function flightHighlights(options: FlightOption[]) {
   return { cheapest, shortest };
 }
 
+// What a traveler sharing the group hotel owes whoever booked it, summed over every stay.
 export function hotelShareForTraveler(trip: Trip, travelerId: string) {
   const traveler = trip.travelers.find((item) => item.id === travelerId);
-  const hotels = trip.travel?.hotels;
-  const hotel = hotels?.options.find((item) => item.token === hotels.selectedToken);
-  if (!traveler || traveler.preferences?.lodgingType === "No need" || !hotel || !hotels || hotels.selectedByTravelerId === travelerId) return undefined;
-  const booker = trip.travelers.find((item) => item.id === hotels.selectedByTravelerId);
-  if (!booker) return undefined;
-  let count = 0;
-  for (const member of trip.travelers) {
-    if (member.preferences?.lodgingType !== "No need") count += 1;
+  if (!traveler || !groupLodgers(trip).some((item) => item.id === travelerId)) return undefined;
+  const count = Math.max(1, groupLodgers(trip).length);
+  let amount = 0;
+  const names: string[] = [];
+  let booker: Trip["travelers"][number] | undefined;
+  for (const { plan, result } of getHotelStays(trip)) {
+    const hotel = selectedGroupHotel(result);
+    if (!hotel || !result || result.selectedByTravelerId === travelerId) continue;
+    const total = hotelPriceTotal(hotel, stayNights(plan));
+    const stayBooker = trip.travelers.find((item) => item.id === result.selectedByTravelerId);
+    if (total === null || !stayBooker) continue;
+    booker = stayBooker;
+    amount += total / count;
+    names.push(hotel.name);
   }
-  const nights = Math.max(1, Math.round((Date.parse(hotels.checkOut) - Date.parse(hotels.checkIn)) / 86400000));
-  const total = hotelPriceTotal(hotel, nights);
-  if (total === null) return undefined;
-  return { bookerName: booker.name, hotelName: hotel.name, amount: total / Math.max(1, count), confirmationCode: trip.travel?.bookings?.[booker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode };
+  if (!booker || names.length === 0) return undefined;
+  return { bookerName: booker.name, hotelName: names.join(" + "), amount, confirmationCode: trip.travel?.bookings?.[booker.id]?.items.find((item) => item.kind === "hotel")?.confirmationCode };
 }
 
 export function bookingConfirmationText(tripName: string, booking: Booking, hotelShare = booking.hotelShare) {

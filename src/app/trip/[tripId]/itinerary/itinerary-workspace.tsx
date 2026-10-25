@@ -7,6 +7,7 @@ import { ManualStopEditor } from "./manual-stop-editor";
 import { PlaceAutocomplete } from "./place-autocomplete";
 import { useRouter } from "next/navigation";
 import { ProposalCard, type ChatState } from "./proposal-card";
+import { PlaceOptions } from "./place-options";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { getChangedStopKeys, getStopKey, needsPlaceLookup } from "@/lib/itinerary-diff";
@@ -83,6 +84,8 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [legKey, setLegKey] = useState<string | null>(null);
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
   const [view, setView] = useState<"group" | "mine">("group");
+  // Whose plan "mine" shows: your own by default, or another traveler's to compare.
+  const [planOwnerId, setPlanOwnerId] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ dayNumber: number; stopIndex: number } | null>(null);
   const [planDraft, setPlanDraft] = useState({ title: "", location: "", note: "" });
   const [planPlace, setPlanPlace] = useState<PlaceSuggestion | null>(null);
@@ -222,8 +225,12 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const overridesFor = (dayNumber: number, stop: ItineraryActivity) =>
     (itinerary.overrides ?? []).filter((item) => item.dayNumber === dayNumber && item.stopTime === stop.time && item.stopTitle === stop.title);
   // The plan this traveler follows instead of a group stop: their own, or one they joined.
+  const ownerId = planOwnerId ?? travelerId;
+  const viewingSomeoneElse = ownerId !== null && ownerId !== travelerId;
+  const ownerLabel = viewingSomeoneElse ? `${nameOf(ownerId)}'s Plan` : "Your Plan";
   const myPlanFor = (dayNumber: number, stop: ItineraryActivity) =>
-    overridesFor(dayNumber, stop).find((item) => item.travelerId === travelerId || (travelerId !== null && item.joinedBy.includes(travelerId)));
+    overridesFor(dayNumber, stop).find((item) => item.travelerId === ownerId || (ownerId !== null && item.joinedBy.includes(ownerId)));
+  const ownerDifferenceCount = ownerId ? itinerary.days.reduce((count, dayItem) => count + dayItem.activities.filter((stop) => myPlanFor(dayItem.dayNumber, stop)).length, 0) : 0;
 
   async function changePlan(body: Record<string, unknown>) {
     if (!currentTraveler) return;
@@ -584,14 +591,23 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
       {approvedProposal ? <section className="mb-5 rounded-2xl border-2 border-[#276655]/30 bg-[#daf0ea] p-5" role="status"><h2 className="text-xl font-bold text-[#276655]">Major Trip Change Approved</h2><p className="mt-2 text-sm leading-6">{approvedProposal.previousDestination !== approvedProposal.proposedDestination ? `The group voted to move the trip from ${approvedProposal.previousDestination} to ${approvedProposal.proposedDestination}. ` : "The group approved a major rewrite. "}The shared itinerary was updated. Old travel searches and simulated bookings were cleared; find travel again for the new plan.</p></section> : null}
       {currentTraveler ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-full border border-[#172733]/10 bg-white p-1" role="radiogroup" aria-label="Whose plan to show">
-            {([["group", "Group Plan"], ["mine", "My Plan"]] as const).map(([id, label]) => (
-              <button aria-checked={view === id} className={`rounded-full px-4 py-2 text-sm font-bold transition ${view === id ? "bg-[#173f50] text-white" : "text-[#607179]"}`} key={id} onClick={() => setView(id)} role="radio" type="button">
-                {label}
-              </button>
-            ))}
+          <div className="-mx-1 flex max-w-full gap-1 overflow-x-auto rounded-full border border-[#172733]/10 bg-white p-1" role="radiogroup" aria-label="Whose plan to show">
+            <button aria-checked={view === "group"} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${view === "group" ? "bg-[#173f50] text-white" : "text-[#607179]"}`} onClick={() => setView("group")} role="radio" type="button">Group Plan</button>
+            {/* Everyone's own version of the trip, so the group can see who does what. */}
+            {[...travelers].sort((a, b) => (a.id === travelerId ? -1 : b.id === travelerId ? 1 : 0)).map((person) => {
+              const active = view === "mine" && ownerId === person.id;
+              return (
+                <button aria-checked={active} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition ${active ? "bg-[#7a5ea8] text-white" : "text-[#607179]"}`} key={person.id} onClick={() => { setView("mine"); setPlanOwnerId(person.id); }} role="radio" type="button">
+                  {person.id === travelerId ? "My Plan" : person.name}
+                </button>
+              );
+            })}
           </div>
-          <p className="text-sm text-[#718087]">{view === "mine" ? "Your day, including any stops where you do your own thing." : "Everyone's shared plan. Pick a stop to do your own thing instead."}</p>
+          <p className="text-sm text-[#718087]">
+            {view === "mine"
+              ? `${viewingSomeoneElse ? `${nameOf(ownerId!)}'s days` : "Your days"}${ownerDifferenceCount > 0 ? `: ${ownerDifferenceCount} ${ownerDifferenceCount === 1 ? "stop differs" : "stops differ"} from the group plan (highlighted in purple).` : ": same as the group plan."}`
+              : "Everyone's shared plan. Pick a stop to do your own thing instead."}
+          </p>
         </div>
       ) : null}
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 py-2" role="tablist" aria-label="Days">
@@ -664,7 +680,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
               return (
                 <li key={key}>
                   <button
-                    className={`w-full rounded-2xl border p-4 text-left transition ${selected ? "border-[#e4664f] bg-[#fff4ef] shadow-[0_8px_24px_rgba(228,102,79,0.14)]" : "border-[#172733]/8 bg-white hover:border-[#e4664f]/40"}`}
+                    className={`w-full rounded-2xl border p-4 text-left transition ${selected ? "border-[#e4664f] bg-[#fff4ef] shadow-[0_8px_24px_rgba(228,102,79,0.14)]" : showingMyPlan ? "border-2 border-[#7a5ea8] bg-[#f6f2fc]" : "border-[#172733]/8 bg-white hover:border-[#e4664f]/40"}`}
                     onClick={() => selectStop(index)}
                     type="button"
                   >
@@ -674,7 +690,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                       ) : item.place?.thumbnail ? (
                         <Image alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" height={64} src={item.place.thumbnail} unoptimized width={64} />
                       ) : (
-                        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#f2f0ea] text-xs font-bold text-[#607179]">{item.time}</span>
+                        <span aria-hidden="true" className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#f2f0ea] text-3xl">{activityIcon(item)}</span>
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#879196]">
@@ -686,7 +702,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                         </p>
                         {view === "mine" && myPlan ? (
                           <>
-                            <p className="mt-1 font-bold text-[#7a5ea8]">{myPlan.title} <span className="ml-1 rounded-full bg-[#e7e2f5] px-2 py-0.5 text-xs text-[#4b3d8a]">Your Plan</span></p>
+                            <p className="mt-1 font-bold text-[#7a5ea8]">{myPlan.title} <span className="ml-1 rounded-full bg-[#e7e2f5] px-2 py-0.5 text-xs text-[#4b3d8a]">{ownerLabel}</span></p>
                             <p className="text-sm text-[#52766c]">{myPlan.location || "On your own"} · instead of {item.place?.name ?? item.title}</p>
                           </>
                         ) : (
@@ -849,6 +865,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                               {message.changes.map((change) => <li key={change}>✓ {change}</li>)}
                             </ul>
                           ) : null}
+                          {message.placeOptions ? <PlaceOptions messageId={message.id} onUpdate={applyProposalState} options={message.placeOptions} travelerId={travelerId} tripId={tripId} /> : null}
                         </div>
                         {fromMuse ? <p className="mt-1 px-1 text-[11px] text-[#718087]">Use @muse to ask Muse to reply.</p> : null}
                       </div>

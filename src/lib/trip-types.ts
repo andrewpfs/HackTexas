@@ -175,6 +175,8 @@ export type ItineraryDay = {
   dayNumber: number;
   date: string;
   title: string;
+  // The city the group sleeps in that night, so multi-city trips get a hotel per city.
+  city?: string;
   activities: ItineraryActivity[];
 };
 
@@ -254,6 +256,13 @@ export type FlightOption = {
 export type SearchStatus = "pending" | "done" | "failed";
 
 export type HotelSearchResult = {
+  // The city this stay is in (one search per city on multi-city trips).
+  city?: string;
+  // How many times this stay was refreshed; each refresh shows a different feed.
+  feed?: number;
+  feedLabel?: string;
+  // Hotels picked by travelers who book their own place instead of the group hotel.
+  soloPicks?: Record<string, string>;
   expediaSearchUrl?: string;
   providerNote?: string;
   status: SearchStatus;
@@ -295,7 +304,10 @@ export type Booking = {
 };
 
 export type TravelPlan = {
+  // Older trips: one hotel for the whole trip. New trips use hotelStays.
   hotels?: HotelSearchResult;
+  // One hotel search per city the group sleeps in.
+  hotelStays?: HotelSearchResult[];
   flights?: Record<string, FlightSearchResult>;
   bookings?: Record<string, Booking>;
 };
@@ -348,6 +360,17 @@ export type ChatMessage = {
   changes?: string[];
   // The stop the traveler was looking at when they wrote the message.
   focus?: { dayNumber: number; title: string };
+  // Real places Muse found when someone asked for alternatives to one stop.
+  placeOptions?: PlaceOptions;
+};
+
+export type PlaceOptions = {
+  requestedByTravelerId: string;
+  dayNumber: number;
+  stopTime: string;
+  stopTitle: string;
+  places: PlaceSuggestion[];
+  chosen?: { placeIndex: number; mode: "group" | "me"; travelerName: string };
 };
 
 // One update in the trip's notification bar.

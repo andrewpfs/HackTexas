@@ -4,6 +4,7 @@ import { isMockFallbackEnabled, selectItineraryReviser } from "@/lib/candidate-p
 import { ChatError, handleItineraryChat } from "@/lib/itinerary-chat";
 import { MockItineraryReviser, validateChatInput } from "@/lib/itinerary-revision";
 import { MusePlannerError } from "@/lib/muse-client";
+import { getSerpApiKey, searchPlaces } from "@/lib/serpapi-places";
 import { appendChatMessage, changePersonalOverride, getTripById, saveItineraryProposal, saveItineraryRevision } from "@/lib/trip-repository";
 
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/itinerary/chat">) {
@@ -15,6 +16,10 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
   try {
     const result = await handleItineraryChat(tripId, input.data, {
       getTripById, appendChatMessage, changePersonalOverride, saveItineraryProposal, saveItineraryRevision,
+      async findPlaces(query) {
+        const apiKey = getSerpApiKey();
+        return apiKey ? searchPlaces({ apiKey, includeReviews: process.env.SERPAPI_INCLUDE_REVIEWS !== "false" }, query, 3) : [];
+      },
       async revise(revisionRequest) {
         try { return await selectItineraryReviser().reviser.revise(revisionRequest); }
         catch (error) {

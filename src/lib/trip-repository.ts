@@ -10,6 +10,7 @@ import type {
   ItineraryDay,
   ItineraryProposal,
   GroupItinerary,
+  HotelSearchResult,
   PlannerSource,
   PlaceSuggestion,
   Traveler,
@@ -27,6 +28,7 @@ import { getSupabaseTripStore } from "./supabase-trip-store";
 import { applyProposalVote, proposalMatchesBase } from "./itinerary-proposals";
 import { applyManualEdit, type ManualStopEdit, type TravelWarning } from "./manual-itinerary";
 import { personalLocationError, type DestinationArea } from "./personal-location";
+import { getHotelStays, isSoloLodger, sameStay, type StayPlan } from "./hotel-stays";
 import { getSketchBasis, sketchHasContent, sketchNeedsRedraw } from "./trip-sketch";
 import { pushNotification, tripPath } from "./trip-notifications";
 
@@ -489,46 +491,63 @@ function isFreshPending(status: string | undefined, startedAt: string | undefine
 
 type ClaimResult<T> = { status: "claimed"; trip: Trip } | { status: "skip"; current: T | undefined } | { status: "no-itinerary" };
 
-// Marks the group hotel search as running. Returns "skip" when it already ran or is running.
-export async function claimHotelSearch(tripId: string, checkIn: string, checkOut: string, force = false) {
-  const result = await getStore().update<ClaimResult<NonNullable<Trip["travel"]>["hotels"]>>(tripId, (trip) => {
+// Saved hotel searches, upgrading an older single-hotel trip to the per-city list.
+function hotelStayResults(trip: Trip) {
+  return getHotelStays(trip).map((stay) => stay.result).filter((result): result is HotelSearchResult => result !== undefined);
+}
+
+function saveHotelStay(trip: Trip, stay: StayPlan, result: HotelSearchResult) {
+  const others = hotelStayResults(trip).filter((item) => !sameStay(item, stay));
+  trip.travel = { ...trip.travel, hotels: undefined, hotelStays: [...others, { ...result, city: stay.city, checkIn: stay.checkIn, checkOut: stay.checkOut }] };
+}
+
+// Marks one stay's hotel search as running. Returns "skip" when it already ran or is
+// running. A refresh runs it again with the next feed (a different provider or sort).
+export async function claimHotelSearch(tripId: string, stayIndex: number, force = false, refresh = false) {
+  const result = await getStore().update<ClaimResult<HotelSearchResult> | { status: "no-stay" }>(tripId, (trip) => {
     if (!trip.itinerary) {
       return { save: false, result: { status: "no-itinerary" as const } };
     }
-    const current = trip.travel?.hotels;
-    if (current && !force && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+    const stay = getHotelStays(trip)[stayIndex];
+    if (!stay) return { save: false, result: { status: "no-stay" as const } };
+    const current = stay.result;
+    if (current && !force && !refresh && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
       return { save: false, result: { status: "skip" as const, current } };
     }
 
-    trip.travel = { ...trip.travel, hotels: { status: "pending", startedAt: new Date().toISOString(), options: [], checkIn, checkOut } };
+    const feed = refresh ? (current?.feed ?? 0) + 1 : current?.feed ?? 0;
+    saveHotelStay(trip, stay.plan, { status: "pending", startedAt: new Date().toISOString(), options: [], checkIn: stay.plan.checkIn, checkOut: stay.plan.checkOut, feed, soloPicks: current?.soloPicks });
     return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
   });
   return result ?? { status: "no-itinerary" as const };
 }
 
-export async function finishHotelSearch(tripId: string, update: Partial<NonNullable<NonNullable<Trip["travel"]>["hotels"]>>, expectedStartedAt?: string) {
+export async function finishHotelSearch(tripId: string, stay: StayPlan, update: Partial<HotelSearchResult>, expectedStartedAt?: string) {
   await getStore().update<null>(tripId, (trip) => {
-    const current = trip.travel?.hotels;
+    const current = hotelStayResults(trip).find((item) => sameStay(item, stay));
     if (!current || current.startedAt !== expectedStartedAt) {
       return { save: false, result: null };
     }
-    trip.travel = { ...trip.travel, hotels: { ...current, ...update, startedAt: undefined } };
+    saveHotelStay(trip, stay, { ...current, ...update, startedAt: undefined });
     return { save: true, result: null };
   });
 }
 
-// The host picks the group's hotel. Picking it again un-picks it.
-export async function selectGroupHotel(tripId: string, travelerId: string, token: string) {
-  const result = await getStore().update<{ status: "updated" | "not-host" | "not-found" }>(tripId, (trip) => {
+// The host picks the group's hotel for one stay; solo lodgers pick their own.
+// Picking the same hotel again un-picks it.
+export async function selectStayHotel(tripId: string, travelerId: string, stayIndex: number, token: string, solo: boolean) {
+  const result = await getStore().update<{ status: "updated" | "not-host" | "not-solo" | "not-found" }>(tripId, (trip) => {
     const traveler = trip.travelers.find((item) => item.id === travelerId);
-    if (!traveler?.isHost) {
-      return { save: false, result: { status: "not-host" as const } };
-    }
-    const hotels = trip.travel?.hotels;
-    if (!hotels?.options.some((option) => option.token === token)) {
+    if (!traveler) return { save: false, result: { status: "not-found" as const } };
+    if (solo && !isSoloLodger(traveler)) return { save: false, result: { status: "not-solo" as const } };
+    if (!solo && !traveler.isHost) return { save: false, result: { status: "not-host" as const } };
+    const stay = getHotelStays(trip)[stayIndex];
+    const hotels = stay?.result;
+    if (!stay || !hotels?.options.some((option) => option.token === token)) {
       return { save: false, result: { status: "not-found" as const } };
     }
 
+<<<<<<< HEAD
     const unpick = hotels.selectedToken === token;
     trip.travel = {
       ...trip.travel,
@@ -537,6 +556,16 @@ export async function selectGroupHotel(tripId: string, travelerId: string, token
     if (!unpick) {
       const hotelName = hotels.options.find((option) => option.token === token)?.name ?? "a hotel";
       pushNotification(trip, `${traveler.name} picked ${hotelName} for the group.`, tripPath(trip, "travel"), traveler.id);
+=======
+    if (solo) {
+      const picks = { ...hotels.soloPicks };
+      if (picks[travelerId] === token) delete picks[travelerId];
+      else picks[travelerId] = token;
+      saveHotelStay(trip, stay.plan, { ...hotels, soloPicks: picks });
+    } else {
+      const unpick = hotels.selectedToken === token;
+      saveHotelStay(trip, stay.plan, { ...hotels, selectedToken: unpick ? undefined : token, selectedByTravelerId: unpick ? undefined : travelerId });
+>>>>>>> 2f6842b15cbe3ffc63716062b8698aa22d1e8b1a
     }
     return { save: true, result: { status: "updated" as const } };
   });
@@ -895,6 +924,7 @@ export async function saveDatePriceCheck(tripId: string, check: NonNullable<Trip
   });
 }
 
+<<<<<<< HEAD
 // ---------- notifications ----------
 
 // Records an update for the notification bar.
@@ -923,5 +953,14 @@ export async function releaseCandidateGeneration(tripId: string) {
     if (!trip.candidatesGeneratingSince) return { save: false, result: null };
     trip.candidatesGeneratingSince = undefined;
     return { save: true, result: null };
+=======
+// Marks which of Muse's place options someone picked, so nobody picks twice.
+export async function markPlaceOptionChosen(tripId: string, messageId: string, chosen: NonNullable<NonNullable<ChatMessage["placeOptions"]>["chosen"]>) {
+  return getStore().update<Trip | null>(tripId, (trip) => {
+    const message = trip.chat?.find((item) => item.id === messageId);
+    if (!message?.placeOptions) return { save: false, result: trip };
+    message.placeOptions.chosen = chosen;
+    return { save: true, result: trip };
+>>>>>>> 2f6842b15cbe3ffc63716062b8698aa22d1e8b1a
   });
 }

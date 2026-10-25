@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { Header } from "../../../components/header";
 import { formatCalendarDate } from "@/lib/date-utils";
 import { getSerpApiKey } from "@/lib/serpapi-places";
-import { getDepartureCity, getHotelSearchInputs, getNights, lowestLodgingBudgetPerNight, travelersNeedingLodging } from "@/lib/travel-planning";
+import { getDepartureCity, lowestLodgingBudgetPerNight } from "@/lib/travel-planning";
+import { getHotelStays, groupLodgers, isSoloLodger, needsLodging, stayNights } from "@/lib/hotel-stays";
+import { hotelShareForTraveler } from "@/lib/travel-display";
 import { getTripById } from "@/lib/trip-repository";
 import { LiveRefresh } from "../live-refresh";
 import { ProgressNav } from "../progress-nav";
@@ -42,7 +44,7 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
     );
   }
 
-  const inputs = getHotelSearchInputs(trip)!;
+  const stays = getHotelStays(trip).map(({ plan, result }) => ({ plan, nights: stayNights(plan), result: result ?? null }));
   const bookings = trip.travel?.bookings ?? {};
 
   return (
@@ -69,16 +71,17 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
           tripName={trip.name || `${itinerary.destination} Trip`}
           destination={itinerary.destination}
           flights={trip.travel?.flights ?? {}}
-          hotels={trip.travel?.hotels ?? null}
-          lodgingCount={Math.max(1, travelersNeedingLodging(trip).length)}
+          lodgingCount={Math.max(1, groupLodgers(trip).length)}
           lowestBudgetPerNight={lowestLodgingBudgetPerNight(trip)}
-          nights={getNights(inputs.checkIn, inputs.checkOut)}
           searchConfigured={getSerpApiKey() !== null}
+          shares={Object.fromEntries(trip.travelers.map((traveler) => [traveler.id, hotelShareForTraveler(trip, traveler.id)]))}
+          stays={stays}
           travelers={trip.travelers.map((traveler) => ({
             id: traveler.id,
             name: traveler.name,
             isHost: traveler.isHost,
-            needsLodging: traveler.preferences?.lodgingType !== "No need",
+            needsLodging: needsLodging(traveler),
+            solo: isSoloLodger(traveler),
             departure: getDepartureCity(trip, traveler.id) ?? "",
           }))}
           tripId={trip.id}

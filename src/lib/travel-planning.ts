@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
 import type { Booking, BookingItem, Trip } from "./trip-types";
-import { addDaysToDate, type HotelSearch } from "./travel-search";
+import type { HotelSearch } from "./travel-search";
 import { hotelShareForTraveler } from "./travel-display";
 import { hotelPriceTotal } from "./hotel-display";
+import { getHotelStays, groupLodgers, isSoloLodger, needsLodging, selectedGroupHotel, stayNights } from "./hotel-stays";
 
 // Travelers who need a bed. People who chose "No need" are staying elsewhere.
 export function travelersNeedingLodging(trip: Trip) {
@@ -23,18 +24,18 @@ export function groupHotelClass(trip: Trip) {
   return levels[Math.floor((levels.length - 1) / 2)] + 1;
 }
 
-export function getHotelSearchInputs(trip: Trip): HotelSearch | null {
-  const itinerary = trip.itinerary;
-  if (!itinerary) {
+// The search for one stay (one city). Only travelers sharing the group hotel count as guests.
+export function getHotelSearchInputs(trip: Trip, stayIndex = 0): HotelSearch | null {
+  const stay = getHotelStays(trip)[stayIndex];
+  if (!stay) {
     return null;
   }
 
   return {
-    destination: itinerary.destination,
-    checkIn: itinerary.startDate,
-    // Check out the morning after the last day.
-    checkOut: addDaysToDate(itinerary.endDate, 1),
-    adults: Math.max(1, travelersNeedingLodging(trip).length),
+    destination: stay.plan.city,
+    checkIn: stay.plan.checkIn,
+    checkOut: stay.plan.checkOut,
+    adults: Math.max(1, groupLodgers(trip).length),
     hotelClass: groupHotelClass(trip),
   };
 }
@@ -78,15 +79,31 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
     });
   }
 
-  const hotels = trip.travel?.hotels;
-  const hotel = hotels?.options.find((option) => option.token === hotels.selectedToken);
-  if (hotel && hotels && hotels.selectedByTravelerId === travelerId && hotelPriceTotal(hotel, getNights(hotels.checkIn, hotels.checkOut)) !== null) {
-    const nights = getNights(hotels.checkIn, hotels.checkOut);
-    const amount = hotelPriceTotal(hotel, nights)!;
+  // Every stay needs a hotel before anyone who sleeps there can confirm: the host picks
+  // the group hotel, and travelers who book their own place pick theirs.
+  const traveler = trip.travelers.find((item) => item.id === travelerId);
+  const stays = getHotelStays(trip);
+  if (traveler && needsLodging(traveler)) {
+    const solo = isSoloLodger(traveler);
+    const missing = stays.filter(({ result }) => (solo ? !result?.soloPicks?.[travelerId] : !result?.selectedToken)).map(({ plan }) => plan.city.split(",")[0]);
+    if (missing.length > 0) {
+      const list = missing.join(" and ");
+      return { error: solo ? `Pick your own hotel in ${list} first.` : traveler.isHost ? `Pick the group hotel in ${list} first.` : `Wait for the host to pick the group hotel in ${list}, then you can confirm.` };
+    }
+  }
+
+  for (const { plan, result } of stays) {
+    const nights = stayNights(plan);
+    const solo = traveler ? isSoloLodger(traveler) : false;
+    const hotel = solo
+      ? result?.options.find((option) => option.token === result.soloPicks?.[travelerId])
+      : result?.selectedByTravelerId === travelerId ? selectedGroupHotel(result) : undefined;
+    const amount = hotel ? hotelPriceTotal(hotel, nights) : null;
+    if (!hotel || amount === null) continue;
     items.push({
       kind: "hotel",
-      label: hotel.name,
-      detail: `${nights} night${nights === 1 ? "" : "s"} for the group · ${hotels.checkIn} to ${hotels.checkOut}`,
+      label: `${hotel.name}, ${plan.city}`,
+      detail: `${nights} night${nights === 1 ? "" : "s"} ${solo ? "just for you" : "for the group"} · ${plan.checkIn} to ${plan.checkOut}`,
       amount,
       confirmationCode: confirmationCode("HTL"),
     });

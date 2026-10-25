@@ -228,7 +228,13 @@ test("activity icons classify logistics without providers", () => {
   assert.equal(activityIcon({ title: "Flight departure" }), "🛫");
   assert.equal(activityIcon({ title: "Train to Kyoto" }), "🚆");
   assert.equal(activityIcon({ title: "Restaurant lunch" }), "🍽️");
-  assert.equal(activityIcon({ title: "Explore" }), "📍");
+  assert.equal(activityIcon({ title: "Explore" }), "🚶");
+  assert.equal(activityIcon({ title: "Hotel check-in and rest" }), "🏨");
+  assert.equal(activityIcon({ title: "Free time and early night" }), "🛏️");
+  assert.equal(activityIcon({ title: "Head to airport" }), "✈️");
+  assert.equal(activityIcon({ title: "Something else entirely" }), "📍");
+  assert.equal(activityIcon({ title: "Meiji Jingu forest walk" }), "🌳");
+  assert.equal(activityIcon({ title: "Spanish tapas" }), "📍");
 });
 
 function result(number: number) {
