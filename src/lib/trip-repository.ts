@@ -3,7 +3,7 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { TravelerPreferences, Trip } from "./trip-types";
+import type { CandidateTripOption, TravelerPreferences, Trip } from "./trip-types";
 import { normalizeInviteCode } from "./trip-validation";
 
 type TripStore = {
@@ -192,6 +192,30 @@ export async function updateTravelerAvailability(
     }
 
     return { status: "traveler-not-found" as const };
+  }
+
+  return { status: "trip-not-found" as const };
+}
+
+export async function saveCandidateOptions(
+  tripId: string,
+  candidateOptions: CandidateTripOption[],
+) {
+  const store = await readStore();
+
+  for (let tripIndex = 0; tripIndex < store.trips.length; tripIndex += 1) {
+    const trip = store.trips[tripIndex];
+    if (trip.id !== tripId) {
+      continue;
+    }
+
+    trip.candidateOptions = candidateOptions;
+    trip.candidatesGeneratedAt = candidateOptions[0]?.generatedAt;
+    store.trips[tripIndex] = trip;
+
+    await mkdir(dataDirectory, { recursive: true });
+    await writeFile(dataFilePath, JSON.stringify(store, null, 2), "utf8");
+    return { status: "updated" as const, trip };
   }
 
   return { status: "trip-not-found" as const };

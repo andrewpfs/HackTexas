@@ -66,6 +66,34 @@ export type Traveler = {
   availableDates?: string[];
 };
 
+export type CandidateActivity = {
+  timeOfDay: "Morning" | "Afternoon" | "Evening";
+  title: string;
+  description: string;
+};
+
+export type CandidateDay = {
+  dayNumber: number;
+  date: string;
+  title: string;
+  activities: CandidateActivity[];
+};
+
+export type CandidateTripOption = {
+  id: string;
+  title: string;
+  destination: string;
+  summary: string;
+  rationale: string;
+  estimatedDurationDays: number;
+  suggestedStartDate: string;
+  suggestedEndDate: string;
+  highlights: string[];
+  considerations: string[];
+  days: CandidateDay[];
+  generatedAt: string;
+};
+
 export type Trip = {
   id: string;
   inviteCode: string;
@@ -80,6 +108,8 @@ export type Trip = {
   status: TripStatus;
   createdAt: string;
   travelers: Traveler[];
+  candidateOptions?: CandidateTripOption[];
+  candidatesGeneratedAt?: string;
 };
 
 export type CreateTripInput = {

@@ -10,8 +10,13 @@
   },
   "include": [
     "src/lib/date-utils.ts",
+    "src/lib/candidate-generation.ts",
+    "src/lib/candidate-planner.ts",
+    "src/lib/candidate-validation.ts",
+    "src/lib/mock-candidate-planner.ts",
     "src/lib/planning-context.ts",
     "src/lib/trip-types.ts",
-    "tests/planning-context.test.ts"
+    "tests/planning-context.test.ts",
+    "tests/candidate-planner.test.ts"
   ]
 }

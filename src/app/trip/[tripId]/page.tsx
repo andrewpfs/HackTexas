@@ -10,10 +10,12 @@ import {
   type DateWindow,
 } from "@/lib/date-utils";
 import { calculatePlanningReadiness } from "@/lib/planning-context";
+import { validateCandidateOptions } from "@/lib/candidate-validation";
+import { GenerateCandidatesAction } from "./generate-candidates-action";
 
 export const instant = false;
 
-const progressSteps = ["Preferences", "AI Suggestions", "Vote", "Final Itinerary"];
+const progressSteps = ["Preferences", "Trip Options", "Vote", "Final Itinerary"];
 
 function formatSharedWindow(window: DateWindow) {
   if (window.startDate === window.endDate) {
@@ -74,6 +76,9 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const allTravelersSubmitted = completedAvailabilityCount === trip.travelers.length;
   const preferredDurationDays = trip.preferredDurationDays;
   const longestSharedWindow = getLongestSharedWindow(sharedWindows);
+  const candidatesAvailable = trip.candidateOptions
+    ? validateCandidateOptions(trip.candidateOptions).valid
+    : false;
 
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
@@ -123,7 +128,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               <p className="eyebrow">Planning readiness</p>
               <h2 className="mt-2 text-2xl font-bold tracking-tight" id="planning-readiness">
                 {planningReadiness.readyForCandidateGeneration
-                  ? "Ready for AI suggestions"
+                  ? "Ready for trip suggestions"
                   : "Your group is still getting ready"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-[#718087]">
@@ -132,13 +137,11 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                   : "Complete the items below before generating trip options."}
               </p>
             </div>
-            <button
-              className="button-primary cursor-not-allowed opacity-60"
-              disabled
-              type="button"
-            >
-              Generate Trip Options
-            </button>
+            <GenerateCandidatesAction
+              tripId={trip.id}
+              ready={planningReadiness.readyForCandidateGeneration}
+              candidatesAvailable={candidatesAvailable}
+            />
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -189,7 +192,11 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             </div>
           ) : null}
 
-          <p className="mt-4 text-xs font-semibold text-[#879196]">AI planning arrives in the next step.</p>
+          <p className="mt-4 text-xs font-semibold text-[#879196]">
+            {candidatesAvailable
+              ? "Three shared trip options are ready for your group."
+              : "Demo planner data is used for this hackathon phase."}
+          </p>
         </section>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
@@ -302,7 +309,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               <div className="border-t border-[#172733]/8 bg-[#173f50] p-6 text-white sm:p-8">
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Coming after preferences</p>
                 <p className="mt-2 text-lg font-bold">Three options → one group vote → one shared itinerary</p>
-                <p className="mt-2 text-sm leading-6 text-white/65">Suggestions, voting, and itinerary generation are intentionally deferred.</p>
+                <p className="mt-2 text-sm leading-6 text-white/65">Voting and final itinerary generation are intentionally deferred.</p>
               </div>
             </section>
           </div>

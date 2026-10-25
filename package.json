@@ -10,7 +10,10 @@
     "clean:test-build": "node -e \"require('node:fs').rmSync('.test-build', { recursive: true, force: true })\"",
     "pretest:planning": "npm run clean:test-build",
     "test:planning": "tsc -p tsconfig.tests.json && node --test .test-build/tests/planning-context.test.js",
-    "posttest:planning": "npm run clean:test-build"
+    "posttest:planning": "npm run clean:test-build",
+    "pretest:candidates": "npm run clean:test-build",
+    "test:candidates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/candidate-planner.test.js",
+    "posttest:candidates": "npm run clean:test-build"
   },
   "dependencies": {
     "next": "16.4.3",
