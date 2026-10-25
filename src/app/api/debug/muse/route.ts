@@ -5,6 +5,10 @@ import { DEFAULT_MUSE_BASE_URL, DEFAULT_MUSE_MODEL, requestMuseJson } from "@/li
 import { calculatePlanningReadiness } from "@/lib/planning-context";
 import { getTripById } from "@/lib/trip-repository";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 // Development-only check of the Muse connection. Never available in production
 // and never returns the key. GET /api/debug/muse, or ?tripId=... to also try
 // planning options for that trip (nothing is saved).

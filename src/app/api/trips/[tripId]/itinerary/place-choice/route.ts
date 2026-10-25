@@ -9,6 +9,10 @@ import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 import { changePersonalOverride, getTripById, markPlaceOptionChosen, saveItineraryProposal } from "@/lib/trip-repository";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 // A traveler picks one of the 3 places Muse found for a stop: either propose it to
 // the group (a vote; if it loses it becomes their personal plan) or keep it just for them.
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/itinerary/place-choice">) {

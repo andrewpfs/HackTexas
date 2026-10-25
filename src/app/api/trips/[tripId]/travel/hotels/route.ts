@@ -5,6 +5,10 @@ import { discoverHotelFeed } from "@/lib/hotel-discovery";
 import { getHotelStays } from "@/lib/hotel-stays";
 import { claimHotelSearch, finishHotelSearch, getTripById, selectStayHotel } from "@/lib/trip-repository";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 async function readBody(request: Request) {
   try {
     return (await request.json()) as Record<string, unknown>;

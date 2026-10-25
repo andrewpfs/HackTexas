@@ -9,6 +9,10 @@ import { MusePlannerError } from "@/lib/muse-client";
 import { getTripById, saveGroupItinerary } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 export async function POST(
   request: Request,
   context: RouteContext<"/api/trips/[tripId]/itinerary/generate">,

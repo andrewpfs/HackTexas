@@ -8,6 +8,10 @@ import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identit
 import { findCityFlightId, searchFlights } from "@/lib/travel-search";
 import { getTripById, saveDatePriceCheck } from "@/lib/trip-repository";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 const maximumWindows = 3;
 const maximumOrigins = 4;
 

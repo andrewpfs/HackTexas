@@ -9,6 +9,8 @@ import { applyTripDetailsUpdate, clearPlanningOutputs, isGeneratingCandidates } 
 import { fastestMode } from "../src/lib/travel-time";
 import { detectRequestScope, personalPlansFromRevision } from "../src/lib/itinerary-revision";
 import { findFlightsWithNearbyAirports } from "../src/lib/flight-routing";
+import { fitCandidateToSharedDates, parseMuseCandidates } from "../src/lib/muse-candidate-planner";
+import { requestMuseJson } from "../src/lib/muse-client";
 import { chosenFlights, flightLegsKey, flightLegsOf, planFlightLegs } from "../src/lib/flight-legs";
 import { findNearbyAirports } from "../src/lib/travel-search";
 import type { FlightOption, ItineraryDay } from "../src/lib/trip-types";
@@ -322,4 +324,43 @@ test("a multi-city trip needs one flight per leg, like one hotel per city", () =
   assert.equal(legacy.length, 1);
   assert.equal(legacy[0].roundTrip, true);
   assert.equal(chosenFlights({ status: "done", from: "Austin", options: [], legs: [{ ...legs[0], options: [flight("NRT")], selectedId: "NRT" }, { ...legs[1], options: [] }] }).length, 1);
+});
+
+test("Muse options that slip outside the shared days are moved into them instead of failing", () => {
+  const trip = makeTrip();
+  trip.confirmedDates = { startDate: "2026-12-03", endDate: "2026-12-05", confirmedAt: "", confirmedByName: "Jay" };
+  const result = buildPlanningContext(trip);
+  assert.equal(result.success, true);
+  if (!result.success) return;
+  const option = {
+    title: "T", destination: "Europe", summary: "S", rationale: "R", estimatedDurationDays: 4,
+    suggestedStartDate: "2026-12-02", suggestedEndDate: "2026-12-05", highlights: [], considerations: [], heroPlace: "",
+    days: [1, 2, 3, 4].map((dayNumber) => ({ dayNumber, date: `2026-12-0${dayNumber + 1}`, title: "Day", activities: [] })),
+  };
+  const fitted = fitCandidateToSharedDates(option, result.context);
+  assert.equal(fitted?.suggestedStartDate, "2026-12-03");
+  assert.equal(fitted?.suggestedEndDate, "2026-12-05");
+  assert.deepEqual(fitted?.days.map((day) => day.date), ["2026-12-03", "2026-12-04", "2026-12-05"]);
+  // Four options are trimmed to three; two are retried.
+  assert.equal(parseMuseCandidates({ candidates: [option, option, option, option] }, result.context).length, 3);
+  assert.throws(() => parseMuseCandidates({ candidates: [option, option] }, result.context), /instead of 3/);
+});
+
+test("Muse requests are retried after a rate limit or server error", async () => {
+  let calls = 0;
+  const fetchImpl = (async () => {
+    calls += 1;
+    if (calls === 1) return new Response("rate limited", { status: 429 });
+    if (calls === 2) return new Response("oops", { status: 503 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: "{\"word\":\"hi\"}" } }] }), { status: 200 });
+  }) as typeof fetch;
+  const output = await requestMuseJson({ apiKey: "k", fetchImpl }, { systemPrompt: "", userPrompt: "", schemaName: "ping", schema: {} }, [0, 0]);
+  assert.deepEqual(output, { word: "hi" });
+  assert.equal(calls, 3);
+
+  // A bad key is not retried.
+  calls = 0;
+  const unauthorized = (async () => { calls += 1; return new Response("bad key", { status: 401 }); }) as typeof fetch;
+  await assert.rejects(() => requestMuseJson({ apiKey: "k", fetchImpl: unauthorized }, { systemPrompt: "", userPrompt: "", schemaName: "ping", schema: {} }, [0, 0]), /HTTP 401/);
+  assert.equal(calls, 1);
 });

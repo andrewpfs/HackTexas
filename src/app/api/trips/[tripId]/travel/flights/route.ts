@@ -8,6 +8,10 @@ import { findCityFlightId, findNearbyAirports, searchFlights } from "@/lib/trave
 import { claimFlightSearch, finishFlightSearch, getTripById, selectFlight } from "@/lib/trip-repository";
 import type { FlightLeg } from "@/lib/trip-types";
 
+// Muse and live travel searches can take a minute or more (with retries). Without this,
+// Vercel stops the function early and the request fails part of the time.
+export const maxDuration = 300;
+
 async function readBody(request: Request) {
   try {
     return (await request.json()) as Record<string, unknown>;

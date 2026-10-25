@@ -76,6 +76,7 @@ const systemPrompt = [
   "- Plan around the flights. Day 1 is the arrival day and the last day is the flight home. After a long flight (over about 9 hours, like the US to Japan), Day 1 should only be landing, getting to the hotel, check-in and a relaxed dinner nearby; the last day should be a light morning, then getting to the airport with time to spare. Title those days so the group sees it (for example \"Arrival and Shinjuku Dinner\").",
   "- Many places have no airport of their own (Niagara Falls, Yosemite, Banff, Cinque Terre, small towns). Then the group flies into the nearest major airport (for example Buffalo, BUF, for Niagara Falls) and drives or takes a shuttle or train the rest of the way. Name that airport, and plan the transfer as a Travel activity on Day 1 and before the flight home on the last day.",
   "- Do not invent current prices, flight numbers, or hotel availability.",
+  "- previousAttemptProblems, when present, lists why your last itinerary was rejected. Fix every one of them.",
   "- For each activity, set placeSearchQuery to a short Google Maps search that finds one real, well-reviewed place for it, including the neighborhood and city (for example \"ramen Shinjuku Tokyo\"). Use an empty string for Travel and Free time.",
   "- Do not quote travelers' private questionnaire notes. Vote feedback may be referenced.",
   "Respond with JSON only.",
