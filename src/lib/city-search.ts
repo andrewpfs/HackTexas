@@ -1,6 +1,28 @@
 const photonUrl = "https://photon.komoot.io/api/";
 const userAgent = "HackTXTripPlanner/1.0 (student hackathon project)";
 
+// Reuse Photon for structured destination metadata, without changing city input.
+export async function lookupDestinationArea(destination: string, fetchImpl: typeof fetch = fetch): Promise<import("./personal-location").DestinationArea | undefined> {
+  try {
+    const url = new URL(photonUrl);
+    url.search = new URLSearchParams({ q: destination, limit: "1", lang: "en" }).toString();
+    const response = await fetchImpl(url, { headers: { "User-Agent": userAgent }, signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return undefined;
+    const body = await response.json();
+    const feature = body.features?.[0];
+    if (!feature) return undefined;
+    const point = feature.geometry?.coordinates;
+    const extent = feature.properties?.extent;
+    const countryOnly = feature.properties?.osm_value === "country";
+    return {
+      countryCode: feature.properties?.countrycode,
+      latitude: !countryOnly && typeof point?.[1] === "number" ? point[1] : undefined,
+      longitude: !countryOnly && typeof point?.[0] === "number" ? point[0] : undefined,
+      extent: Array.isArray(extent) && extent.length === 4 && extent.every((value: unknown) => typeof value === "number" && Number.isFinite(value)) ? extent : undefined,
+    };
+  } catch { return undefined; }
+}
+
 type PhotonResponse = {
   features?: { properties?: { name?: string; state?: string; country?: string } }[];
 };

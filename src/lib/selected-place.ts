@@ -10,6 +10,9 @@ export function readSelectedPlace(value: unknown): PlaceSuggestion | null {
   const longitude = typeof place.longitude === "number" && Number.isFinite(place.longitude) && Math.abs(place.longitude) <= 180 ? place.longitude : undefined;
   return {
     name: place.name.trim(),
+    placeId: typeof place.placeId === "string" ? place.placeId : undefined,
+    countryCode: typeof place.countryCode === "string" ? place.countryCode : undefined,
+    region: typeof place.region === "string" ? place.region : undefined,
     address: typeof place.address === "string" ? place.address : null,
     mapsUrl: place.mapsUrl,
     latitude,

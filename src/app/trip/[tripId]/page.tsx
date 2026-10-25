@@ -144,8 +144,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               </dl>
             </div>
             <div className="relative flex flex-col justify-center border-t-2 border-dashed border-[#173f50]/25 bg-[#fffaf1] p-6 md:border-l-2 md:border-t-0">
-              <span className="absolute -top-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
-              <span className="absolute -bottom-3 left-1/2 hidden h-6 w-6 -translate-x-1/2 rounded-full bg-[#f2f0ea] md:block" aria-hidden="true" />
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#879196]">Invite Code</p>
               <p className="mt-2 text-xs leading-5 text-[#718087]">Share this code so friends can board.</p>
               <CopyInviteLink className="button-secondary mt-2 !min-h-10 !px-4 !text-sm" joinPath={joinPath} showCode />

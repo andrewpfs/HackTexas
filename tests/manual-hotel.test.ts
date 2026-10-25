@@ -1,3 +1,7 @@
+import { personalLocationError } from "../src/lib/personal-location";
+import { readPersonalPlace, signPersonalPlace } from "../src/lib/personal-place-selection";
+import { lookupDestinationArea } from "../src/lib/city-search";
+import { estimateTravel } from "../src/lib/travel-time";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -76,6 +80,28 @@ test("manual shared edits persist atomically without network or Muse", async (su
       assert.equal(networkCalls, 0);
       await assert.rejects(repository.editSharedStop(trip.id, edit(trip), false), /changed/);
       assert.equal((await repository.getTripById(trip.id))!.chat!.length, 1);
+    });
+    await suite.test("server rejects faraway personal overrides and preserves legacy plans", async () => {
+      const trip = makeTrip("personal-validation");
+      trip.itinerary!.destination = "Japan";
+      await repository.saveTrip(trip);
+      const input = { action: "add" as const, travelerId: "jay", dayNumber: 1, stopTime: "10:00 AM", stopTitle: "Museum", title: "Coffee", location: "Coffee", note: "" };
+      const far = await repository.changePersonalOverride(trip.id, { ...input, place: place(29.76, -95.37) });
+      assert.equal(far.status, "invalid-location");
+      const typed = await repository.changePersonalOverride(trip.id, { ...input, requireSelectedPlace: true });
+      assert.equal(typed.status, "invalid-location");
+      assert.deepEqual((await repository.getTripById(trip.id))!.itinerary!.overrides, trip.itinerary!.overrides);
+      const nearby = { ...place(35.69, 139.71), placeId: "tokyo-coffee", countryCode: "JP", address: "Tokyo, Japan" };
+      const valid = await repository.changePersonalOverride(trip.id, { ...input, place: nearby });
+      assert.equal(valid.status, "updated");
+      const saved = (await repository.getTripById(trip.id))!.itinerary!.overrides!;
+      assert.equal(saved[0].location, "Tokyo"); // Legacy text-only plan still loads.
+      assert.equal(saved[0].place, undefined);
+      assert.equal(saved[1].place!.placeId, "tokyo-coffee");
+      assert.equal(saved[1].location, "Tokyo, Japan");
+      const stale = await repository.changePersonalOverride(trip.id, { ...input, place: nearby, expectedDestination: "Kyoto" });
+      assert.equal(stale.status, "invalid-location");
+      assert.equal(networkCalls, 0);
     });
     for (const action of ["before", "after"] as const) {
       await suite.test(`untimed add ${action} persists at requested position`, async () => {
@@ -283,4 +309,52 @@ test("unpriced Expedia hotels never become a zero-dollar booking or owed share",
   assert.equal(hotelShareForTraveler(trip, "tin"), undefined);
   // No mutation has to contact an AI or travel provider.
   assert.equal(applyManualEdit(trip, edit(trip), false).saved, true);
+});
+
+
+test("dashboard invite uses trip parameter and keeps full link separate", () => {
+  assert.equal(inviteCopyText("/join?trip=ABC123", "https://trip.example", "code"), "ABC123");
+  assert.equal(inviteCopyText("/join?trip=ABC123", "https://trip.example", "link"), "https://trip.example/join?trip=ABC123");
+});
+
+test("personal locations respect country, both surrounding stops, and the 120-minute cutoff", () => {
+  const itinerary = makeTrip().itinerary!;
+  itinerary.destination = "Japan";
+  const check = (selected: PlaceSuggestion | undefined) => personalLocationError(itinerary, 1, "1:00 PM", "Lunch", selected, { countryCode: "JP" });
+  assert.equal(check({ ...place(35.69, 139.71), countryCode: "JP" }), null);
+  assert.equal(check(place(35.72, 139.72)), null);
+  assert.match(check({ ...place(29.76, -95.37), countryCode: "US" })!, /Japan/);
+  assert.match(check(place(29.76, -95.37))!, /too far/);
+  assert.match(check(undefined)!, /real place/);
+  // Find a point at the exact rounded boundary using the real helper.
+  let latitude = 35.68;
+  while (estimateTravel({ latitude: 35.68, longitude: 139.7 }, { latitude, longitude: 139.7 }, "car").minutes < 120) latitude += 0.0001;
+  const boundary = place(latitude, 139.7);
+  assert.equal(estimateTravel({ latitude: 35.68, longitude: 139.7 }, { latitude, longitude: 139.7 }, "car").minutes, 120);
+  assert.match(check(boundary)!, /too far/);
+  itinerary.days[0].activities[0].place = undefined;
+  assert.match(check(place(29.76, -95.37))!, /too far/); // The next stop still guards rejoining.
+  for (const stop of itinerary.days[0].activities) stop.place = undefined;
+  const japan = { countryCode: "JP", extent: [129, 46, 146, 30] };
+  assert.equal(personalLocationError(itinerary, 1, "1:00 PM", "Lunch", place(34.69, 135.5), japan), null); // Osaka within Japan, no local anchors.
+  assert.match(personalLocationError(itinerary, 1, "1:00 PM", "Lunch", place(29.76, -95.37), japan)!, /too far/);
+  assert.equal(personalLocationError(itinerary, 1, "1:00 PM", "Lunch", { ...place(0, 0), latitude: undefined, longitude: undefined }), null);
+});
+
+test("real place selection signatures reject tampering and stale destinations", () => {
+  const selected = { ...place(35.69, 139.71), countryCode: "JP", placeId: "real-id" };
+  const token = signPersonalPlace("trip", "Japan", selected, { countryCode: "JP" });
+  assert.deepEqual(readPersonalPlace("trip", "Japan", token)?.place, selected);
+  assert.equal(readPersonalPlace("other", "Japan", token), null);
+  assert.equal(readPersonalPlace("trip", "Houston", token), null);
+  assert.equal(readPersonalPlace("trip", "Japan", token + "changed"), null);
+  assert.equal(readPersonalPlace("trip", "Japan", undefined), null);
+});
+
+test("destination metadata reuses Photon and tolerates unavailable metadata", async () => {
+  const fakeFetch: typeof fetch = async () => Response.json({ features: [{ properties: { countrycode: "JP", extent: [129, 46, 146, 30] }, geometry: { coordinates: [138, 36] } }] });
+  const area = await lookupDestinationArea("Japan", fakeFetch);
+  assert.equal(area?.countryCode, "JP");
+  assert.deepEqual(area?.extent, [129, 46, 146, 30]);
+  assert.equal(await lookupDestinationArea("Japan", async () => { throw new Error("Offline"); }), undefined);
 });

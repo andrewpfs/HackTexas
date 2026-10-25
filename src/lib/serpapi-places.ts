@@ -18,6 +18,8 @@ export type SerpApiConfig = {
 type SerpPlace = {
   title?: string;
   place_id?: string;
+  country_code?: string;
+  region?: string;
   data_id?: string;
   rating?: number;
   reviews?: number;
@@ -109,6 +111,9 @@ export async function searchPlaces(config: SerpApiConfig, query: string): Promis
     if (!place.title) continue;
     suggestions.push({
     name: place.title,
+    placeId: place.place_id || place.data_id,
+    countryCode: place.country_code,
+    region: place.region,
     rating: typeof place.rating === "number" ? place.rating : null,
     reviewCount: typeof place.reviews === "number" ? place.reviews : null,
     price: place.price || null,

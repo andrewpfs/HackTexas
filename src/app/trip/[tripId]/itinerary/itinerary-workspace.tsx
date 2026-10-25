@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { personalLocationError } from "@/lib/personal-location";
 import { activityIcon } from "@/lib/activity-icons";
 import { ManualStopEditor } from "./manual-stop-editor";
 import { PlaceAutocomplete } from "./place-autocomplete";
@@ -74,10 +75,10 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
   const [editing, setEditing] = useState<{ dayNumber: number; stopIndex: number } | null>(null);
   const [planDraft, setPlanDraft] = useState({ title: "", location: "", note: "" });
   const [planPlace, setPlanPlace] = useState<PlaceSuggestion | null>(null);
-  const [planPlaceSearchUnavailable, setPlanPlaceSearchUnavailable] = useState(false);
+  const [locationValidation, setLocationValidation] = useState<{ key: string; error: string } | null>(null);
+  const locationRequest = useRef(0);
   const [planBusy, setPlanBusy] = useState(false);
   const [planError, setPlanError] = useState("");
-  const updatePlanPlaceSearchUnavailable = useCallback((unavailable: boolean) => setPlanPlaceSearchUnavailable(unavailable), []);
   const [draft, setDraft] = useState("");
   const [aboutStop, setAboutStop] = useState(true);
   const [isSending, setIsSending] = useState(false);
@@ -345,7 +346,30 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
     );
   }
 
+  async function validatePlanPlace(dayNumber: number, stop: ItineraryActivity, place: PlaceSuggestion | null) {
+    locationRequest.current += 1;
+    const requestNumber = locationRequest.current;
+    setPlanError("");
+    setLocationValidation(null);
+    if (!place) return;
+    const key = JSON.stringify([place.selectionToken, dayNumber, stop.time, stop.title]);
+    try {
+      const response = await fetch(`/api/trips/${tripId}/itinerary/overrides`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate", travelerId, title: "Personal activity", dayNumber, stopTime: stop.time, stopTitle: stop.title, selectionToken: place.selectionToken }),
+      });
+      const data = await response.json();
+      if (requestNumber !== locationRequest.current) return;
+      setLocationValidation({ key, error: response.ok ? "" : data.error || "Choose another nearby place." });
+    } catch {
+      if (requestNumber === locationRequest.current) setLocationValidation({ key, error: "Could not check this location. Select it again to retry." });
+    }
+  }
+
   function renderPersonalPlans(dayNumber: number, stop: ItineraryActivity) {
+    const validationKey = JSON.stringify([planPlace?.selectionToken, dayNumber, stop.time, stop.title]);
+    const checked = locationValidation?.key === validationKey;
+    const locationError = planPlace ? personalLocationError(itinerary, dayNumber, stop.time, stop.title, planPlace) || (checked ? locationValidation.error : "") : "";
     const plans: PersonalOverride[] = overridesFor(dayNumber, stop);
     const mine = plans.find((plan) => plan.travelerId === travelerId);
 
@@ -387,16 +411,18 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                 setPlanError("Say what you'd rather do.");
                 return;
               }
-              if (planDraft.location.trim() && !planPlace && !planPlaceSearchUnavailable) {
+              if (!planPlace || !checked || locationError) {
                 setPlanError("Choose a real place from the suggestions.");
                 return;
               }
-              changePlan({ action: "add", dayNumber, stopTime: stop.time, stopTitle: stop.title, ...planDraft, place: planPlace });
+              changePlan({ action: "add", dayNumber, stopTime: stop.time, stopTitle: stop.title, ...planDraft, selectionToken: planPlace.selectionToken });
             }}
           >
             <label className="block text-sm font-semibold">Activity Title<input className="form-control mt-1 !py-2.5 text-sm" maxLength={120} onChange={(event) => setPlanDraft({ ...planDraft, title: event.target.value })} placeholder="Arcade In Akihabara" value={planDraft.title} /></label>
-            <PlaceAutocomplete tripId={tripId} value={planDraft.location} place={planPlace} onChange={(location, place) => { setPlanDraft({ ...planDraft, location }); setPlanPlace(place); }} onUnavailable={updatePlanPlaceSearchUnavailable} label="Location / Address" placeholder="Search For A Place Or Address" maxLength={160} />
-            <button className="w-full rounded-full bg-[#7a5ea8] px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-60" disabled={planBusy} type="submit">
+            <PlaceAutocomplete personal tripId={tripId} value={planDraft.location} place={planPlace} onChange={(location, place) => { setPlanDraft({ ...planDraft, location }); setPlanPlace(place); validatePlanPlace(dayNumber, stop, place); }} label="Location / Address" placeholder="Search For A Place Or Address" maxLength={160} />
+            {locationError ? <p className="text-sm font-semibold text-[#a34532]" role="alert">Location Doesn’t Fit This Trip: {locationError}</p> : null}
+            {planPlace && !checked ? <p className="text-xs" role="status">Checking this location…</p> : null}
+            <button className="w-full rounded-full bg-[#7a5ea8] px-4 py-2.5 text-sm font-bold text-white transition hover:-translate-y-0.5 disabled:opacity-60" disabled={planBusy || !planPlace || !checked || !!locationError} type="submit">
               {planBusy ? "Saving…" : "Do My Own Thing Here"}
             </button>
             <p className="text-xs text-[#879196]">The group plan stays the same for everyone else. You can rejoin anytime.</p>

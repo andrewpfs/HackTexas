@@ -295,3 +295,8 @@ select:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .invite-code:hover .invite-code-value { opacity: 0; }
+  .invite-code:hover .invite-code-action { opacity: 1; }
+}

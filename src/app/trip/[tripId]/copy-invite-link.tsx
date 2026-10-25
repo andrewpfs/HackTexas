@@ -30,9 +30,9 @@ export function CopyInviteLink({ joinPath, className = "button-secondary", showC
   return (
     <div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button aria-label="Copy Invite Code" className={`group relative cursor-copy rounded-lg font-mono font-bold tracking-[0.15em] text-[#173f50] focus-visible:outline-2 focus-visible:outline-[#397bb3] ${showCode ? "min-w-44 py-1 text-3xl" : "border border-[#173f50]/20 px-3 py-2 text-sm"}`} onClick={() => copy("code")} title="Copy invite code" type="button">
-          <span className={`transition-opacity duration-200 ${copied === "code" ? "opacity-0" : "group-hover:opacity-0 group-focus-visible:opacity-0"}`}>{code}</span>
-          <span aria-hidden="true" className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${copied === "code" ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"}`}>{copied === "code" ? "Copied!" : <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect height="12" rx="2" width="12" x="8" y="8" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>}</span>
+        <button aria-label={`Copy Invite Code: ${code}`} className={`invite-code relative cursor-copy rounded-lg font-mono font-bold tracking-[0.15em] text-[#173f50] focus-visible:outline-2 focus-visible:outline-[#397bb3] ${showCode ? "min-w-44 py-1 text-3xl" : "border border-[#173f50]/20 px-3 py-2 text-sm"}`} onClick={() => copy("code")} title="Copy invite code" type="button">
+          <span className={`invite-code-value transition-opacity duration-200 ${copied === "code" ? "opacity-0" : ""}`}>{code}</span>
+          <span aria-hidden="true" className={`invite-code-action absolute inset-0 flex items-center justify-center gap-2 transition-opacity duration-200 ${copied === "code" ? "opacity-100" : "opacity-0"}`}>{copied === "code" ? "Copied!" : <><svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect height="12" rx="2" width="12" x="8" y="8" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg><span className="text-sm tracking-normal">Copy</span></>}</span>
         </button>
         <button className={className} onClick={() => copy("link")} type="button">{copied === "link" ? "Copied!" : "Copy Link"}</button>
       </div>
