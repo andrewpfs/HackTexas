@@ -9,6 +9,7 @@ import { applyTripDetailsUpdate, clearPlanningOutputs, isGeneratingCandidates } 
 import { fastestMode } from "../src/lib/travel-time";
 import { detectRequestScope, personalPlansFromRevision } from "../src/lib/itinerary-revision";
 import { findFlightsWithNearbyAirports } from "../src/lib/flight-routing";
+import { chosenFlights, flightLegsKey, flightLegsOf, planFlightLegs } from "../src/lib/flight-legs";
 import { findNearbyAirports } from "../src/lib/travel-search";
 import type { FlightOption, ItineraryDay } from "../src/lib/trip-types";
 import { maximumNotifications, pushNotification, tripPath } from "../src/lib/trip-notifications";
@@ -293,4 +294,32 @@ test("the draft is redrawn once everyone submits preferences, even before everyo
   assert.equal(sketchNeedsRedraw(trip), true);
   assert.deepEqual(getSketchRequest(trip).group?.sharedDateWindows, []);
   assert.ok(getSketchRequest(trip).days > 0);
+});
+
+test("a multi-city trip needs one flight per leg, like one hotel per city", () => {
+  const day = (dayNumber: number, date: string, city: string) => ({ dayNumber, date, title: "Day", city, activities: [] });
+  const itinerary = {
+    destination: "Tokyo → Kyoto → Tokyo",
+    startDate: "2026-12-03",
+    endDate: "2026-12-09",
+    days: [day(1, "2026-12-03", "Tokyo, Japan"), day(2, "2026-12-04", "Tokyo, Japan"), day(3, "2026-12-05", "Kyoto, Japan"), day(4, "2026-12-06", "Kyoto, Japan"), day(5, "2026-12-07", "Tokyo, Japan"), day(6, "2026-12-08", "Tokyo, Japan"), day(7, "2026-12-09", "Tokyo, Japan")],
+  };
+  const legs = planFlightLegs(itinerary, "Houston, Texas");
+  assert.deepEqual(legs, [
+    { from: "Houston, Texas", to: "Tokyo, Japan", date: "2026-12-03" },
+    { from: "Tokyo, Japan", to: "Kyoto, Japan", date: "2026-12-05" },
+    { from: "Kyoto, Japan", to: "Tokyo, Japan", date: "2026-12-07" },
+    { from: "Tokyo, Japan", to: "Houston, Texas", date: "2026-12-09" },
+  ]);
+  assert.notEqual(flightLegsKey(legs), flightLegsKey(planFlightLegs(itinerary, "Austin, Texas")));
+
+  // A one-city trip is just there and back.
+  const oneCity = { ...itinerary, destination: "Tokyo", days: itinerary.days.map((item) => ({ ...item, city: "Tokyo, Japan" })) };
+  assert.equal(planFlightLegs(oneCity, "Austin, Texas").length, 2);
+
+  // Searches saved before legs existed still read as one round trip.
+  const legacy = flightLegsOf({ status: "done", from: "Austin, Texas", options: [flight("NRT")], selectedId: "NRT" }, itinerary);
+  assert.equal(legacy.length, 1);
+  assert.equal(legacy[0].roundTrip, true);
+  assert.equal(chosenFlights({ status: "done", from: "Austin", options: [], legs: [{ ...legs[0], options: [flight("NRT")], selectedId: "NRT" }, { ...legs[1], options: [] }] }).length, 1);
 });

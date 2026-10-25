@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { flightLegsKey, planFlightLegs } from "@/lib/flight-legs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "../../../components/header";
@@ -71,6 +72,11 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
           tripName={trip.name || `${itinerary.destination} Trip`}
           destination={itinerary.destination}
           flights={trip.travel?.flights ?? {}}
+          itineraryStart={itinerary.startDate}
+          legsKeys={Object.fromEntries(trip.travelers.map((traveler) => {
+            const home = getDepartureCity(trip, traveler.id) ?? "";
+            return [traveler.id, home ? flightLegsKey(planFlightLegs(itinerary, home)) : ""];
+          }))}
           lodgingCount={Math.max(1, groupLodgers(trip).length)}
           lowestBudgetPerNight={lowestLodgingBudgetPerNight(trip)}
           searchConfigured={getSerpApiKey() !== null}

@@ -278,14 +278,31 @@ export type HotelSearchResult = {
   error?: string;
 };
 
+// One flight a traveler needs: home to the first city, between cities, and home again.
+export type FlightLeg = {
+  from: string;
+  to: string;
+  date: string;
+  options: FlightOption[];
+  selectedId?: string;
+  error?: string;
+  // Explains why flights land at a nearby airport instead of the city itself.
+  groundNote?: string;
+  // Only for trips searched before flights were split into legs (one round trip).
+  roundTrip?: boolean;
+};
+
 export type FlightSearchResult = {
   status: SearchStatus;
   startedAt?: string;
   from: string;
+  // One-way flights for each leg of the trip. Older trips have options/selectedId instead.
+  legs?: FlightLeg[];
+  // Which route the legs were searched for, so a changed itinerary searches again.
+  legsKey?: string;
   options: FlightOption[];
   selectedId?: string;
   error?: string;
-  // Explains why flights land at a nearby airport instead of the destination itself.
   groundNote?: string;
 };
 

@@ -245,7 +245,7 @@ test("chat, proposals and repository writes remain safe without provider calls",
     await suite.test("old hotel and flight responses cannot refill searches after an approved move", async () => {
       const original = await savedTrip();
       const oldHotels = await repository.claimHotelSearch(original.id, 0, true);
-      const oldFlights = await repository.claimFlightSearch(original.id, "Jay", "Austin");
+      const oldFlights = await repository.claimFlightSearch(original.id, "Jay", "Austin", "");
       assert.equal(oldHotels.status, "claimed"); assert.equal(oldFlights.status, "claimed");
       if (oldHotels.status !== "claimed" || oldFlights.status !== "claimed") return;
       const proposed = (await ask(original, "@muse move", majorResult(original))).trip;

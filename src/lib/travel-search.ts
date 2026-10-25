@@ -221,7 +221,8 @@ export type FlightSearch = {
   fromId: string;
   toId: string;
   outboundDate: string;
-  returnDate: string;
+  // Leave out for a one-way flight (each leg of a multi-city trip).
+  returnDate?: string;
 };
 
 export async function searchFlights(config: TravelSearchConfig, search: FlightSearch): Promise<FlightOption[]> {
@@ -230,8 +231,7 @@ export async function searchFlights(config: TravelSearchConfig, search: FlightSe
     departure_id: search.fromId,
     arrival_id: search.toId,
     outbound_date: search.outboundDate,
-    return_date: search.returnDate,
-    type: "1",
+    ...(search.returnDate ? { return_date: search.returnDate, type: "1" } : { type: "2" }),
     adults: "1",
     currency: "USD",
     hl: "en",

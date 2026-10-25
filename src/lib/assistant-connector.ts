@@ -1,4 +1,5 @@
 import "server-only";
+import { chosenFlight, chosenFlights, flightLegsOf } from "./flight-legs";
 
 import { createHmac, randomBytes } from "node:crypto";
 import { getHotelStays, groupLodgers, isSoloLodger, selectedGroupHotel, stayNights } from "./hotel-stays";
@@ -58,8 +59,12 @@ export function describeMyTrip(trip: Trip, travelerId: string) {
 }
 
 export function describeMyBookings(trip: Trip, travelerId: string) {
-  const flights = trip.travel?.flights?.[travelerId];
-  const flight = flights?.options.find((option) => option.id === flights.selectedId);
+  // One flight per leg: home to the first city, between cities, and home.
+  const legs = flightLegsOf(trip.travel?.flights?.[travelerId], trip.itinerary);
+  const flightLegs = legs.map((leg) => {
+    const flight = chosenFlight(leg);
+    return { from: leg.from, to: leg.to, date: leg.date, chosen: flight ? { airline: flight.airline, from: flight.departAirport, to: flight.arriveAirport, departs: flight.departTime, arrives: flight.arriveTime, stops: flight.stops, priceUsd: flight.price, fare: leg.roundTrip ? "round trip" : "one way", driveAfterLanding: flight.groundTransfer ?? null } : null };
+  });
   // One hotel per city the group sleeps in; solo lodgers have their own pick.
   const me = trip.travelers.find((traveler) => traveler.id === travelerId);
   const solo = me ? isSoloLodger(me) : false;
@@ -83,8 +88,8 @@ export function describeMyBookings(trip: Trip, travelerId: string) {
     items: [
       {
         item: "flight",
-        status: bookedKinds.has("flight") ? "booked" : flight ? "chosen, not booked" : "not chosen yet",
-        chosen: flight ? { airline: flight.airline, from: flight.departAirport, to: flight.arriveAirport, departs: flight.departTime, arrives: flight.arriveTime, stops: flight.stops, roundTripPriceUsd: flight.price } : null,
+        status: bookedKinds.has("flight") ? "booked" : flightLegs.length > 0 && flightLegs.every((leg) => leg.chosen) ? "chosen, not booked" : "not chosen for every leg yet",
+        legs: flightLegs,
         youBookThis: true,
       },
       {
@@ -100,15 +105,17 @@ export function describeMyBookings(trip: Trip, travelerId: string) {
 
 export function describeBookingDetails(trip: Trip, travelerId: string, item: "flight" | "hotel") {
   if (item === "flight") {
-    const flights = trip.travel?.flights?.[travelerId];
-    const flight = flights?.options.find((option) => option.id === flights.selectedId);
-    if (!flight || !trip.itinerary) return { error: "No flight is chosen yet. Choose one on the trip's Book Travel page." };
-    const query = encodeURIComponent(`flights from ${flight.departAirport} to ${flight.arriveAirport} on ${trip.itinerary.startDate} returning ${trip.itinerary.endDate}`);
+    const chosen = chosenFlights(trip.travel?.flights?.[travelerId], trip.itinerary);
+    if (chosen.length === 0 || !trip.itinerary) return { error: "No flight is chosen yet. Choose one on the trip's Book Travel page." };
+    const itinerary = trip.itinerary;
     return {
-      ...flight,
-      returnDate: trip.itinerary.endDate,
-      bookingSearchUrl: `https://www.google.com/travel/flights?q=${query}`,
-      note: "This is a round-trip fare. Pick the matching return flight on the airline or Google Flights before paying.",
+      legs: chosen.map(({ leg, flight }) => {
+        const query = encodeURIComponent(leg.roundTrip
+          ? `flights from ${flight.departAirport} to ${flight.arriveAirport} on ${itinerary.startDate} returning ${itinerary.endDate}`
+          : `one way flights from ${flight.departAirport} to ${flight.arriveAirport} on ${leg.date}`);
+        return { ...flight, date: leg.date, fare: leg.roundTrip ? "round trip" : "one way", bookingSearchUrl: `https://www.google.com/travel/flights?q=${query}` };
+      }),
+      note: "Each leg is its own ticket. Book every leg the traveler approved, and the drive after landing where one is listed.",
     };
   }
 

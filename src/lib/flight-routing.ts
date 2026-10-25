@@ -42,7 +42,7 @@ async function airportCodesNear(place: string, dependencies: FlightRoutingDepend
 export async function findFlightsWithNearbyAirports(
   from: string,
   destination: string,
-  dates: { outboundDate: string; returnDate: string },
+  dates: { outboundDate: string; returnDate?: string },
   dependencies: FlightRoutingDependencies,
 ): Promise<FlightRoutingResult> {
   const [fromId, toId] = await Promise.all([dependencies.findCityFlightId(from), dependencies.findCityFlightId(destination)]);
