@@ -6,11 +6,10 @@ import { getTripById } from "@/lib/trip-repository";
 import { CopyInviteLink } from "./copy-invite-link";
 import { MyPreferencesAction } from "./my-preferences-action";
 import {
-  findSharedDates,
   formatCalendarDate,
-  getContiguousDateWindows,
   type DateWindow,
 } from "@/lib/date-utils";
+import { calculatePlanningReadiness } from "@/lib/planning-context";
 
 export const instant = false;
 
@@ -25,6 +24,22 @@ function formatSharedWindow(window: DateWindow) {
   const endYear = window.endDate.slice(0, 4);
   const includeStartYear = startYear !== endYear;
   return `${formatCalendarDate(window.startDate, includeStartYear)} – ${formatCalendarDate(window.endDate)}`;
+}
+
+function getLongestSharedWindow(windows: DateWindow[]) {
+  if (windows.length === 0) {
+    return null;
+  }
+
+  let longestWindow = windows[0];
+
+  for (const window of windows) {
+    if (window.dayCount > longestWindow.dayCount) {
+      longestWindow = window;
+    }
+  }
+
+  return longestWindow;
 }
 
 export async function generateMetadata(props: PageProps<"/trip/[tripId]">): Promise<Metadata> {
@@ -52,23 +67,13 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
     ? `${trip.travelers.length} travelers joined · ${trip.expectedTravelerCount} expected`
     : `${trip.travelers.length} joined`;
   const joinPath = `/join?trip=${trip.inviteCode}`;
-  let completedPreferencesCount = 0;
-  let completedAvailabilityCount = 0;
-  const submittedAvailability: string[][] = [];
-  for (const traveler of trip.travelers) {
-    if (traveler.preferencesComplete) {
-      completedPreferencesCount += 1;
-    }
-
-    if (traveler.availabilityComplete) {
-      completedAvailabilityCount += 1;
-      submittedAvailability.push(traveler.availableDates || []);
-    }
-  }
-  const sharedDates = findSharedDates(submittedAvailability);
-  const sharedWindows = getContiguousDateWindows(sharedDates);
+  const planningReadiness = calculatePlanningReadiness(trip);
+  const completedPreferencesCount = planningReadiness.preferencesCompleteCount;
+  const completedAvailabilityCount = planningReadiness.availabilityCompleteCount;
+  const sharedWindows = planningReadiness.sharedWindows;
   const allTravelersSubmitted = completedAvailabilityCount === trip.travelers.length;
   const preferredDurationDays = trip.preferredDurationDays;
+  const longestSharedWindow = getLongestSharedWindow(sharedWindows);
 
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">
@@ -110,6 +115,81 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="planning-readiness">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="eyebrow">Planning readiness</p>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight" id="planning-readiness">
+                {planningReadiness.readyForCandidateGeneration
+                  ? "Ready for AI suggestions"
+                  : "Your group is still getting ready"}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[#718087]">
+                {planningReadiness.readyForCandidateGeneration
+                  ? "The current group has enough complete information for candidate generation."
+                  : "Complete the items below before generating trip options."}
+              </p>
+            </div>
+            <button
+              className="button-primary cursor-not-allowed opacity-60"
+              disabled
+              type="button"
+            >
+              Generate Trip Options
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-[#f7f7f3] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Current group</p>
+              <p className="mt-2 font-bold text-[#173f50]">
+                {planningReadiness.preferencesCompleteCount} preferences, {planningReadiness.availabilityCompleteCount} availability
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[#f7f7f3] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Shared window</p>
+              <p className="mt-2 font-bold text-[#173f50]">
+                {longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[#f7f7f3] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Planning mode</p>
+              <p className="mt-2 font-bold text-[#173f50]">
+                {planningReadiness.planningMode === "known_destination"
+                  ? `${trip.destination} / known destination`
+                  : "Destination will be suggested from group preferences"}
+              </p>
+            </div>
+          </div>
+
+          {planningReadiness.blockers.length > 0 ? (
+            <div className="mt-5 rounded-2xl bg-[#fff0ec] p-5 text-sm text-[#8f3f30]">
+              <p className="font-bold">Still needed</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {planningReadiness.blockers.map((blocker, index) => (
+                  <li key={`${blocker.code}-${blocker.travelerName || index}`}>{blocker.message}</li>
+                ))}
+              </ul>
+              {planningReadiness.blockers.some((blocker) => blocker.code === "no_shared_dates") ? (
+                <p className="mt-3 font-semibold">Edit availability before generating trip options.</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {planningReadiness.warnings.length > 0 ? (
+            <div className="mt-5 rounded-2xl bg-[#fff8dc] p-5 text-sm text-[#6f5a16]">
+              <p className="font-bold">Things to keep in mind</p>
+              <ul className="mt-2 list-disc space-y-1 pl-5">
+                {planningReadiness.warnings.map((warning) => (
+                  <li key={warning.code}>{warning.message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <p className="mt-4 text-xs font-semibold text-[#879196]">AI planning arrives in the next step.</p>
         </section>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">

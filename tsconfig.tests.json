@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": ".test-build",
+    "rootDir": "."
+  },
+  "include": [
+    "src/lib/date-utils.ts",
+    "src/lib/planning-context.ts",
+    "src/lib/trip-types.ts",
+    "tests/planning-context.test.ts"
+  ]
+}

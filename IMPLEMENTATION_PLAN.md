@@ -34,11 +34,12 @@ Each phase should leave the application runnable. Later phases should not block 
 - Let each traveler mark available dates inside the host's date window.
 - Make selected and unavailable dates visually clear.
 
-## Phase 6 - Persistence and Data Layer
+## Phase 6 - Planning Readiness and Context
 
-- Define simple typed models for trips, travelers, responses, candidates, votes, itineraries, and overrides.
-- Add the smallest reliable persistence approach needed for the demo.
-- Keep provider and reasoning boundaries clear.
+- Calculate deterministic readiness blockers and useful non-blocking warnings from persisted trip data.
+- Normalize complete group data into a private planning context for future candidate generation.
+- Reuse the existing shared-date and contiguous-window utilities without calling Muse or travel providers.
+- Show safe readiness status on the group dashboard without exposing private questionnaire answers.
 
 ## Phase 7 - Mock Candidate Generation
 
