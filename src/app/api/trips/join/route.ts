@@ -6,10 +6,9 @@ import { normalizeInviteCode, validateJoinTripInput } from "@/lib/trip-validatio
 function makeTripPreview(trip: Trip): JoinTripPreview {
   return {
     inviteCode: trip.inviteCode,
-    displayName: trip.destination ? `${trip.destination} Trip` : "Group Trip",
+    displayName: trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip"),
     hostName: trip.hostName,
     prompt: trip.prompt,
-    origin: trip.origin,
     destination: trip.destination,
     earliestPossibleDate: trip.earliestPossibleDate,
     latestPossibleDate: trip.latestPossibleDate,
@@ -59,6 +58,7 @@ export async function POST(request: Request) {
     const result = await addTravelerToTrip(
       validationResult.data.inviteCode,
       validationResult.data.travelerName,
+      validationResult.data.departureLocation,
     );
 
     if (result.status === "not-found") {

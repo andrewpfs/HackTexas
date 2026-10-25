@@ -22,7 +22,7 @@ export default async function AvailabilityPage(
     notFound();
   }
 
-  const tripName = trip.destination ? `${trip.destination} Trip` : "Group Trip";
+  const tripName = trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip");
   const formattedStart = formatCalendarDate(trip.earliestPossibleDate);
   const formattedEnd = formatCalendarDate(trip.latestPossibleDate);
 

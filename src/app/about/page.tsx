@@ -1,0 +1,9 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { Header } from "../components/header";
+
+export const metadata: Metadata = { title: "About" };
+
+export default function AboutPage() {
+  return <main className="min-h-screen bg-[#f8f6f1] text-[#172733]"><Header /><section className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20"><p className="eyebrow">Built for HackTX 2026</p><h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">Group travel should feel exciting before takeoff.</h1><p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f7078]">HackTX Trip Planner brings schedules, budgets, interests, lodging needs, and departure cities into one shared planning space. Instead of one person juggling polls and group chats, every traveler contributes to a plan the whole group can understand.</p><div className="mt-12 grid gap-6 md:grid-cols-2"><article className="ticket-card p-7"><p className="eyebrow">The Concept</p><h2 className="mt-3 text-2xl font-bold">Find the common ground</h2><p className="mt-3 leading-7 text-[#66757d]">The current demo collects traveler details, calculates shared availability, and creates deterministic candidate trips. Future phases will add Muse-powered group reasoning without fabricating live travel inventory.</p></article><article className="ticket-card p-7"><p className="eyebrow">The Team</p><h2 className="mt-3 text-2xl font-bold">Built by our HackTX 2026 team</h2><p className="mt-3 leading-7 text-[#66757d]">This section is ready for team names and roles when the final roster is added. No names have been invented.</p></article></div><div className="mt-10 flex flex-wrap gap-3"><Link className="button-primary" href="/create">Plan a Trip</Link><Link className="button-secondary" href="/">Back Home</Link></div></section></main>;
+}

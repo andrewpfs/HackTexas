@@ -7,6 +7,7 @@ import { CopyInviteLink } from "./copy-invite-link";
 import { MyPreferencesAction } from "./my-preferences-action";
 import {
   formatCalendarDate,
+  getContiguousDateWindows,
   type DateWindow,
 } from "@/lib/date-utils";
 import { calculatePlanningReadiness } from "@/lib/planning-context";
@@ -15,7 +16,7 @@ import { GenerateCandidatesAction } from "./generate-candidates-action";
 
 export const instant = false;
 
-const progressSteps = ["Preferences", "Trip Options", "Vote", "Final Itinerary"];
+const progressSteps = ["Get Ready", "Compare Options", "Decide Together", "Shared Itinerary"];
 
 function formatSharedWindow(window: DateWindow) {
   if (window.startDate === window.endDate) {
@@ -52,18 +53,19 @@ export async function generateMetadata(props: PageProps<"/trip/[tripId]">): Prom
     return { title: "Trip not found" };
   }
 
-  return { title: trip.destination ? `${trip.destination} Trip` : "Group Trip" };
+  return { title: trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip") };
 }
 
 export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
   const { tripId } = await props.params;
+  const searchParams = await props.searchParams;
   const trip = await getTripById(tripId);
 
   if (!trip) {
     notFound();
   }
 
-  const displayName = trip.destination ? `${trip.destination} Trip` : "Group Trip";
+  const displayName = trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip");
   const travelWindow = `${formatCalendarDate(trip.earliestPossibleDate)} – ${formatCalendarDate(trip.latestPossibleDate)}`;
   const travelerCount = trip.expectedTravelerCount
     ? `${trip.travelers.length} travelers joined · ${trip.expectedTravelerCount} expected`
@@ -98,7 +100,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             </div>
             <dl className="grid grid-cols-2 gap-x-9 gap-y-4 text-sm lg:text-right">
               <div><dt className="text-white/50">Host</dt><dd className="mt-1 font-bold">{trip.hostName}</dd></div>
-              <div><dt className="text-white/50">From</dt><dd className="mt-1 font-bold">{trip.origin}</dd></div>
               <div><dt className="text-white/50">Travel window</dt><dd className="mt-1 font-bold">{travelWindow}</dd></div>
               <div><dt className="text-white/50">Destination</dt><dd className="mt-1 font-bold">{trip.destination || "Not chosen yet"}</dd></div>
               <div><dt className="text-white/50">Preferred duration</dt><dd className="mt-1 font-bold">{trip.preferredDurationDays ? `${trip.preferredDurationDays} days` : "Not specified"}</dd></div>
@@ -122,6 +123,28 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
           </ol>
         </section>
 
+        <MyPreferencesAction
+          tripId={trip.id}
+          travelers={trip.travelers.map((traveler) => ({
+            id: traveler.id,
+            isHost: traveler.isHost,
+            departureLocation: traveler.departureLocation || (traveler.isHost ? trip.origin : ""),
+            preferencesComplete: traveler.preferencesComplete,
+            availabilityComplete: traveler.availabilityComplete === true,
+          }))}
+        />
+
+        {typeof searchParams.availabilityUpdated === "string" ? (
+          <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-semibold text-[#6f5a16]" role="status">
+            The trip window changed. Dates outside the new window were removed for {searchParams.availabilityUpdated} {searchParams.availabilityUpdated === "1" ? "traveler" : "travelers"}; they will need to review and resubmit availability.
+          </p>
+        ) : null}
+        {searchParams.tripUpdated === "1" ? (
+          <p className="mt-4 rounded-2xl bg-[#daf0ea] p-4 text-sm font-semibold text-[#276655]" role="status">
+            Trip details updated. Any older candidate options were cleared.
+          </p>
+        ) : null}
+
         <section className="mt-6 rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="planning-readiness">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
@@ -144,32 +167,24 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
             />
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl bg-[#f7f7f3] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Current group</p>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]" title="Completed preference and availability submissions from joined travelers.">Current group</p>
               <p className="mt-2 font-bold text-[#173f50]">
                 {planningReadiness.preferencesCompleteCount} preferences, {planningReadiness.availabilityCompleteCount} availability
               </p>
             </div>
             <div className="rounded-2xl bg-[#f7f7f3] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Shared window</p>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]" title="The longest consecutive date range currently shared by submitted travelers.">Shared window</p>
               <p className="mt-2 font-bold text-[#173f50]">
                 {longestSharedWindow ? formatSharedWindow(longestSharedWindow) : "None yet"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-[#f7f7f3] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#879196]">Planning mode</p>
-              <p className="mt-2 font-bold text-[#173f50]">
-                {planningReadiness.planningMode === "known_destination"
-                  ? `${trip.destination} / known destination`
-                  : "Destination will be suggested from group preferences"}
               </p>
             </div>
           </div>
 
           {planningReadiness.blockers.length > 0 ? (
             <div className="mt-5 rounded-2xl bg-[#fff0ec] p-5 text-sm text-[#8f3f30]">
-              <p className="font-bold">Still needed</p>
+              <p className="font-bold">📝 Still Needed</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {planningReadiness.blockers.map((blocker, index) => (
                   <li key={`${blocker.code}-${blocker.travelerName || index}`}>{blocker.message}</li>
@@ -183,7 +198,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
 
           {planningReadiness.warnings.length > 0 ? (
             <div className="mt-5 rounded-2xl bg-[#fff8dc] p-5 text-sm text-[#6f5a16]">
-              <p className="font-bold">Things to keep in mind</p>
+              <p className="font-bold">💡 Keep in Mind</p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 {planningReadiness.warnings.map((warning) => (
                   <li key={warning.code}>{warning.message}</li>
@@ -212,6 +227,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#173f50] text-sm font-bold text-white">{traveler.name.charAt(0).toUpperCase()}</span>
                     <div className="min-w-0 flex-1">
                       <p className="font-semibold">{traveler.name}{traveler.isHost ? " (Host)" : ""}</p>
+                      <p className="mt-1 text-xs text-[#718087]">Departing from {traveler.departureLocation || (traveler.isHost ? trip.origin : "Not added yet")}</p>
                       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold">
                         <span className={traveler.preferencesComplete ? "text-[#276655]" : "text-[#778388]"}>
                           Preferences {traveler.preferencesComplete ? "✓" : "waiting"}
@@ -229,14 +245,6 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 <br />
                 {completedAvailabilityCount} of {trip.travelers.length} travelers submitted availability
               </p>
-              <MyPreferencesAction
-                tripId={trip.id}
-                travelers={trip.travelers.map((traveler) => ({
-                  id: traveler.id,
-                  preferencesComplete: traveler.preferencesComplete,
-                  availabilityComplete: traveler.availabilityComplete === true,
-                }))}
-              />
             </section>
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
@@ -246,6 +254,12 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 <p className="mt-5 rounded-2xl bg-[#f7f7f3] p-5 text-sm leading-6 text-[#718087]">Waiting for travelers to submit availability.</p>
               ) : (
                 <div className="mt-5">
+                  <div className="mb-5 space-y-2">
+                    {trip.travelers.map((traveler) => {
+                      const travelerWindows = getContiguousDateWindows(traveler.availableDates || []);
+                      return <details className="rounded-2xl border border-[#172733]/8 bg-[#f7f7f3] p-4" key={traveler.id}><summary className="cursor-pointer font-bold text-[#173f50]">{traveler.name} <span className="font-normal text-[#718087]">· {traveler.availabilityComplete ? `${traveler.availableDates?.length || 0} dates` : "Not submitted"}</span></summary>{travelerWindows.length > 0 ? <ul className="mt-3 space-y-1 text-sm text-[#607179]">{travelerWindows.map((window) => <li key={`${traveler.id}-${window.startDate}`}>{formatSharedWindow(window)}</li>)}</ul> : <p className="mt-3 text-sm text-[#718087]">No availability saved yet.</p>}</details>;
+                    })}
+                  </div>
                   <p className="text-sm font-bold text-[#3b505a]">
                     {allTravelersSubmitted
                       ? "Shared group availability"
@@ -285,7 +299,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
           <div className="space-y-6">
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="trip-details">
               <p className="eyebrow">Trip details</p>
-              <h2 className="mt-2 text-2xl font-bold tracking-tight" id="trip-details">What the host shared</h2>
+              <h2 className="mt-2 text-2xl font-bold tracking-tight" id="trip-details">Trip Brief</h2>
               <dl className="mt-6 space-y-4 text-sm">
                 <div><dt className="font-bold text-[#3b505a]">Destination</dt><dd className="mt-1 text-[#718087]">{trip.destination || "Destination not chosen yet"}</dd></div>
                 <div><dt className="font-bold text-[#3b505a]">Possible travel window</dt><dd className="mt-1 text-[#718087]">{travelWindow}</dd></div>
@@ -308,7 +322,7 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
               </div>
               <div className="border-t border-[#172733]/8 bg-[#173f50] p-6 text-white sm:p-8">
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Coming after preferences</p>
-                <p className="mt-2 text-lg font-bold">Three options → one group vote → one shared itinerary</p>
+                <p className="mt-2 text-lg font-bold">Get Ready → Compare Options → Decide Together → Shared Itinerary</p>
                 <p className="mt-2 text-sm leading-6 text-white/65">Voting and final itinerary generation are intentionally deferred.</p>
               </div>
             </section>

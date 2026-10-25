@@ -16,7 +16,9 @@
     "src/lib/mock-candidate-planner.ts",
     "src/lib/planning-context.ts",
     "src/lib/trip-types.ts",
+    "src/lib/trip-updates.ts",
     "tests/planning-context.test.ts",
-    "tests/candidate-planner.test.ts"
+    "tests/candidate-planner.test.ts",
+    "tests/trip-updates.test.ts"
   ]
 }

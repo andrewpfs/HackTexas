@@ -21,10 +21,9 @@ export default async function JoinTripPage(props: PageProps<"/join">) {
   if (trip) {
     initialPreview = {
       inviteCode: trip.inviteCode,
-      displayName: trip.destination ? `${trip.destination} Trip` : "Group Trip",
+      displayName: trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip"),
       hostName: trip.hostName,
       prompt: trip.prompt,
-      origin: trip.origin,
       destination: trip.destination,
       earliestPossibleDate: trip.earliestPossibleDate,
       latestPossibleDate: trip.latestPossibleDate,

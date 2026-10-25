@@ -9,6 +9,7 @@ import {
   type LodgingAmenity,
   type LodgingType,
   type TravelerPreferences,
+  type UpdateTripInput,
 } from "./trip-types";
 import { isValidISODate } from "./date-utils";
 
@@ -17,7 +18,7 @@ export type TripValidationResult =
   | { valid: false; errors: string[] };
 
 export type JoinTripValidationResult =
-  | { valid: true; data: { inviteCode: string; travelerName: string } }
+  | { valid: true; data: { inviteCode: string; travelerName: string; departureLocation: string } }
   | { valid: false; error: string };
 
 export type PreferencesValidationResult =
@@ -26,6 +27,10 @@ export type PreferencesValidationResult =
 
 export type AvailabilityValidationResult =
   | { valid: true; data: { availableDates: string[] } }
+  | { valid: false; errors: string[] };
+
+export type UpdateTripValidationResult =
+  | { valid: true; data: UpdateTripInput }
   | { valid: false; errors: string[] };
 
 export const maximumTravelerNameLength = 80;
@@ -80,8 +85,9 @@ export function validateCreateTripInput(body: unknown): TripValidationResult {
   const values = body as Record<string, unknown>;
   const errors: string[] = [];
   const hostName = readRequiredText(values.hostName, "Your name", errors);
+  const name = readOptionalText(values.name);
   const prompt = readRequiredText(values.prompt, "Trip idea", errors);
-  const origin = readRequiredText(values.origin, "Starting city", errors);
+  const origin = readRequiredText(values.origin, "Departure city", errors);
   const destination = readOptionalText(values.destination);
   const earliestPossibleDate = readRequiredText(values.earliestPossibleDate, "Earliest date", errors);
   const latestPossibleDate = readRequiredText(values.latestPossibleDate, "Latest date", errors);
@@ -113,6 +119,7 @@ export function validateCreateTripInput(body: unknown): TripValidationResult {
     valid: true,
     data: {
       hostName,
+      name,
       prompt,
       origin,
       destination,
@@ -151,7 +158,60 @@ export function validateJoinTripInput(body: unknown): JoinTripValidationResult {
     };
   }
 
-  return { valid: true, data: { inviteCode, travelerName } };
+  const departureLocation = readRequiredText(
+    values.departureLocation,
+    "Departure city",
+    [],
+  );
+  if (departureLocation === "") {
+    return { valid: false, error: "Where you are traveling from is required." };
+  }
+
+  return { valid: true, data: { inviteCode, travelerName, departureLocation } };
+}
+
+export function validateUpdateTripInput(body: unknown): UpdateTripValidationResult {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return { valid: false, errors: ["Please provide valid trip details."] };
+  }
+
+  const values = body as Record<string, unknown>;
+  const errors: string[] = [];
+  const name = readOptionalText(values.name);
+  const prompt = readRequiredText(values.prompt, "Trip idea", errors);
+  const destination = readOptionalText(values.destination);
+  const earliestPossibleDate = readRequiredText(values.earliestPossibleDate, "Earliest date", errors);
+  const latestPossibleDate = readRequiredText(values.latestPossibleDate, "Latest date", errors);
+
+  if (earliestPossibleDate !== "" && !isValidISODate(earliestPossibleDate)) {
+    errors.push("Earliest date must be a valid date.");
+  }
+  if (latestPossibleDate !== "" && !isValidISODate(latestPossibleDate)) {
+    errors.push("Latest date must be a valid date.");
+  }
+  if (isValidISODate(earliestPossibleDate) && isValidISODate(latestPossibleDate) && latestPossibleDate < earliestPossibleDate) {
+    errors.push("Latest date cannot be before earliest date.");
+  }
+
+  const preferredDurationDays = readOptionalInteger(values.preferredDurationDays, "Preferred duration", 365, errors);
+  const expectedTravelerCount = readOptionalInteger(values.expectedTravelerCount, "Expected traveler count", 100, errors);
+
+  if (errors.length > 0) {
+    return { valid: false, errors };
+  }
+
+  return {
+    valid: true,
+    data: {
+      name,
+      prompt,
+      destination,
+      earliestPossibleDate,
+      latestPossibleDate,
+      preferredDurationDays,
+      expectedTravelerCount,
+    },
+  };
 }
 
 function readMoneyAmount(

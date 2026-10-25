@@ -14,7 +14,7 @@ export function CopyInviteLink({ joinPath }: CopyInviteLinkProps) {
 
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setCopyMessage("Invite link copied.");
+      setCopyMessage("Copied!");
     } catch {
       setCopyMessage("Copy failed. You can copy the visible link above.");
     }
@@ -22,7 +22,7 @@ export function CopyInviteLink({ joinPath }: CopyInviteLinkProps) {
 
   return (
     <>
-      <button className="button-secondary mt-4 w-full" onClick={copyInviteLink} type="button">Copy invite link</button>
+      <button className="button-secondary mt-4 w-full" onClick={copyInviteLink} type="button"><span aria-hidden="true">🔗</span> Copy Invite Link</button>
       <p className="mt-2 min-h-4 text-center text-xs text-[#8a9498]" role="status">{copyMessage}</p>
     </>
   );

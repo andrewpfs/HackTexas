@@ -21,7 +21,7 @@ export default async function PreferencesPage(
     notFound();
   }
 
-  const tripName = trip.destination ? `${trip.destination} Trip` : "Group Trip";
+  const tripName = trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip");
 
   return (
     <main className="min-h-screen bg-[#f2f0ea] text-[#172733]">

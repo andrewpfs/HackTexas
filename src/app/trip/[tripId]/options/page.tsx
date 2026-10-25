@@ -18,7 +18,7 @@ export async function generateMetadata(
     return { title: "Trip not found" };
   }
 
-  return { title: `Trip Options | ${trip.destination || "Group Trip"}` };
+  return { title: `Trip Options | ${trip.name || trip.destination || "Group Trip"}` };
 }
 
 export default async function TripOptionsPage(
@@ -69,7 +69,8 @@ export default async function TripOptionsPage(
                 <span className="rounded-full bg-[#f3c969] px-3 py-1 text-xs font-bold text-[#173f50]">3 options ready</span>
                 <span className="text-sm text-white/60">Demo planner</span>
               </div>
-              <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Compare your group&apos;s trip options</h1>
+              <h1 className="mt-5 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">{trip.name || (trip.destination ? `${trip.destination} Trip` : "Group Trip")}</h1>
+              <p className="mt-2 text-xl font-semibold text-[#f3c969]">Compare your group&apos;s trip options</p>
               <p className="mt-4 text-lg leading-7 text-white/70">
                 Each concept uses the same shared dates and group preferences, with a different pace and focus.
               </p>

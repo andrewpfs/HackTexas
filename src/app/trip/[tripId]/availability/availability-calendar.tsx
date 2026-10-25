@@ -184,8 +184,8 @@ export function AvailabilityCalendar({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="button-secondary min-h-0 px-4 py-2 text-sm" onClick={() => setSelectedDates([...allSelectableDates])} type="button">Select all dates</button>
-            <button className="button-secondary min-h-0 px-4 py-2 text-sm" onClick={() => setSelectedDates([])} type="button">Clear selection</button>
+            <button className="button-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setSelectedDates([...allSelectableDates])} type="button">I&apos;m Free for All Dates</button>
+            <button className="button-secondary min-h-11 px-4 py-2 text-sm" onClick={() => setSelectedDates([])} type="button">Clear Dates</button>
           </div>
         </div>
 

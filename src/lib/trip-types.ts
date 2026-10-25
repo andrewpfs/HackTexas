@@ -60,6 +60,7 @@ export type Traveler = {
   id: string;
   name: string;
   isHost: boolean;
+  departureLocation?: string;
   preferencesComplete: boolean;
   preferences?: TravelerPreferences;
   availabilityComplete?: boolean;
@@ -98,6 +99,7 @@ export type Trip = {
   id: string;
   inviteCode: string;
   hostName: string;
+  name?: string;
   prompt: string;
   origin: string;
   destination?: string;
@@ -114,8 +116,19 @@ export type Trip = {
 
 export type CreateTripInput = {
   hostName: string;
+  name?: string;
   prompt: string;
   origin: string;
+  destination?: string;
+  earliestPossibleDate: string;
+  latestPossibleDate: string;
+  preferredDurationDays?: number;
+  expectedTravelerCount?: number;
+};
+
+export type UpdateTripInput = {
+  name?: string;
+  prompt: string;
   destination?: string;
   earliestPossibleDate: string;
   latestPossibleDate: string;
@@ -128,7 +141,6 @@ export type JoinTripPreview = {
   displayName: string;
   hostName: string;
   prompt: string;
-  origin: string;
   destination?: string;
   earliestPossibleDate: string;
   latestPossibleDate: string;

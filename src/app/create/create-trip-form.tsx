@@ -26,6 +26,7 @@ export function CreateTripForm() {
     const formData = new FormData(event.currentTarget);
     const requestBody = {
       hostName: formData.get("hostName"),
+      name: formData.get("name"),
       prompt: formData.get("prompt"),
       origin: formData.get("origin"),
       destination: formData.get("destination"),
@@ -64,13 +65,18 @@ export function CreateTripForm() {
         <input className="form-control" id="host-name" name="hostName" placeholder="Jay" required type="text" />
       </div>
       <div className="mt-7">
+        <label className="form-label" htmlFor="trip-name">Trip name <span className="font-normal text-[#879196]">(optional)</span></label>
+        <input className="form-control" id="trip-name" name="name" placeholder="Tin&apos;tastic Tokyo Trip" type="text" />
+        <p className="mt-2 text-sm text-[#7a878d]">Leave blank and we will use the destination or “Group Trip.”</p>
+      </div>
+      <div className="mt-7">
         <label className="form-label" htmlFor="trip-idea">Trip idea</label>
         <textarea className="form-control min-h-32 resize-y" id="trip-idea" name="prompt" placeholder="Four friends from Austin want to travel somewhere during winter break for about five days." required />
         <p className="mt-2 text-sm text-[#7a878d]">A sentence or two is plenty.</p>
       </div>
       <div className="mt-7 grid gap-5 sm:grid-cols-2">
         <div>
-          <label className="form-label" htmlFor="origin">Starting city</label>
+          <label className="form-label" htmlFor="origin">Where are you traveling from?</label>
           <input className="form-control" id="origin" name="origin" placeholder="Austin, Texas" required type="text" />
         </div>
         <div>
@@ -78,14 +84,15 @@ export function CreateTripForm() {
           <input className="form-control" id="destination" name="destination" placeholder="Tokyo, Japan" type="text" />
         </div>
       </div>
-      <fieldset className="mt-7">
-        <legend className="text-base font-bold">Possible travel window</legend>
-        <p className="mt-1 text-sm text-[#7a878d]">Use the widest dates your group could consider.</p>
-        <div className="mt-4 grid gap-5 sm:grid-cols-2">
+      <fieldset className="ticket-card mt-7 p-5 sm:p-6">
+        <legend className="px-2 text-sm font-bold uppercase tracking-[0.14em] text-[#173f50]">📅 Trip Window</legend>
+        <p className="mt-1 text-sm text-[#66757d]">Choose the earliest and latest dates the group could consider.</p>
+        <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
           <div>
             <label className="form-label" htmlFor="earliest-date">Earliest date</label>
             <input className="form-control" id="earliest-date" name="earliestPossibleDate" required type="date" />
           </div>
+          <span className="hidden pb-3 text-xl text-[#e4664f] sm:block" aria-hidden="true">→</span>
           <div>
             <label className="form-label" htmlFor="latest-date">Latest date</label>
             <input className="form-control" id="latest-date" name="latestPossibleDate" required type="date" />

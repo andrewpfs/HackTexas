@@ -32,6 +32,7 @@ function makeCompleteTraveler(
     id,
     name,
     isHost,
+    departureLocation: isHost ? "Austin, Texas" : "Houston, Texas",
     preferencesComplete: true,
     preferences: makePreferences(isHost ? 1800 : 2200),
     availabilityComplete: true,
@@ -187,12 +188,26 @@ test("planning context has deterministic traveler and date ordering", () => {
   }
 
   assert.equal(result.context.travelers[0].name, "Host Person");
+  assert.equal(result.context.travelers[0].departureLocation, "Austin, Texas");
   assert.equal(result.context.travelers[1].name, "Guest Person");
+  assert.equal(result.context.travelers[1].departureLocation, "Houston, Texas");
   assert.deepEqual(result.context.travelers[1].availableDates, [
     "2026-12-03",
     "2026-12-04",
     "2026-12-05",
   ]);
+});
+
+test("legacy host origin is used but a guest without an origin is blocked", () => {
+  const trip = makeReadyTrip();
+  trip.travelers[0].departureLocation = undefined;
+  trip.travelers[1].departureLocation = undefined;
+
+  const readiness = calculatePlanningReadiness(trip);
+
+  const originBlockers = readiness.blockers.filter((blocker) => blocker.code === "departure_location_missing");
+  assert.equal(originBlockers.length, 1);
+  assert.equal(originBlockers[0].travelerName, "Guest Person");
 });
 
 test("an old trip without availability fields remains readable but not ready", () => {

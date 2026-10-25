@@ -1,24 +1,5 @@
 import Link from "next/link";
 
 export function Header() {
-  return (
-    <header className="relative z-20 border-b border-[#172733]/10 bg-[#f8f6f1]/95 px-5 backdrop-blur sm:px-8 lg:px-10">
-      <div className="mx-auto flex h-18 max-w-7xl items-center justify-between">
-        <Link className="flex items-center gap-2.5 font-bold tracking-tight text-[#102a38]" href="/">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#173f50] text-[#f3c969]" aria-hidden="true">
-            ✦
-          </span>
-          <span className="hidden sm:inline">HackTX Trip Planner</span>
-        </Link>
-        <nav className="flex items-center gap-2" aria-label="Primary navigation">
-          <Link className="hidden rounded-full px-4 py-2 text-sm font-semibold text-[#52646d] hover:bg-white sm:block" href="/join">
-            Join a trip
-          </Link>
-          <Link className="rounded-full bg-[#173f50] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#24586c]" href="/create">
-            Plan a trip
-          </Link>
-        </nav>
-      </div>
-    </header>
-  );
+  return <header className="relative z-20 border-b border-white/10 bg-[#123746] px-4 text-white shadow-sm sm:px-8 lg:px-10"><div className="mx-auto flex min-h-18 max-w-7xl flex-wrap items-center justify-between gap-2 py-3"><Link className="flex items-center gap-2.5 font-bold tracking-tight text-white" href="/"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3c969] text-[#173f50]" aria-hidden="true">✦</span><span className="text-sm sm:text-base">HackTX Trip Planner</span></Link><nav className="order-3 flex w-full items-center justify-between gap-1 border-t border-white/10 pt-2 sm:order-2 sm:w-auto sm:border-0 sm:pt-0" aria-label="Primary navigation"><Link className="nav-link" href="/">Home</Link><Link className="nav-link" href="/create">Plan a Trip</Link><Link className="nav-link" href="/join">Join a Trip</Link><Link className="nav-link" href="/about">About</Link></nav></div></header>;
 }

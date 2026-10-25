@@ -13,7 +13,10 @@
     "posttest:planning": "npm run clean:test-build",
     "pretest:candidates": "npm run clean:test-build",
     "test:candidates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/candidate-planner.test.js",
-    "posttest:candidates": "npm run clean:test-build"
+    "posttest:candidates": "npm run clean:test-build",
+    "pretest:updates": "npm run clean:test-build",
+    "test:updates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/trip-updates.test.js",
+    "posttest:updates": "npm run clean:test-build"
   },
   "dependencies": {
     "next": "16.4.3",

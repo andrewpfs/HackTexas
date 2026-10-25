@@ -24,6 +24,7 @@ export async function GET(
       name: traveler.name,
       isHost: traveler.isHost,
       preferencesComplete: traveler.preferencesComplete,
+      departureLocation: traveler.departureLocation || (traveler.isHost ? trip.origin : ""),
       preferences: traveler.preferences,
     },
   });
@@ -60,8 +61,21 @@ export async function PUT(
     );
   }
 
+  const values = requestBody as Record<string, unknown>;
+  if (typeof values.departureLocation !== "string" || values.departureLocation.trim() === "") {
+    return NextResponse.json(
+      { error: "Departure city is required.", errors: ["Where you are traveling from is required."] },
+      { status: 400 },
+    );
+  }
+
   try {
-    const result = await updateTravelerPreferences(tripId, travelerId, validationResult.data);
+    const result = await updateTravelerPreferences(
+      tripId,
+      travelerId,
+      validationResult.data,
+      values.departureLocation.trim(),
+    );
     if (result.status !== "updated") {
       return NextResponse.json({ error: "We couldn't find that traveler on this trip." }, { status: 404 });
     }
@@ -72,6 +86,7 @@ export async function PUT(
         name: result.traveler.name,
         isHost: result.traveler.isHost,
         preferencesComplete: result.traveler.preferencesComplete,
+        departureLocation: result.traveler.departureLocation,
         preferences: result.traveler.preferences,
       },
     });

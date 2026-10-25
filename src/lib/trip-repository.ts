@@ -3,8 +3,9 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import type { CandidateTripOption, TravelerPreferences, Trip } from "./trip-types";
+import type { CandidateTripOption, TravelerPreferences, Trip, UpdateTripInput } from "./trip-types";
 import { normalizeInviteCode } from "./trip-validation";
+import { applyTripDetailsUpdate } from "./trip-updates";
 
 type TripStore = {
   trips: Trip[];
@@ -88,7 +89,7 @@ export async function getTripByInviteCode(inviteCode: string) {
   return null;
 }
 
-export async function addTravelerToTrip(inviteCode: string, travelerName: string) {
+export async function addTravelerToTrip(inviteCode: string, travelerName: string, departureLocation: string) {
   const normalizedInviteCode = normalizeInviteCode(inviteCode);
   const normalizedTravelerName = travelerName.trim().toLowerCase();
   const store = await readStore();
@@ -109,12 +110,15 @@ export async function addTravelerToTrip(inviteCode: string, travelerName: string
       id: randomUUID(),
       name: travelerName.trim(),
       isHost: false,
+      departureLocation: departureLocation.trim(),
       preferencesComplete: false,
       availabilityComplete: false,
       availableDates: [],
     };
 
     trip.travelers.push(traveler);
+    trip.candidateOptions = undefined;
+    trip.candidatesGeneratedAt = undefined;
     store.trips[tripIndex] = trip;
     await mkdir(dataDirectory, { recursive: true });
     await writeFile(dataFilePath, JSON.stringify(store, null, 2), "utf8");
@@ -129,6 +133,7 @@ export async function updateTravelerPreferences(
   tripId: string,
   travelerId: string,
   preferences: TravelerPreferences,
+  departureLocation: string,
 ) {
   const store = await readStore();
 
@@ -145,7 +150,10 @@ export async function updateTravelerPreferences(
       }
 
       traveler.preferences = preferences;
+      traveler.departureLocation = departureLocation.trim();
       traveler.preferencesComplete = true;
+      trip.candidateOptions = undefined;
+      trip.candidatesGeneratedAt = undefined;
       trip.travelers[travelerIndex] = traveler;
       store.trips[tripIndex] = trip;
 
@@ -182,6 +190,8 @@ export async function updateTravelerAvailability(
 
       traveler.availableDates = availableDates;
       traveler.availabilityComplete = true;
+      trip.candidateOptions = undefined;
+      trip.candidatesGeneratedAt = undefined;
       trip.travelers[travelerIndex] = traveler;
       store.trips[tripIndex] = trip;
 
@@ -192,6 +202,35 @@ export async function updateTravelerAvailability(
     }
 
     return { status: "traveler-not-found" as const };
+  }
+
+  return { status: "trip-not-found" as const };
+}
+
+export async function updateTripDetails(
+  tripId: string,
+  hostTravelerId: string,
+  input: UpdateTripInput,
+) {
+  const store = await readStore();
+
+  for (let tripIndex = 0; tripIndex < store.trips.length; tripIndex += 1) {
+    const trip = store.trips[tripIndex];
+    if (trip.id !== tripId) {
+      continue;
+    }
+
+    const hostTraveler = trip.travelers.find((traveler) => traveler.id === hostTravelerId);
+    if (!hostTraveler || !hostTraveler.isHost) {
+      return { status: "not-host" as const };
+    }
+
+    const affectedTravelerCount = applyTripDetailsUpdate(trip, input);
+    store.trips[tripIndex] = trip;
+
+    await mkdir(dataDirectory, { recursive: true });
+    await writeFile(dataFilePath, JSON.stringify(store, null, 2), "utf8");
+    return { status: "updated" as const, trip, affectedTravelerCount };
   }
 
   return { status: "trip-not-found" as const };

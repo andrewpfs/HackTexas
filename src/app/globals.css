@@ -27,6 +27,10 @@ body {
   font-family: "Avenir Next", "Segoe UI", Arial, sans-serif;
 }
 
+a {
+  text-underline-offset: 0.2em;
+}
+
 button,
 input,
 textarea,
@@ -131,4 +135,123 @@ select:focus-visible {
   border-color: #e4664f;
   box-shadow: 0 0 0 4px rgba(228, 102, 79, 0.1);
   outline: none;
+}
+
+.nav-link {
+  border-radius: 9999px;
+  padding: 0.55rem 0.65rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.ticket-card {
+  position: relative;
+  border: 1px solid rgba(23, 63, 80, 0.14);
+  border-radius: 1.5rem;
+  background: white;
+  box-shadow: 0 12px 35px rgba(23, 63, 80, 0.06);
+}
+
+.ticket-card::after {
+  content: "";
+  position: absolute;
+  left: 1.25rem;
+  right: 1.25rem;
+  bottom: 0.55rem;
+  border-bottom: 1px dashed rgba(23, 63, 80, 0.16);
+}
+
+.money-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d5d9d7;
+  border-radius: 0.875rem;
+  background: white;
+  color: #53666f;
+}
+
+.money-control span {
+  padding: 0 0.9rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.money-control input {
+  min-width: 0;
+  border: 0;
+  border-inline: 1px solid #e3e5e2;
+  padding: 0.85rem 0.75rem;
+  color: #172733;
+  outline: none;
+}
+
+.money-control:focus-within {
+  border-color: #e4664f;
+  box-shadow: 0 0 0 4px rgba(228, 102, 79, 0.1);
+}
+
+.activity-choice {
+  display: flex;
+  min-height: 3.25rem;
+  cursor: pointer;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid #d5d9d7;
+  border-radius: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #53666f;
+}
+
+.activity-choice-selected {
+  border-color: #173f50;
+  background: #173f50;
+  color: white;
+}
+
+.todo-card {
+  display: flex;
+  min-height: 5.5rem;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid rgba(23, 63, 80, 0.12);
+  border-radius: 1rem;
+  background: #f7f7f3;
+  padding: 1rem;
+  color: #53666f;
+}
+
+.todo-card strong {
+  margin-top: 0.65rem;
+  color: #173f50;
+}
+
+@media (min-width: 640px) {
+  .nav-link {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .button-primary,
+  .button-secondary,
+  .button-dark {
+    min-height: 3rem;
+    padding-inline: 1rem;
+  }
+
+  input[type="date"] {
+    min-width: 0;
+  }
 }

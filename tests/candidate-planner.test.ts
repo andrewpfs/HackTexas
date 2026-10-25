@@ -37,6 +37,7 @@ function makeTraveler(
     id,
     name,
     isHost,
+    departureLocation: isHost ? "Austin, Texas" : "Dallas, Texas",
     preferencesComplete: true,
     preferences: makePreferences(isHost ? 1500 : 1900, isHost ? 4 : 3),
     availabilityComplete: true,

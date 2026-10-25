@@ -7,10 +7,10 @@ export const metadata: Metadata = {
 };
 
 const travelers = [
-  { name: "Jay", initial: "J", complete: true, color: "bg-[#173f50]" },
-  { name: "Henry", initial: "H", complete: true, color: "bg-[#476f80]" },
-  { name: "Andrew", initial: "A", complete: false, color: "bg-[#e79b68]" },
-  { name: "Maya", initial: "M", complete: false, color: "bg-[#aa7f9c]" },
+  { name: "Jay", origin: "Austin", initial: "J", complete: true, color: "bg-[#173f50]" },
+  { name: "Henry", origin: "Houston", initial: "H", complete: true, color: "bg-[#476f80]" },
+  { name: "Andrew", origin: "Dallas", initial: "A", complete: false, color: "bg-[#e79b68]" },
+  { name: "Maya", origin: "San Antonio", initial: "M", complete: false, color: "bg-[#aa7f9c]" },
 ];
 
 const interests = [
@@ -21,7 +21,7 @@ const interests = [
   { name: "Museums", count: 2, color: "bg-[#dcebf2] text-[#3a6476]" },
 ];
 
-const progressSteps = ["Preferences", "AI Suggestions", "Vote", "Final Itinerary"];
+const progressSteps = ["Get Ready", "Compare Options", "Decide Together", "Shared Itinerary"];
 
 export default function DemoTripPage() {
   return (
@@ -41,7 +41,7 @@ export default function DemoTripPage() {
               <p className="mt-3 max-w-2xl text-lg leading-7 text-white/70">Food, city lights, and unforgettable winter days in Tokyo—planned around the whole group.</p>
             </div>
             <dl className="grid grid-cols-2 gap-x-9 gap-y-4 text-sm lg:text-right">
-              <div><dt className="text-white/50">From</dt><dd className="mt-1 font-bold">Austin, Texas</dd></div>
+              <div><dt className="text-white/50">Route</dt><dd className="mt-1 font-bold">4 cities → Tokyo</dd></div>
               <div><dt className="text-white/50">Travel window</dt><dd className="mt-1 font-bold">Dec 15–23</dd></div>
               <div><dt className="text-white/50">Travelers</dt><dd className="mt-1 font-bold">4 people</dd></div>
               <div><dt className="text-white/50">Destination</dt><dd className="mt-1 font-bold">Tokyo, Japan</dd></div>
@@ -75,7 +75,7 @@ export default function DemoTripPage() {
                 {travelers.map((traveler) => (
                   <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" key={traveler.name}>
                     <span className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white ${traveler.color}`}>{traveler.initial}</span>
-                    <span className="font-semibold">{traveler.name}</span>
+                    <span className="font-semibold">{traveler.name}<span className="block text-xs font-normal text-[#718087]">From {traveler.origin}</span></span>
                     <span className={`ml-auto rounded-full px-3 py-1 text-xs font-bold ${traveler.complete ? "bg-[#daf0ea] text-[#276655]" : "bg-[#f0efeb] text-[#778388]"}`}>
                       {traveler.complete ? "✓ Completed" : "Waiting"}
                     </span>
@@ -83,7 +83,7 @@ export default function DemoTripPage() {
                 ))}
               </ul>
               <button className="button-primary mt-7 w-full" type="button">Complete My Preferences <span aria-hidden="true">→</span></button>
-              <p className="mt-3 text-center text-xs text-[#8a9498]">Questionnaire coming in the next phase.</p>
+              <p className="mt-3 text-center text-xs text-[#8a9498]">Add your route, budget, activities, lodging, and notes.</p>
             </section>
 
             <section className="rounded-3xl border border-[#172733]/8 bg-white p-6 sm:p-8" aria-labelledby="availability">
@@ -94,6 +94,7 @@ export default function DemoTripPage() {
                   <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#e4664f]" /> Everyone</span>
                 </div>
               </div>
+              <details className="mt-5 rounded-2xl bg-[#f7f7f3] p-4"><summary className="cursor-pointer font-bold text-[#173f50]">Traveler availability details</summary><ul className="mt-3 space-y-1 text-sm text-[#66757d]"><li>Jay · Dec 15–20</li><li>Henry · Dec 18–23</li><li>Andrew · Dec 19–21</li><li>Maya · Dec 19–20</li></ul></details>
               <div className="mt-7 grid grid-cols-9 gap-1.5 sm:gap-2">
                 {[1, 2, 2, 3, 4, 4, 3, 2, 1].map((value, index) => (
                   <div className="text-center" key={index}>
@@ -136,7 +137,7 @@ export default function DemoTripPage() {
               </div>
               <div className="border-t border-[#172733]/8 bg-[#173f50] p-6 text-white sm:p-8">
                 <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3c969]">Coming after preferences</p>
-                <p className="mt-2 text-lg font-bold">Three options → one group vote → one shared itinerary</p>
+                <p className="mt-2 text-lg font-bold">Get Ready → Compare Options → Decide Together → Shared Itinerary</p>
                 <p className="mt-2 text-sm leading-6 text-white/65">Later, the group can adjust the shared plan while each traveler keeps room for personal alternatives.</p>
               </div>
             </section>

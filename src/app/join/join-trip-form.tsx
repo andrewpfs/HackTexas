@@ -79,12 +79,13 @@ export function JoinTripForm(props: JoinTripFormProps) {
     setErrorMessage("");
     const formData = new FormData(event.currentTarget);
     const travelerName = formData.get("travelerName");
+    const departureLocation = formData.get("departureLocation");
 
     try {
       const response = await fetch("/api/trips/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inviteCode: preview.inviteCode, travelerName }),
+        body: JSON.stringify({ inviteCode: preview.inviteCode, travelerName, departureLocation }),
       });
       const responseData = (await response.json()) as JoinResponse;
 
@@ -129,7 +130,6 @@ export function JoinTripForm(props: JoinTripFormProps) {
           <p className="mt-2 text-sm leading-6 text-[#66757d]">{preview.prompt}</p>
           <dl className="mt-5 grid gap-4 text-sm sm:grid-cols-2">
             <div><dt className="font-bold text-[#3b505a]">Host</dt><dd className="mt-1 text-[#718087]">{preview.hostName}</dd></div>
-            <div><dt className="font-bold text-[#3b505a]">From</dt><dd className="mt-1 text-[#718087]">{preview.origin}</dd></div>
             <div><dt className="font-bold text-[#3b505a]">Destination</dt><dd className="mt-1 text-[#718087]">{preview.destination || "Destination not chosen yet"}</dd></div>
             <div><dt className="font-bold text-[#3b505a]">Possible travel window</dt><dd className="mt-1 text-[#718087]">{formatDate(preview.earliestPossibleDate)} – {formatDate(preview.latestPossibleDate)}</dd></div>
             <div><dt className="font-bold text-[#3b505a]">Preferred duration</dt><dd className="mt-1 text-[#718087]">{preview.preferredDurationDays ? `${preview.preferredDurationDays} days` : "Not specified"}</dd></div>
@@ -139,9 +139,15 @@ export function JoinTripForm(props: JoinTripFormProps) {
       ) : null}
 
       {preview ? (
-        <div className="mt-6">
-          <label className="form-label" htmlFor="travelerName">Your name</label>
-          <input className="form-control" disabled={isSubmitting} id="travelerName" maxLength={maximumTravelerNameLength} name="travelerName" placeholder="How the group knows you" type="text" />
+        <div className="mt-6 grid gap-5 sm:grid-cols-2">
+          <div>
+            <label className="form-label" htmlFor="travelerName">Your name</label>
+            <input className="form-control" disabled={isSubmitting} id="travelerName" maxLength={maximumTravelerNameLength} name="travelerName" placeholder="How the group knows you" required type="text" />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="departureLocation">Where are you traveling from?</label>
+            <input className="form-control" disabled={isSubmitting} id="departureLocation" name="departureLocation" placeholder="Houston, Texas" required type="text" />
+          </div>
         </div>
       ) : null}
 

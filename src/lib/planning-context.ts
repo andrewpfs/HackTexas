@@ -22,6 +22,7 @@ export type PlanningIssue = {
     | "no_travelers"
     | "preferences_incomplete"
     | "availability_incomplete"
+    | "departure_location_missing"
     | "no_shared_dates"
     | "fewer_travelers_than_expected"
     | "shared_window_shorter_than_preferred";
@@ -46,6 +47,7 @@ export type PlanningReadiness = {
 export type PlanningTraveler = {
   name: string;
   isHost: boolean;
+  departureLocation: string;
   overallMaximumBudgetUsd: number;
   foodBudgetPerDayUsd: number | null;
   lodgingBudgetPerNightUsd: number | null;
@@ -78,7 +80,7 @@ export type PlanningContext = {
   planningMode: PlanningMode;
   trip: {
     prompt: string;
-    origin: string;
+    name: string | null;
     destination: string | null;
     earliestPossibleDate: string;
     latestPossibleDate: string;
@@ -124,6 +126,18 @@ function hasCompleteAvailability(traveler: Traveler) {
   return traveler.availabilityComplete === true && Array.isArray(traveler.availableDates);
 }
 
+export function getTravelerDepartureLocation(trip: Trip, traveler: Traveler) {
+  if (traveler.departureLocation && traveler.departureLocation.trim() !== "") {
+    return traveler.departureLocation.trim();
+  }
+
+  if (traveler.isHost && trip.origin && trip.origin.trim() !== "") {
+    return trip.origin.trim();
+  }
+
+  return "";
+}
+
 function getSortedUniqueDates(dates: string[]) {
   const uniqueDates: string[] = [];
 
@@ -152,6 +166,14 @@ export function calculatePlanningReadiness(trip: Trip): PlanningReadiness {
   }
 
   for (const traveler of trip.travelers) {
+    if (getTravelerDepartureLocation(trip, traveler) === "") {
+      blockers.push({
+        code: "departure_location_missing",
+        message: `${traveler.name} still needs to add a departure city.`,
+        travelerName: traveler.name,
+      });
+    }
+
     if (hasCompletePreferences(traveler)) {
       preferencesCompleteCount += 1;
     } else {
@@ -277,12 +299,14 @@ function normalizeSelectedOptions<T extends string>(
 }
 
 function normalizeTraveler(
+  trip: Trip,
   traveler: Traveler,
   preferences: TravelerPreferences,
 ): PlanningTraveler {
   return {
     name: traveler.name,
     isHost: traveler.isHost,
+    departureLocation: getTravelerDepartureLocation(trip, traveler),
     overallMaximumBudgetUsd: preferences.maximumBudget,
     foodBudgetPerDayUsd: preferences.foodBudgetPerDay || null,
     lodgingBudgetPerNightUsd: preferences.lodgingBudgetPerNight || null,
@@ -378,7 +402,7 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
       return { success: false, readiness: calculatePlanningReadiness(trip) };
     }
 
-    planningTravelers.push(normalizeTraveler(traveler, traveler.preferences));
+    planningTravelers.push(normalizeTraveler(trip, traveler, traveler.preferences));
   }
 
   const destination = trip.destination && trip.destination.trim() !== ""
@@ -392,7 +416,7 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
       planningMode: readiness.planningMode,
       trip: {
         prompt: trip.prompt,
-        origin: trip.origin,
+        name: trip.name || null,
         destination,
         earliestPossibleDate: trip.earliestPossibleDate,
         latestPossibleDate: trip.latestPossibleDate,
