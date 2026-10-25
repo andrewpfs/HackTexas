@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { addPlacesToItinerary, getSerpApiKey } from "@/lib/serpapi-places";
 import { claimPlacesLookup, finishPlacesLookup } from "@/lib/trip-repository";
 
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
+
 // Looks up real places (Google Maps via SerpApi) for the shared itinerary.
 // Runs at most once per itinerary; results are saved so credits are not reused.
 export async function POST(

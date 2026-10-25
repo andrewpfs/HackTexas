@@ -8,6 +8,9 @@ import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identit
 import { findCityFlightId, searchFlights } from "@/lib/travel-search";
 import { getTripById, saveDatePriceCheck } from "@/lib/trip-repository";
 
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
+
 const maximumWindows = 3;
 const maximumOrigins = 4;
 

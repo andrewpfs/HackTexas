@@ -156,3 +156,22 @@ test("rejects malformed JSON and HTTP errors", async () => {
     MusePlannerError,
   );
 });
+
+test("a temporary Muse error is retried once before giving up", async () => {
+  const { requestMuseJson } = await import("../src/lib/muse-client");
+  let calls = 0;
+  const flaky = (async () => {
+    calls += 1;
+    return calls === 1
+      ? new Response("busy", { status: 503 })
+      : Response.json({ choices: [{ message: { content: "{\"ok\":true}" } }] });
+  }) as typeof fetch;
+  const result = await requestMuseJson({ apiKey: "k", fetchImpl: flaky }, { systemPrompt: "", userPrompt: "", schemaName: "x", schema: {} });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls, 2);
+
+  let badCalls = 0;
+  const bad = (async () => { badCalls += 1; return new Response("no", { status: 401 }); }) as typeof fetch;
+  await assert.rejects(requestMuseJson({ apiKey: "k", fetchImpl: bad }, { systemPrompt: "", userPrompt: "", schemaName: "x", schema: {} }), /HTTP 401/);
+  assert.equal(badCalls, 1);
+});

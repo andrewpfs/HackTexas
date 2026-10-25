@@ -8,6 +8,10 @@ import { MockItineraryPlanner } from "@/lib/mock-itinerary-planner";
 import { MusePlannerError } from "@/lib/muse-client";
 import { getTripById, saveGroupItinerary } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
+import { logError } from "@/lib/server-log";
+
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
@@ -56,7 +60,7 @@ export async function POST(
         throw error;
       }
 
-      console.error("Muse itinerary planner failed:", error.message);
+      logError("itinerary", "Muse itinerary planner failed", error, { tripId });
 
       if (!isMockFallbackEnabled()) {
         return NextResponse.json(
@@ -80,7 +84,7 @@ export async function POST(
         );
       }
       if (result.reason === "invalid-output") {
-        console.error("Itinerary planner returned invalid output:", result.errors);
+        logError("itinerary", "planner returned an invalid itinerary", undefined, { tripId, errors: result.errors.slice(0, 5) });
         return NextResponse.json(
           { error: "The planner could not create a valid itinerary. Please try again." },
           { status: 500 },
@@ -111,7 +115,7 @@ export async function POST(
       { status: 201 },
     );
   } catch (error) {
-    console.error("Failed to generate shared itinerary:", error);
+    logError("itinerary", "crashed", error, { tripId });
     return NextResponse.json(
       { error: "We could not create the shared itinerary. Please try again." },
       { status: 500 },

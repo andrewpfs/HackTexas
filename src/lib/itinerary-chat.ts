@@ -33,7 +33,6 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
 
   // Ordinary chat stops before constructing a revision request or choosing Muse.
   if (!mentionsMuse(input.text)) return { trip: current, changedStops: [] };
-  if (current.pendingItineraryProposal?.status === "pending") return reply("Please finish voting on the open proposal first, then ask me to change the plan.");
 
   // Errors from Muse's last answer, sent back once so it can correct itself.
   let fixErrors: string[] = [];
@@ -49,6 +48,9 @@ export async function handleItineraryChat(tripId: string, input: { travelerId: s
     const museMessage = makeChatMessage({ role: "muse", authorName: "Muse", text: result.reply });
 
     if (result.days) {
+      // Questions, personal plans and place options still work during a vote;
+      // only a new change to the shared plan has to wait for it.
+      if (current.pendingItineraryProposal?.status === "pending") return reply("There's already a group vote open. Please finish voting on it first, then ask me for this change.");
       result.days = repairRevisedDays(itinerary, result.days);
       // A revision keeps the itinerary's own days, so check against those dates
       // (the same rule used when the group approves a proposal).

@@ -159,7 +159,7 @@ export function parseMuseCandidates(
 
     if (!isShared(candidate, sharedDates)) {
       throw new MusePlannerError(
-        `Muse candidate ${index + 1} used dates outside the group's shared availability.`,
+        `Muse candidate ${index + 1} used dates outside the group's shared availability (${candidate.suggestedStartDate} to ${candidate.suggestedEndDate}; allowed ${context.groupAvailability.sharedDates[0] ?? "none"} to ${context.groupAvailability.sharedDates.at(-1) ?? "none"}).`,
       );
     }
 

@@ -149,8 +149,11 @@ test("chat, proposals and repository writes remain safe without provider calls",
       assert.equal(trip.name, "Tokyo Winter");
       assert.match(trip.chat?.at(-1)?.text ?? "", /group vote/);
       const again = await ask(trip, "@muse another change", majorResult(trip));
-      assert.equal(again.calls, 0);
       assert.equal(again.trip.pendingItineraryProposal?.id, trip.pendingItineraryProposal?.id);
+      assert.match(again.trip.chat?.at(-1)?.text ?? "", /already a group vote open/);
+      // A personal plan doesn't touch the shared plan, so it still works during the vote.
+      const personal = await ask(again.trip, "@muse I'll skip lunch", { kind: "personal", reply: "A coffee break for you.", changes: [], days: null, personal: { dayNumber: 1, stopTitle: "Lunch", title: "Coffee", location: "Nearby", note: "" } });
+      assert.ok(personal.trip.itinerary?.overrides?.some((item) => item.title === "Coffee"));
     });
     await suite.test("one vote per traveler persists; votes may change until finalization", async () => {
       const trip = await propose();

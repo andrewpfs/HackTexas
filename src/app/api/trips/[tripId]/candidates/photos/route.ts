@@ -3,6 +3,9 @@ import { addImagesToCandidateDays } from "@/lib/place-images";
 import { addSerpPhotosToCandidates, getSerpApiKey } from "@/lib/serpapi-places";
 import { claimOptionPhotos, finishOptionPhotos } from "@/lib/trip-repository";
 
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
+
 // Finds a photo for each stop in the trip options. Wikipedia first (free), then
 // Google Maps through SerpApi for stops it could not find. Runs once per set of options.
 export async function POST(

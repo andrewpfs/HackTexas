@@ -52,7 +52,8 @@ export function applyTripDetailsUpdate(trip: Trip, input: UpdateTripInput) {
   return affectedTravelerCount;
 }
 
-const candidateGenerationTimeoutMs = 3 * 60 * 1000;
+// Just over the 60-second route limit: a lock older than this belongs to a request the host already stopped.
+const candidateGenerationTimeoutMs = 90 * 1000;
 
 // True while some browser is planning options (the lock expires after 3 minutes).
 export function isGeneratingCandidates(trip: Pick<Trip, "candidatesGeneratingSince">, now = Date.now()) {

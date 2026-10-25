@@ -4,6 +4,9 @@ import { getDepartureCity } from "@/lib/travel-planning";
 import { findCityFlightId, searchFlights } from "@/lib/travel-search";
 import { claimFlightSearch, finishFlightSearch, getTripById, selectFlight } from "@/lib/trip-repository";
 
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
+
 async function readBody(request: Request) {
   try {
     return (await request.json()) as Record<string, unknown>;

@@ -11,6 +11,10 @@ import { MusePlannerError } from "@/lib/muse-candidate-planner";
 import { addImagesToCandidates } from "@/lib/place-images";
 import { claimCandidateGeneration, getTripById, releaseCandidateGeneration, saveCandidateOptions } from "@/lib/trip-repository";
 import type { PlannerSource } from "@/lib/trip-types";
+import { logError, logInfo, logWarn } from "@/lib/server-log";
+
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
 
 export async function POST(
   request: Request,
@@ -18,6 +22,8 @@ export async function POST(
 ) {
   const { tripId } = await context.params;
   let claimed = false;
+  const started = Date.now();
+  logInfo("generate", "start", { tripId });
 
   try {
     const trip = await getTripById(tripId);
@@ -39,6 +45,7 @@ export async function POST(
 
     // Someone else's browser may already be planning (for example an automatic refresh).
     if ((await claimCandidateGeneration(trip.id)) === "busy") {
+      logInfo("generate", "already running in another request", { tripId, since: trip.candidatesGeneratingSince });
       return NextResponse.json({ inProgress: true, optionsPath: `/trip/${trip.id}/options` }, { status: 202 });
     }
     claimed = true;
@@ -54,7 +61,7 @@ export async function POST(
         throw error;
       }
 
-      console.error("Muse planner failed:", error.message);
+      logError("generate", "Muse planner failed", error, { tripId, mockFallback: isMockFallbackEnabled(), ms: Date.now() - started });
 
       if (!isMockFallbackEnabled()) {
         return NextResponse.json(
@@ -71,6 +78,7 @@ export async function POST(
     }
 
     if (!generationResult.success && generationResult.reason === "not-ready") {
+      logWarn("generate", "group not ready", { tripId, blockers: generationResult.blockers });
       return NextResponse.json(
         {
           error: "The group is not ready to generate trip options yet.",
@@ -81,7 +89,7 @@ export async function POST(
     }
 
     if (!generationResult.success) {
-      console.error("Candidate planner returned invalid output:", generationResult.errors);
+      logError("generate", "planner returned invalid options twice", undefined, { tripId, errors: generationResult.errors.slice(0, 5), ms: Date.now() - started });
       return NextResponse.json(
         { error: "The planner could not create valid trip options. Please try again." },
         { status: 500 },
@@ -98,6 +106,7 @@ export async function POST(
     }
     const origin = new URL(request.url).origin;
     after(() => notifyGroup(saveResult.trip, optionsReadyText(saveResult.trip), origin));
+    logInfo("generate", "done", { tripId, planner: plannerSource, options: generationResult.candidates.length, ms: Date.now() - started });
 
     return NextResponse.json(
       {
@@ -110,7 +119,7 @@ export async function POST(
       { status: 201 },
     );
   } catch (error) {
-    console.error("Failed to generate trip options:", error);
+    logError("generate", "crashed", error, { tripId, ms: Date.now() - started });
     return NextResponse.json(
       { error: "We could not generate trip options. Please try again." },
       { status: 500 },

@@ -185,3 +185,19 @@ test("an incomplete trip is rejected before the planner is called", async () => 
     assert.equal(result.reason, "not-ready");
   }
 });
+
+test("option generation asks Muse once more after a bad answer", async () => {
+  const { generateCandidateOptionsForTrip } = await import("../src/lib/candidate-generation");
+  const { MusePlannerError } = await import("../src/lib/muse-client");
+  const good = await planTrip(makeTrip(undefined));
+  let calls = 0;
+  const flaky = { async generateCandidates() { calls += 1; if (calls === 1) throw new MusePlannerError("dates outside"); return good; } };
+  const result = await generateCandidateOptionsForTrip(makeTrip(undefined), flaky);
+  assert.equal(result.success, true);
+  assert.equal(calls, 2);
+
+  let badCalls = 0;
+  const broken = { async generateCandidates() { badCalls += 1; throw new MusePlannerError("still broken"); } };
+  await assert.rejects(generateCandidateOptionsForTrip(makeTrip(undefined), broken), /still broken/);
+  assert.equal(badCalls, 2);
+});

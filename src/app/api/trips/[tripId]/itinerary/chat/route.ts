@@ -6,6 +6,10 @@ import { MockItineraryReviser, validateChatInput } from "@/lib/itinerary-revisio
 import { MusePlannerError } from "@/lib/muse-client";
 import { getSerpApiKey, searchPlaces } from "@/lib/serpapi-places";
 import { appendChatMessage, changePersonalOverride, getTripById, saveItineraryProposal, saveItineraryRevision } from "@/lib/trip-repository";
+import { logError, logWarn } from "@/lib/server-log";
+
+// Muse and the travel searches can take 20-45 seconds; don't let the host cut them off early.
+export const maxDuration = 60;
 
 export async function POST(request: Request, context: RouteContext<"/api/trips/[tripId]/itinerary/chat">) {
   const { tripId } = await context.params;
@@ -24,6 +28,7 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
         try { return await selectItineraryReviser().reviser.revise(revisionRequest); }
         catch (error) {
           if (!(error instanceof MusePlannerError)) throw error;
+          logError("chat", "Muse reply failed", error, { tripId, mockFallback: isMockFallbackEnabled() });
           if (!isMockFallbackEnabled()) throw new ChatError("Muse couldn't answer right now. Your message was saved; try again in a moment.", 502);
           return new MockItineraryReviser().revise();
         }
@@ -36,8 +41,11 @@ export async function POST(request: Request, context: RouteContext<"/api/trips/[
     }
     return NextResponse.json({ itinerary: result.trip.itinerary, messages: result.trip.chat ?? [], changedStops: result.changedStops, proposal: result.trip.pendingItineraryProposal ?? null, approvedProposal: result.trip.lastApprovedItineraryProposal ?? null });
   } catch (error) {
-    if (error instanceof ChatError) return NextResponse.json({ error: error.message }, { status: error.status });
-    console.error("Failed to handle itinerary chat:", error);
+    if (error instanceof ChatError) {
+      logWarn("chat", "rejected", { tripId, status: error.status, error: error.message });
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    logError("chat", "crashed", error, { tripId });
     return NextResponse.json({ error: "We couldn't send that message. Please try again." }, { status: 500 });
   }
 }
