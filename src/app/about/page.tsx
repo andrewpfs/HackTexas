@@ -18,11 +18,11 @@ export default function AboutPage() {
       <Header />
       <section className="mx-auto max-w-5xl px-5 py-14 sm:px-8 sm:py-20">
         <h1 className="mt-1 max-w-3xl font-extrabold leading-[1.02] tracking-[-0.045em] text-[#e4664f] text-5xl sm:text-6xl">Group Travel Should Feel Exciting Before Takeoff.</h1>
-        <p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f7078]">HackTX Trip Planner brings schedules, budgets, interests, lodging needs, and departure cities into one shared planning space. Instead of one person juggling polls and group chats, every traveler contributes to a plan the whole group can understand.</p>
+        <p className="mt-6 max-w-3xl text-lg leading-8 text-[#5f7078]">TravelSync brings schedules, budgets, interests, lodging needs, and departure cities into one shared planning space. Instead of one person juggling polls and group chats, every traveler contributes to a plan the whole group can understand.</p>
         <article className="ticket-card mt-12 p-7">
           <p className="eyebrow">The Concept</p>
           <h2 className="mt-3 text-2xl font-bold">Find The Common Ground</h2>
-          <p className="mt-3 leading-7 text-[#66757d]">The current demo collects traveler details, calculates shared availability, and creates deterministic candidate trips. Future phases will add Muse-powered group reasoning without fabricating live travel inventory.</p>
+          <p className="mt-3 leading-7 text-[#66757d]">TravelSync collects everyone&apos;s details and finds the dates that work. Muse Spark weighs the whole group to plan three trip options, then one shared itinerary with real places, hotels and flights.</p>
         </article>
         <section className="mt-12" aria-labelledby="team-heading">
           <p className="eyebrow">The Team</p>

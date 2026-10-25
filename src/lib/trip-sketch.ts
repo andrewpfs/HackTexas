@@ -36,9 +36,10 @@ export interface SketchPlanner {
   sketch(request: SketchRequest): Promise<SketchDraft>;
 }
 
-// Everyone has shared preferences and dates, so the draft can be fitted to the whole group.
+// Everyone has submitted preferences, so the draft can be redrawn for the whole group.
+// Dates are used too once people add them, but the redraw doesn't wait for them.
 export function isGroupInputComplete(trip: Trip) {
-  return trip.travelers.length > 0 && trip.travelers.every((traveler) => traveler.preferencesComplete && traveler.availabilityComplete);
+  return trip.travelers.length > 0 && trip.travelers.every((traveler) => traveler.preferencesComplete && traveler.preferences !== undefined);
 }
 
 // Small, stable string hash (FNV-1a) so the key stays short.
@@ -112,8 +113,10 @@ export function getSketchDuration(trip: Trip) {
     }
   }
   const preferred = trip.preferredDurationDays;
+  // With no shared dates yet, keep drawing at the trip's intended length instead of nothing.
+  if (usableDays === 0) usableDays = Math.min(planningDays, typeof preferred === "number" && preferred > 0 ? Math.floor(preferred) : planningDays);
   const requested = typeof preferred === "number" && Number.isFinite(preferred) && preferred > 0 ? Math.floor(preferred) : usableDays;
-  return Math.min(14, Math.max(0, Math.min(requested, usableDays)));
+  return Math.min(14, Math.max(1, Math.min(requested, usableDays)));
 }
 
 export function getSketchRequest(trip: Trip): SketchRequest {
@@ -131,7 +134,8 @@ export function getSketchRequest(trip: Trip): SketchRequest {
   };
 
   if (isGroupInputComplete(trip)) {
-    const shared = findSharedDates(trip.travelers.map((traveler) => traveler.availableDates ?? []));
+    const withDates = trip.travelers.filter((traveler) => traveler.availabilityComplete);
+    const shared = withDates.length === trip.travelers.length ? findSharedDates(withDates.map((traveler) => traveler.availableDates ?? [])) : [];
     request.group = {
       travelers: trip.travelers.map((traveler) => ({
         name: traveler.name,
@@ -185,7 +189,7 @@ const systemPrompt = [
   "- suggestions: 2-4 extra places or experiences the group might also like (the host may have invited ideas), each with a short reason. Do not repeat places already listed.",
   "- If no destination is given, suggest one that fits the description.",
   "- tripStyle, when present, says how the group wants to travel. If it describes backpacking, a road trip or several cities, or destinationIsRegion is true (for example \"Europe\"), plan a route through several cities, and several countries when the region spans them, about 2-4 days per stop, and list every stop in places.",
-  "- group, when present, means everyone has now shared preferences and dates. Refine the draft for the whole group: fit their interests and activity details, keep to the lowest budget, and use confirmedDates when set. Keep the host's named places. Do not quote anyone's private notes.",
+  "- group, when present, means everyone has now shared their preferences (sharedDateWindows is empty until everyone has added dates). Refine the draft for the whole group: fit their interests and activity details, keep to the lowest budget, and use confirmedDates when set. Keep the host's named places. Do not quote anyone's private notes.",
   "Do not mention prices, hotels, or flights. Respond with JSON only.",
 ].join("\n");
 

@@ -41,7 +41,7 @@ export default function Home() {
             </h1>
             <p className="mt-7 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
               Bring everyone’s schedules, budgets, and travel styles together.
-              HackTX Trip Planner helps your group agree on one trip that
+              TravelSync helps your group agree on one trip that
               actually works.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -50,7 +50,7 @@ export default function Home() {
               </Link>
               <Link className="button-secondary" href="/join">Join a Trip</Link>
             </div>
-            <p className="mt-5 text-sm text-white/70">No accounts needed for the demo · Everyone gets a say</p>
+            <p className="mt-5 text-sm text-white/70">No accounts needed · Everyone gets a say</p>
           </div>
 
           <div className="relative mx-auto w-full max-w-xl lg:ml-auto">
@@ -157,15 +157,15 @@ export default function Home() {
       <section className="border-t border-[#172733]/10 bg-white px-5 py-16 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-3xl"><p className="eyebrow">Quick Answers</p><h2 className="mt-3 text-3xl font-semibold tracking-tight">Frequently Asked Questions</h2><div className="mt-7 divide-y divide-[#172733]/10 rounded-3xl border border-[#172733]/10 px-5 sm:px-7">
           <details className="py-5"><summary className="cursor-pointer font-bold">What does this planner do?</summary><p className="mt-3 leading-7 text-[#66757d]">It gathers each traveler&apos;s timing, budget, interests, and lodging preferences so the group can compare practical trip options.</p></details>
-          <details className="py-5"><summary className="cursor-pointer font-bold">Does everyone need an account?</summary><p className="mt-3 leading-7 text-[#66757d]">No. For the current hackathon experience, travelers join from a shared link and this browser remembers their traveler identity.</p></details>
+          <details className="py-5"><summary className="cursor-pointer font-bold">Does everyone need an account?</summary><p className="mt-3 leading-7 text-[#66757d]">No. Travelers join from a shared link, and a verified phone number lets you pick your trips back up on any device.</p></details>
           <details className="py-5"><summary className="cursor-pointer font-bold">How does the group choose a trip?</summary><p className="mt-3 leading-7 text-[#66757d]">Travelers share preferences and availability, compare generated options, decide together, and create one shared itinerary.</p></details>
-          <details className="py-5"><summary className="cursor-pointer font-bold">Does it book trips automatically?</summary><p className="mt-3 leading-7 text-[#66757d]">No. This demo does not make payments, reservations, or real bookings.</p></details>
+          <details className="py-5"><summary className="cursor-pointer font-bold">Does it book trips automatically?</summary><p className="mt-3 leading-7 text-[#66757d]">No. TravelSync finds real flights and hotels and keeps track of who is booking what. You pay the airline and hotel directly.</p></details>
         </div></div>
       </section>
 
       <footer className="border-t border-[#172733]/10 px-5 py-7 sm:px-8 lg:px-10">
         <div className="mx-auto flex max-w-7xl flex-col gap-2 text-sm text-[#69777d] sm:flex-row sm:items-center sm:justify-between">
-          <p>HackTX Trip Planner</p>
+          <p>TravelSync</p>
           <p>Plan together. Travel happier.</p>
         </div>
       </footer>

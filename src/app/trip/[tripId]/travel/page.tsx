@@ -61,7 +61,7 @@ export default async function TravelPage(props: PageProps<"/trip/[tripId]/travel
         <div className="mt-6">
           <h1 className="text-5xl font-extrabold leading-[1.02] tracking-[-0.045em] text-[#e4664f] sm:text-6xl">Book Flights And Hotel</h1>
           <p className="mt-3 max-w-2xl text-lg leading-7 text-[#66757d]">
-            {itinerary.destination} · {formatCalendarDate(itinerary.startDate, false)} – {formatCalendarDate(itinerary.endDate)}. Real prices, simulated checkout.
+            {itinerary.destination} · {formatCalendarDate(itinerary.startDate, false)} – {formatCalendarDate(itinerary.endDate)}. Live prices from Google Flights and Google Hotels.
           </p>
         </div>
 

@@ -144,7 +144,7 @@ export function applyProposalVote(trip: Trip, proposalId: string, travelerId: st
   itinerary.summary = proposal.summary;
   itinerary.placesStatus = undefined;
   itinerary.placesStartedAt = undefined;
-  finishProposal(trip, proposal, "approved", `Major trip change approved. ${moved ? `The trip moved from ${proposal.previousDestination} to ${proposal.proposedDestination}. ` : ""}The shared plan was updated; old travel searches and simulated bookings were cleared. Search again for travel.`);
+  finishProposal(trip, proposal, "approved", `Major trip change approved. ${moved ? `The trip moved from ${proposal.previousDestination} to ${proposal.proposedDestination}. ` : ""}The shared plan was updated; old travel searches and bookings were cleared. Search again for travel.`);
   trip.lastApprovedItineraryProposal = structuredClone(proposal);
   return "approved";
 }

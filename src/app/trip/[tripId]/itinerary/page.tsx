@@ -120,7 +120,7 @@ export default async function ItineraryPage(props: PageProps<"/trip/[tripId]/iti
         <section className="mt-8 rounded-3xl border border-[#173f50]/15 bg-white p-6 sm:p-8">
           <p className="eyebrow">Arrange Your Travel</p>
           <h2 className="mt-2 text-xl font-bold">Find Hotels And Everyone&apos;s Flights</h2>
-          <p className="mt-2 text-sm leading-6 text-[#53666f]">Browse real provider results, choose a group hotel and individual flights, and try the simulated booking checkout. No payment or real reservation is made.</p>
+          <p className="mt-2 text-sm leading-6 text-[#53666f]">Browse real hotels and flights, choose the group hotel and your own flight, and confirm your booking.</p>
           <Link className="mt-3 inline-block text-sm font-bold underline underline-offset-4" href={`/trip/${trip.id}/travel`}>Continue To Book Travel →</Link>
         </section>
 

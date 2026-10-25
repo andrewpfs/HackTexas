@@ -23,7 +23,7 @@ type TripSketchCardProps = {
   // The draft's inputs changed (or it doesn't exist yet), so a new one should be drawn.
   needsRedraw: boolean;
   basisKey: string;
-  // True once everyone has shared preferences and dates.
+  // True once everyone has submitted their preferences.
   groupReady: boolean;
 };
 
@@ -67,7 +67,7 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
         </div>
         <p className="text-sm text-[#738087]">
           {sketch?.stage === "group"
-            ? sketch.source === "muse" ? "Updated by Muse Spark with everyone's preferences and dates" : "Updated with everyone's preferences and dates"
+            ? sketch.source === "muse" ? "Redrawn by Muse Spark with everyone's preferences" : "Redrawn with everyone's preferences"
             : sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
         </p>
       </div>
@@ -91,7 +91,7 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
           {updating ? (
             <p className="mt-5 flex items-center gap-2 rounded-2xl bg-[#eaf6f0] px-4 py-3 text-sm font-semibold text-[#276655]" role="status">
               <span aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#276655]/30 border-t-[#276655]" />
-              {groupReady ? "Muse is updating this draft with everyone's preferences and dates. The new one appears here when it's ready." : "Muse is redrawing this draft with the new trip details. The new one appears here when it's ready."}
+              {groupReady ? "Everyone has shared their preferences. Muse is drawing a new draft for the whole group, and it appears here when it's ready." : "Muse is redrawing this draft with the new trip details. The new one appears here when it's ready."}
             </p>
           ) : updateFailed ? (
             <p className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-[#fff0ec] px-4 py-3 text-sm font-semibold text-[#8f3f30]" role="status">
@@ -99,7 +99,7 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
               <button className="font-bold underline underline-offset-4" onClick={redraw} type="button">Try Again</button>
             </p>
           ) : !groupReady ? (
-            <p className="mt-5 rounded-2xl bg-[#f7f7f3] px-4 py-3 text-sm text-[#53666f]">This draft stays the same while people join. Once everyone has shared preferences and dates, Muse updates it for the whole group.</p>
+            <p className="mt-5 rounded-2xl bg-[#f7f7f3] px-4 py-3 text-sm text-[#53666f]">This first draft is from the trip description. Once everyone has submitted their preferences, Muse draws a new one for the whole group.</p>
           ) : null}
           <p className="mt-5 rounded-2xl bg-[#173f50] p-5 text-lg leading-7 text-white">{sketch.summary}</p>
 

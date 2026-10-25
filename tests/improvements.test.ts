@@ -351,7 +351,7 @@ test("flight badges include ties; hotel owed share stays separate from a travele
   assert.equal(result.booking.items.length, 1);
   const confirmation = bookingConfirmationText("Tokyo Winter", result.booking);
   assert.ok(confirmation.includes("You owe Jay about $300.00"));
-  assert.ok(confirmation.includes("Amount paid (simulated): $500.00"));
+  assert.ok(confirmation.includes("Total: $500.00"));
   trip.travelers[1].preferences!.lodgingType = "No need";
   assert.equal(hotelShareForTraveler(trip, "Tin"), undefined);
 });

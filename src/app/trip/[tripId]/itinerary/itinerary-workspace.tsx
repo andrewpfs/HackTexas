@@ -588,7 +588,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
 
   return (
     <div className="mt-6">
-      {approvedProposal ? <section className="mb-5 rounded-2xl border-2 border-[#276655]/30 bg-[#daf0ea] p-5" role="status"><h2 className="text-xl font-bold text-[#276655]">Major Trip Change Approved</h2><p className="mt-2 text-sm leading-6">{approvedProposal.previousDestination !== approvedProposal.proposedDestination ? `The group voted to move the trip from ${approvedProposal.previousDestination} to ${approvedProposal.proposedDestination}. ` : "The group approved a major rewrite. "}The shared itinerary was updated. Old travel searches and simulated bookings were cleared; find travel again for the new plan.</p></section> : null}
+      {approvedProposal ? <section className="mb-5 rounded-2xl border-2 border-[#276655]/30 bg-[#daf0ea] p-5" role="status"><h2 className="text-xl font-bold text-[#276655]">Major Trip Change Approved</h2><p className="mt-2 text-sm leading-6">{approvedProposal.previousDestination !== approvedProposal.proposedDestination ? `The group voted to move the trip from ${approvedProposal.previousDestination} to ${approvedProposal.proposedDestination}. ` : "The group approved a major rewrite. "}The shared itinerary was updated. Old travel searches and bookings were cleared; find travel again for the new plan.</p></section> : null}
       {currentTraveler ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="-mx-1 flex max-w-full gap-1 overflow-x-auto rounded-full border border-[#172733]/10 bg-white p-1" role="radiogroup" aria-label="Whose plan to show">
@@ -751,7 +751,7 @@ export function ItineraryWorkspace({ tripId, initialItinerary, initialMessages, 
                             {travelModes.find((option) => option.mode === mode)?.icon} {formatMinutes(estimate.minutes)} {mode === "walk" ? "walk" : mode === "bike" ? "by bike" : mode === "transit" ? "by transit" : "by car"}
                           </button>
                           {mode === quickest ? <span className="rounded-full bg-[#daf0ea] px-2 py-0.5 text-xs font-bold text-[#276655]">⚡ Fastest</span> : null}
-                          <span className="text-xs text-[#879196]">{formatDistance(estimate.distanceKm)} · estimate</span>
+                          <span className="text-xs text-[#879196]">{formatDistance(estimate.distanceKm)}</span>
                           <span className="flex gap-1" role="group" aria-label="Change how you get there">
                             {travelModes.map((option) => (
                               <button

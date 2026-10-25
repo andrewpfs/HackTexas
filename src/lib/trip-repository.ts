@@ -805,7 +805,7 @@ export async function finishTripSketch(tripId: string, basis: SketchBasis, outco
     if (outcome.ok) {
       const wasGroupUpdate = basis.stage === "group" && sketchHasContent(current);
       trip.sketch = { status: "done", ...outcome.draft, source: outcome.source, generatedAt: new Date().toISOString(), basisKey: basis.key, stage: basis.stage };
-      if (wasGroupUpdate) pushNotification(trip, "Muse updated the first draft with everyone's preferences and dates.", tripPath(trip));
+      if (wasGroupUpdate) pushNotification(trip, "Everyone shared their preferences, so Muse drew a new first draft for the group.", tripPath(trip));
     } else if (current && sketchHasContent(current)) {
       current.refreshing = undefined;
       current.failedBasisKey = basis.key;

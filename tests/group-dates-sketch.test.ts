@@ -282,3 +282,15 @@ test("nearby airports are read from Wikidata, nearest first, without duplicates"
   assert.equal(airports[0].latitude, 42.9405);
   assert.equal(airports[0].countryCode, "US");
 });
+
+test("the draft is redrawn once everyone submits preferences, even before everyone adds dates", () => {
+  const trip = makeTrip();
+  trip.travelers[1].availabilityComplete = false;
+  trip.travelers[1].availableDates = [];
+  const basis = getSketchBasis(trip);
+  assert.equal(basis.stage, "group");
+  trip.sketch = { ...done, basisKey: "host:old", stage: "host" };
+  assert.equal(sketchNeedsRedraw(trip), true);
+  assert.deepEqual(getSketchRequest(trip).group?.sharedDateWindows, []);
+  assert.ok(getSketchRequest(trip).days > 0);
+});

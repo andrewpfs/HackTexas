@@ -231,7 +231,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
       {/* ---------- booking ---------- */}
       <section className="overflow-hidden rounded-3xl border border-[#172733]/8 bg-white" aria-labelledby="book-heading">
         <div className="bg-[#173f50] px-6 py-4 text-white sm:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f3c969]">Demo Mode · No Payment Is Taken</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#f3c969]">Checkout</p>
           <h2 className="mt-1 text-2xl font-bold" id="book-heading">Ready To Book</h2>
         </div>
 
@@ -242,7 +242,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
             <div>
               <p className="flex items-center gap-2 text-lg font-bold text-[#276655]">
                 <svg aria-hidden="true" className="h-6 w-6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-                You&apos;re booked (demo)
+                You&apos;re booked
               </p>
               <ul className="mt-4 divide-y divide-[#172733]/8 rounded-2xl border border-[#172733]/8">
                 {myBooking.items.map((item) => (
@@ -252,13 +252,13 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 text-right text-lg font-extrabold text-[#173f50]">You Paid {money(myBooking.total)} {myBooking.items.every((item) => item.source !== "assistant") ? "(Simulated)" : "(Recorded)"}</p>
+              <p className="mt-4 text-right text-lg font-extrabold text-[#173f50]">Total {money(myBooking.total)}</p>
               {owedCopy ? <p className="mt-3 rounded-2xl bg-[#fff8dc] p-4 font-bold text-[#6f5a16]">{owedCopy} This is separate from the amount above.</p> : null}
               <EmailConfirmation booking={myBooking} tripId={props.tripId} travelerId={me.id} hotelShare={owedShare} tripName={props.tripName} />
               <p className="mt-2 text-xs text-[#879196]">
                 {myBooking.items.some((item) => item.source === "assistant")
-                  ? "Items marked “By your assistant” were recorded by your connected assistant. Demo items were not reserved and no card was charged."
-                  : "These are demo confirmation codes. Nothing was reserved and no card was charged."}
+                  ? "Items marked “By your assistant” were booked by your connected assistant. TravelSync doesn't take payment, so pay the airline and hotel for anything else."
+                  : "These are TravelSync booking codes for the group. TravelSync doesn't take payment, so pay the airline and hotel directly."}
               </p>
             </div>
           ) : (
@@ -286,7 +286,7 @@ export function TravelWorkspace(props: TravelWorkspaceProps) {
               </ul>
               {myStays.some((stay) => stay.hotel && stay.total === null) ? <p className="mt-3 text-sm text-[#53666f]">A hotel with no listed price can&apos;t be booked here. Check its provider site, or refresh for a priced list.</p> : null}
               {missingHotels.length > 0 ? <p className="mt-4 rounded-2xl bg-[#f7f7f3] p-4 text-sm font-semibold text-[#53666f]" role="status">{me.solo ? `Pick your own hotel in ${missingList} above to confirm.` : me.isHost ? `Pick the group hotel in ${missingList} above, then everyone can confirm.` : `You can confirm once the host picks the group hotel in ${missingList}.`}</p> : null}
-              {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} This is not part of your simulated charge.</p> : null}
+              {owedCopy ? <p className="mt-4 rounded-2xl bg-[#fff8dc] p-4 text-sm font-bold text-[#6f5a16]">{owedCopy} This isn&apos;t included in your total.</p> : null}
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-lg font-extrabold text-[#173f50]">Estimated total {money(myTotal)}</p>
                 <button

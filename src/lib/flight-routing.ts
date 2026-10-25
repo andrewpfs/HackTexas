@@ -82,6 +82,6 @@ export async function findFlightsWithNearbyAirports(
   return {
     ok: true,
     options: withDrives,
-    ...(anyDrive ? { groundNote: `${shortName(destination)} has no airport with flights from ${shortName(from)}, so these land at the nearest airports and you drive the rest. Drive times are estimates.` } : {}),
+    ...(anyDrive ? { groundNote: `${shortName(destination)} has no airport with flights from ${shortName(from)}, so these land at the nearest airports and you drive the rest.` } : {}),
   };
 }

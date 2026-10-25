@@ -110,7 +110,7 @@ export function buildBooking(trip: Trip, travelerId: string): { booking: Booking
   }
 
   if (items.length === 0) {
-    return { error: "Choose a priced flight or hotel for demo checkout. Check unpriced hotel results on the provider's site." };
+    return { error: "Choose a priced flight or hotel to check out. Check unpriced hotel results on the provider's site." };
   }
 
   return {

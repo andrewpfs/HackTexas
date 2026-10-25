@@ -39,11 +39,11 @@ export function bookingConfirmationText(tripName: string, booking: Booking, hote
   for (const item of booking.items) {
     lines.push(`${item.kind === "flight" ? "Flight" : "Hotel"}: ${item.label}`, item.detail, `Confirmation: ${item.confirmationCode}`, `Amount: $${item.amount.toFixed(2)}`, "");
   }
-  lines.push(`Amount paid${booking.items.some((item) => item.source === "assistant") ? " (recorded)" : " (simulated)"}: $${booking.total.toFixed(2)}`);
+  lines.push(`Total: $${booking.total.toFixed(2)}`);
   if (hotelShare) {
     lines.push(`Hotel: ${hotelShare.hotelName}`, `You owe ${hotelShare.bookerName} about $${hotelShare.amount.toFixed(2)} for your hotel share (separate from your payment).`);
     if (hotelShare.confirmationCode) lines.push(`Group hotel confirmation: ${hotelShare.confirmationCode}`);
   }
-  lines.push("Demo items are simulated. No reservation or payment was made for demo items.");
+  lines.push("These are TravelSync booking codes. Pay the airline and hotel directly.");
   return lines.join("\n");
 }

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function Header() {
@@ -5,7 +6,9 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#123746]/95 px-4 text-white backdrop-blur sm:px-8 lg:px-10">
       <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 py-2.5">
         <Link className="flex items-center gap-2.5 font-bold tracking-tight text-white" href="/">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3c969] text-[#173f50]" aria-hidden="true">✦</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3c969]" aria-hidden="true">
+            <Image alt="" className="h-6 w-6" height={24} priority src="/images/Logo_1.png" width={24} />
+          </span>
           <span className="text-sm sm:text-base">TravelSync</span>
         </Link>
         {/* On phones the main button sits beside the logo so the links below fit on one line. */}
