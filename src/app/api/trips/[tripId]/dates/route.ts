@@ -2,13 +2,16 @@ import { cookies } from "next/headers";
 import { after, NextResponse } from "next/server";
 import { datesConfirmedText, textTravelers } from "@/lib/group-texts";
 import { confirmedDatesStillShared } from "@/lib/date-suggestions";
-import { isValidISODate } from "@/lib/date-utils";
+import { addDays, getDatesInRange, isValidISODate } from "@/lib/date-utils";
 import { readSessionValue, sessionCookieName } from "@/lib/phone-auth";
 import { calculatePlanningReadiness } from "@/lib/planning-context";
 import { canActAsTraveler, travelerCookieName } from "@/lib/trip-browser-identity";
 import { confirmTripDates, getTripById } from "@/lib/trip-repository";
 
-// The host confirms the exact trip dates. They must be days everyone marked free.
+const maximumTripDays = 30;
+
+// The host sets the exact trip dates. Usually days everyone marked free, but the
+// host can override and pick any days; the card warns who isn't free.
 export async function PUT(request: Request, context: RouteContext<"/api/trips/[tripId]/dates">) {
   const { tripId } = await context.params;
   const body = (await request.json().catch(() => ({}))) as { hostTravelerId?: unknown; startDate?: unknown; endDate?: unknown };
@@ -26,11 +29,16 @@ export async function PUT(request: Request, context: RouteContext<"/api/trips/[t
   if (!trip.travelers.find((traveler) => traveler.id === hostTravelerId)?.isHost || !canActAsTraveler(trip, hostTravelerId, cookieStore.get(travelerCookieName(tripId))?.value, session)) {
     return NextResponse.json({ error: "Only the host can confirm the trip dates." }, { status: 403 });
   }
-  if (!confirmedDatesStillShared({ startDate, endDate }, calculatePlanningReadiness(trip).sharedDates)) {
-    return NextResponse.json({ error: "Every day of the trip has to be a day the whole group is free." }, { status: 400 });
+  // Allow "yesterday" so a host in an earlier time zone isn't blocked near midnight.
+  if (startDate < addDays(new Date().toISOString().slice(0, 10), -1)) {
+    return NextResponse.json({ error: "Those dates have already passed." }, { status: 400 });
   }
+  if (getDatesInRange(startDate, endDate).length > maximumTripDays) {
+    return NextResponse.json({ error: `Pick ${maximumTripDays} days or fewer.` }, { status: 400 });
+  }
+  const outsideSharedDates = !confirmedDatesStillShared({ startDate, endDate }, calculatePlanningReadiness(trip).sharedDates);
 
-  const result = await confirmTripDates(tripId, hostTravelerId, startDate, endDate);
+  const result = await confirmTripDates(tripId, hostTravelerId, startDate, endDate, outsideSharedDates);
   if (result.status === "already-planned") {
     return NextResponse.json({ error: "Options already exist. Edit the trip details to start planning over." }, { status: 409 });
   }

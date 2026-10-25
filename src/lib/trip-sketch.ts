@@ -1,8 +1,20 @@
 import { MusePlannerError, requestMuseJson, type MuseConfig } from "./muse-client";
 import type { Trip, TripSketch } from "./trip-types";
 import { findSharedDates, getContiguousDateWindows, getDatesInRange, isValidISODate } from "./date-utils";
+import { detectTripStyle, hasTripStyle, type TripStyleSummary } from "./trip-style";
 
 export type SketchDraft = Pick<TripSketch, "summary" | "places" | "days" | "suggestions">;
+
+export type SketchGroupTraveler = {
+  name: string;
+  from: string;
+  budgetUsd: number | null;
+  preferredDays: number | null;
+  interests: string[];
+  activityDetails: string;
+  notes: string;
+  lodging: string;
+};
 
 export type SketchRequest = {
   description: string;
@@ -11,46 +23,82 @@ export type SketchRequest = {
   days: number;
   window: string;
   origin: string;
-  // What the travelers who answered so far want. Missing until someone fills in preferences.
-  group?: SketchGroupPreferences;
-};
-
-export type SketchGroupPreferences = {
-  travelersWhoAnswered: number;
-  interests: { interest: string; travelers: number }[];
-  budgetRangeUsd: { lowest: number; highest: number };
-  destinationIdeas: string[];
-  activityIdeas: string[];
-  lodging: string[];
-};
-
-// A summary of everyone's submitted preferences, so the first draft reflects the
-// group and not only the host's description.
-export function summarizeGroupPreferences(trip: Trip): SketchGroupPreferences | undefined {
-  const answered = trip.travelers.filter((traveler) => traveler.preferencesComplete && traveler.preferences);
-  if (answered.length === 0) return undefined;
-  const counts = new Map<string, number>();
-  for (const traveler of answered) {
-    for (const interest of traveler.preferences!.activityInterests) counts.set(interest, (counts.get(interest) ?? 0) + 1);
-  }
-  const budgets = answered.map((traveler) => traveler.preferences!.maximumBudget);
-  const text = (values: (string | undefined)[]) => [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))].map((value) => value.slice(0, 200));
-  return {
-    travelersWhoAnswered: answered.length,
-    interests: [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([interest, travelers]) => ({ interest, travelers })),
-    budgetRangeUsd: { lowest: Math.min(...budgets), highest: Math.max(...budgets) },
-    destinationIdeas: text(answered.map((traveler) => traveler.preferences!.destinationPreferences)),
-    activityIdeas: text(answered.map((traveler) => traveler.preferences!.activityDetails)),
-    lodging: text(answered.map((traveler) => traveler.preferences!.lodgingType)),
+  tripStyle?: TripStyleSummary;
+  // Present once everyone has shared preferences and dates.
+  group?: {
+    travelers: SketchGroupTraveler[];
+    sharedDateWindows: string[];
+    confirmedDates: string | null;
   };
-}
+};
 
 export interface SketchPlanner {
   sketch(request: SketchRequest): Promise<SketchDraft>;
 }
 
+// Everyone has shared preferences and dates, so the draft can be fitted to the whole group.
+export function isGroupInputComplete(trip: Trip) {
+  return trip.travelers.length > 0 && trip.travelers.every((traveler) => traveler.preferencesComplete && traveler.availabilityComplete);
+}
+
+// Small, stable string hash (FNV-1a) so the key stays short.
+function hashText(text: string) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+// What the draft depends on. Until everyone has answered, only the host's trip
+// details count, so the draft doesn't redraw every time someone joins or saves.
+export function getSketchBasis(trip: Trip): { stage: "host" | "group"; key: string } {
+  const hostPart = [trip.prompt, trip.name ?? "", trip.destination ?? "", trip.origin, trip.earliestPossibleDate, trip.latestPossibleDate, trip.preferredDurationDays ?? null];
+  if (!isGroupInputComplete(trip)) {
+    return { stage: "host", key: `host:${hashText(JSON.stringify(hostPart))}` };
+  }
+  const travelers = [...trip.travelers]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((traveler) => [traveler.id, traveler.departureLocation ?? "", traveler.preferences ?? null, [...(traveler.availableDates ?? [])].sort()]);
+  const dates = trip.confirmedDates ? [trip.confirmedDates.startDate, trip.confirmedDates.endDate] : null;
+  return { stage: "group", key: `group:${hashText(JSON.stringify([hostPart, travelers, dates]))}` };
+}
+
+const redrawTimeoutMs = 3 * 60 * 1000;
+
+function isFresh(startedAt: string | undefined, now: number) {
+  return startedAt !== undefined && now - Date.parse(startedAt) < redrawTimeoutMs;
+}
+
+// The key a saved draft was drawn from. Drafts saved before keys existed count as
+// up to date for the host's details, so old trips don't all redraw at once.
+export function storedSketchKey(sketch: TripSketch, basis: { stage: "host" | "group"; key: string }) {
+  return sketch.basisKey ?? (basis.stage === "host" ? basis.key : "legacy");
+}
+
+export function sketchHasContent(sketch: TripSketch | undefined) {
+  return Boolean(sketch && sketch.status === "done" && sketch.summary.trim() !== "");
+}
+
+// Whether a viewer should ask for a (re)drawn draft right now.
+export function sketchNeedsRedraw(trip: Trip, now = Date.now()) {
+  const sketch = trip.sketch;
+  if (!sketch) return true;
+  if (sketch.status === "pending") return !isFresh(sketch.startedAt, now);
+  if (sketch.refreshing && isFresh(sketch.refreshing.startedAt, now)) return false;
+  const basis = getSketchBasis(trip);
+  if (sketch.failedBasisKey === basis.key || sketch.status === "failed") return false;
+  return storedSketchKey(sketch, basis) !== basis.key;
+}
+
 // Use the longest contiguous dates everyone has marked once all travelers have answered.
+// Once the dates are set, the draft covers exactly those days.
 export function getSketchDuration(trip: Trip) {
+  const confirmed = trip.confirmedDates;
+  if (confirmed && isValidISODate(confirmed.startDate) && isValidISODate(confirmed.endDate) && confirmed.startDate <= confirmed.endDate) {
+    return Math.min(14, getDatesInRange(confirmed.startDate, confirmed.endDate).length);
+  }
   if (!isValidISODate(trip.earliestPossibleDate) || !isValidISODate(trip.latestPossibleDate) || trip.earliestPossibleDate > trip.latestPossibleDate) return 1;
   const planningDays = getDatesInRange(trip.earliestPossibleDate, trip.latestPossibleDate).length;
   let usableDays = planningDays;
@@ -69,15 +117,37 @@ export function getSketchDuration(trip: Trip) {
 }
 
 export function getSketchRequest(trip: Trip): SketchRequest {
-  return {
+  const texts = [trip.prompt, trip.name, trip.destination];
+  for (const traveler of trip.travelers) texts.push(traveler.preferences?.activityDetails, traveler.preferences?.notes, traveler.preferences?.destinationPreferences);
+  const tripStyle = detectTripStyle(texts, trip.destination);
+  const request: SketchRequest = {
     description: trip.prompt,
     destination: trip.destination?.trim() || null,
     tripName: trip.name?.trim() || null,
     days: getSketchDuration(trip),
     window: `${trip.earliestPossibleDate} to ${trip.latestPossibleDate}`,
     origin: trip.origin,
-    group: summarizeGroupPreferences(trip),
+    ...(hasTripStyle(tripStyle) ? { tripStyle } : {}),
   };
+
+  if (isGroupInputComplete(trip)) {
+    const shared = findSharedDates(trip.travelers.map((traveler) => traveler.availableDates ?? []));
+    request.group = {
+      travelers: trip.travelers.map((traveler) => ({
+        name: traveler.name,
+        from: traveler.departureLocation || (traveler.isHost ? trip.origin : ""),
+        budgetUsd: traveler.preferences?.maximumBudget ?? null,
+        preferredDays: traveler.preferences?.preferredDurationDays ?? null,
+        interests: traveler.preferences?.activityInterests ?? [],
+        activityDetails: traveler.preferences?.activityDetails ?? "",
+        notes: traveler.preferences?.notes ?? "",
+        lodging: traveler.preferences?.lodgingType ?? "",
+      })),
+      sharedDateWindows: getContiguousDateWindows(shared).slice(0, 4).map((window) => `${window.startDate} to ${window.endDate} (${window.dayCount} days)`),
+      confirmedDates: trip.confirmedDates ? `${trip.confirmedDates.startDate} to ${trip.confirmedDates.endDate}` : null,
+    };
+  }
+  return request;
 }
 
 const stringSchema = { type: "string" };
@@ -107,14 +177,15 @@ const sketchSchema = {
 };
 
 const systemPrompt = [
-  "You help a group start planning a trip. The host wrote a short description. When group is present, some travelers have also shared preferences.",
-  "- If group is present, shape the whole sketch around it: lead with interests many travelers share, keep the plan realistic for the lowest budget, and work in their destination and activity ideas. Mention in summary that it reflects the group's preferences. Never quote what an individual wrote.",
+  "You help a group start planning a trip. The host wrote a short description.",
   "Draw a first rough sketch the whole group can react to:",
   "- summary: 1-2 friendly sentences on the shape of the trip.",
   "- places: the cities or areas the description asks for, in a sensible travel order, each with a short reason. Never drop a place the host named.",
   "- days: exactly the requested number of days, each with a short title and one sentence plan. Split time between the named places sensibly, including travel between them.",
   "- suggestions: 2-4 extra places or experiences the group might also like (the host may have invited ideas), each with a short reason. Do not repeat places already listed.",
   "- If no destination is given, suggest one that fits the description.",
+  "- tripStyle, when present, says how the group wants to travel. If it describes backpacking, a road trip or several cities, or destinationIsRegion is true (for example \"Europe\"), plan a route through several cities, and several countries when the region spans them, about 2-4 days per stop, and list every stop in places.",
+  "- group, when present, means everyone has now shared preferences and dates. Refine the draft for the whole group: fit their interests and activity details, keep to the lowest budget, and use confirmedDates when set. Keep the host's named places. Do not quote anyone's private notes.",
   "Do not mention prices, hotels, or flights. Respond with JSON only.",
 ].join("\n");
 

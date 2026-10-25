@@ -59,7 +59,7 @@ export function voteDecidedText(trip: Trip, proposal: ItineraryProposal, origin:
 
 export function datesConfirmedText(trip: Trip, origin: string) {
   const dates = trip.confirmedDates!;
-  return `${dates.confirmedByName} set the dates for "${tripName(trip)}": ${formatCalendarDate(dates.startDate, false)} – ${formatCalendarDate(dates.endDate)}. ${origin}/trip/${trip.id}`;
+  return `${dates.confirmedByName} set the dates for "${tripName(trip)}": ${formatCalendarDate(dates.startDate, false)} – ${formatCalendarDate(dates.endDate)}. Tap to confirm you're in: ${origin}/trip/${trip.id}`;
 }
 
 export function optionsReadyText(trip: Trip, origin: string) {

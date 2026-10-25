@@ -52,11 +52,23 @@ export function AvailabilityHeatmap({ earliestPossibleDate, latestPossibleDate, 
                   >
                     <p className="font-bold text-[#f3c969]">{formatCalendarDate(date)}</p>
                     {free.length > 0 ? (
-                      <p className="mt-1">{free.length === total ? "Everyone is free: " : "Free: "}{free.map((traveler) => traveler.name).join(", ")}</p>
+                      <>
+                        <p className="mt-1">{free.length === total ? "Everyone is free:" : `Free (${free.length} of ${total}):`}</p>
+                        <ul className="mt-0.5 space-y-0.5">
+                          {free.map((traveler) => <li className="truncate" key={traveler.name}>• {traveler.name}</li>)}
+                        </ul>
+                      </>
                     ) : (
                       <p className="mt-1 text-white/70">{waiting.length === total ? "No one has submitted dates yet." : "No one is free."}</p>
                     )}
-                    {waiting.length > 0 && free.length > 0 ? <p className="mt-1 text-white/60">Not submitted: {waiting.map((traveler) => traveler.name).join(", ")}</p> : null}
+                    {waiting.length > 0 && free.length > 0 ? (
+                      <>
+                        <p className="mt-1.5 text-white/60">Not submitted:</p>
+                        <ul className="mt-0.5 space-y-0.5 text-white/60">
+                          {waiting.map((traveler) => <li className="truncate" key={traveler.name}>• {traveler.name}</li>)}
+                        </ul>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               );

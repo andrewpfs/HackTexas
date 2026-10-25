@@ -2,6 +2,7 @@ import type { CandidatePlanner } from "./candidate-planner";
 import { validateCandidateOptions } from "./candidate-validation";
 import { estimateGroupFlightTimes } from "./flight-time";
 import { buildPlanningContext } from "./planning-context";
+import { getTripFeasibility } from "./trip-feasibility";
 import type { Trip } from "./trip-types";
 
 export async function generateCandidateOptionsForTrip(
@@ -24,6 +25,9 @@ export async function generateCandidateOptionsForTrip(
     const flightTimes = await estimateGroupFlightTimes(context.travelers.map((traveler) => traveler.departureLocation), context.trip.destination);
     if (flightTimes) context.trip.flightTimes = flightTimes;
   }
+  // The group was warned about these before generating; Muse should address them.
+  const warnings = getTripFeasibility(trip, context.trip.flightTimes ?? null);
+  if (warnings.length > 0) context.trip.feasibilityWarnings = warnings.map((warning) => `${warning.title}: ${warning.detail}`);
 
   const candidates = await planner.generateCandidates(context);
   const validation = validateCandidateOptions(candidates);

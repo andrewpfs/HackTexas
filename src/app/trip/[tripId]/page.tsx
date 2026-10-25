@@ -13,7 +13,9 @@ import { LiveRefresh } from "./live-refresh";
 import { ProgressNav } from "./progress-nav";
 import { TripSketchCard } from "./trip-sketch-card";
 import { getVotingSummary } from "@/lib/voting";
-import { confirmedDatesStillShared, suggestTripDates } from "@/lib/date-suggestions";
+import { activeConfirmedDates, suggestTripDates } from "@/lib/date-suggestions";
+import { getSketchBasis, isGroupInputComplete, sketchNeedsRedraw } from "@/lib/trip-sketch";
+import { getTripFeasibility } from "@/lib/trip-feasibility";
 import { getSerpApiKey } from "@/lib/serpapi-places";
 import { ConfirmDatesCard } from "./confirm-dates-card";
 import { tripDestinationLabel } from "@/lib/trip-destination";
@@ -95,14 +97,21 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
 
   // Once everyone has sent dates, the host confirms exact days before options are generated.
   const host = trip.travelers.find((traveler) => traveler.isHost);
+  // The host can pick any days on the calendar, so this shows even with no shared dates.
   const showDateConfirmation = !candidatesAvailable && !itineraryReady && trip.travelers.length > 0 &&
-    completedAvailabilityCount === trip.travelers.length && planningReadiness.sharedDates.length > 0;
+    completedAvailabilityCount === trip.travelers.length;
   // With a known destination, flight time sets the shortest sensible trip.
   const flightTimes = showDateConfirmation && trip.destination?.trim()
     ? await estimateGroupFlightTimes(trip.travelers.map((traveler) => getTravelerDepartureLocation(trip, traveler)), trip.destination.trim())
     : null;
   const dateSuggestions = showDateConfirmation ? suggestTripDates(sharedWindows, preferredDurationDays, 3, flightTimes?.recommendedMinimumDays) : [];
-  const confirmedDates = confirmedDatesStillShared(trip.confirmedDates, planningReadiness.sharedDates) ? trip.confirmedDates! : null;
+  const confirmedDates = activeConfirmedDates(trip.confirmedDates, planningReadiness.sharedDates);
+  // Checked before generating, so the group hears about an unrealistic plan first.
+  const feasibilityWarnings = showDateConfirmation ? getTripFeasibility(trip, flightTimes) : [];
+  const sketchBasis = getSketchBasis(trip);
+  const sketchDateLabel = confirmedDates
+    ? `${formatCalendarDate(confirmedDates.startDate, false)} – ${formatCalendarDate(confirmedDates.endDate)}`
+    : travelWindow;
 
   const completedAvailabilityLabel =
     completedAvailabilityCount === trip.travelers.length
@@ -208,16 +217,18 @@ export default async function TripPage(props: PageProps<"/trip/[tripId]">) {
                 faresConfigured={getSerpApiKey() !== null}
                 flightTimes={flightTimes}
                 hostId={host?.id ?? ""}
+                earliestPossibleDate={trip.earliestPossibleDate}
                 hostName={host?.name ?? "The host"}
+                latestPossibleDate={trip.latestPossibleDate}
                 priceCheck={trip.datePriceCheck ?? null}
-                sharedDates={planningReadiness.sharedDates}
                 suggestions={dateSuggestions}
+                travelers={trip.travelers.map((traveler) => ({ id: traveler.id, name: traveler.name, isHost: traveler.isHost, availableDates: traveler.availableDates ?? [] }))}
                 tripId={trip.id}
               />
             ) : null}
-            {!candidatesAvailable && !itineraryReady ? <TripSketchCard destination={trip.destination || "Your Group Trip"} origin={trip.origin} dateLabel={travelWindow} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} preferenceCount={planningReadiness.preferencesCompleteCount} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
+            {!candidatesAvailable && !itineraryReady ? <TripSketchCard basisKey={sketchBasis.key} dateLabel={sketchDateLabel} destination={trip.destination || "Your Group Trip"} groupReady={isGroupInputComplete(trip)} hostId={trip.travelers.find((traveler) => traveler.isHost)?.id ?? ""} needsRedraw={sketchNeedsRedraw(trip)} origin={trip.origin} sketch={trip.sketch ?? null} tripId={trip.id} /> : null}
           </div>
-          <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
+          <CrewCard candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} longestSharedWindow={longestSharedWindow} feasibilityWarnings={feasibilityWarnings} readiness={planningReadiness} trip={trip} votedCount={votingSummary.votedCount} />
         </div>
       </div>
     </main>

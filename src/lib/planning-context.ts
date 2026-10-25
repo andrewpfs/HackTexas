@@ -15,7 +15,8 @@ import {
   getDatesInRange,
   type DateWindow,
 } from "./date-utils";
-import { confirmedDatesStillShared } from "./date-suggestions";
+import { activeConfirmedDates, travelersNotFreeOn, travelersYetToAgree } from "./date-suggestions";
+import { detectTripStyle, hasTripStyle, type TripStyleSummary } from "./trip-style";
 
 export type PlanningMode = "known_destination" | "unknown_destination";
 
@@ -28,7 +29,8 @@ export type PlanningIssue = {
     | "no_shared_dates"
     | "fewer_travelers_than_expected"
     | "shared_window_shorter_than_preferred"
-    | "dates_not_confirmed";
+    | "dates_not_confirmed"
+    | "dates_not_agreed";
   message: string;
   travelerName?: string;
 };
@@ -93,6 +95,12 @@ export type PlanningContext = {
     joinedTravelerCount: number;
     // The first rough plan drawn from the host's description, when there is one.
     sketch?: { summary: string; places: string[]; days: string[] };
+    // The exact dates the group agreed on. Muse plans only these days.
+    confirmedDates?: { startDate: string; endDate: string; dayCount: number; travelersNotFreeOnEveryDay: string[] };
+    // How the group wants to travel (backpacking, a whole region, ...), when the words say so.
+    tripStyle?: TripStyleSummary;
+    // Problems found before planning (too short, tight budget, ...) that Muse should address.
+    feasibilityWarnings?: string[];
     // Rough flight hours from each departure city, added when the destination is known.
     flightTimes?: import("./flight-time").GroupFlightTimes;
   };
@@ -220,7 +228,8 @@ export function calculatePlanningReadiness(trip: Trip): PlanningReadiness {
   const everyTravelerSubmittedAvailability =
     trip.travelers.length > 0 && availabilityCompleteCount === trip.travelers.length;
 
-  if (everyTravelerSubmittedAvailability && sharedDates.length === 0) {
+  // A host who picked dates on purpose (an override) has already dealt with this.
+  if (everyTravelerSubmittedAvailability && sharedDates.length === 0 && !trip.confirmedDates?.outsideSharedDates) {
     blockers.push({
       code: "no_shared_dates",
       message: "Your group doesn't currently have any shared travel dates.",
@@ -261,13 +270,24 @@ export function calculatePlanningReadiness(trip: Trip): PlanningReadiness {
   // Before Muse plans options, the host reviews and confirms the exact dates.
   // Trips that already have options or an itinerary keep working without it.
   const plannedAlready = Boolean(trip.candidateOptions?.length || trip.itinerary);
-  if (blockers.length === 0 && !plannedAlready && !confirmedDatesStillShared(trip.confirmedDates, sharedDates)) {
+  const confirmed = activeConfirmedDates(trip.confirmedDates, sharedDates);
+  if (blockers.length === 0 && !plannedAlready && !confirmed) {
     blockers.push({
       code: "dates_not_confirmed",
       message: trip.confirmedDates
         ? "Availability changed, so the host needs to confirm the trip dates again."
         : "The host needs to review and confirm the trip dates.",
     });
+  }
+  // Then everyone else says "I'm in" for those dates.
+  if (blockers.length === 0 && !plannedAlready && confirmed) {
+    for (const traveler of travelersYetToAgree(trip, confirmed)) {
+      blockers.push({
+        code: "dates_not_agreed",
+        message: `${traveler.name} still needs to confirm the trip dates.`,
+        travelerName: traveler.name,
+      });
+    }
   }
 
   return {
@@ -427,7 +447,7 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
   }
 
   // Confirmed dates narrow the plan to exactly those days.
-  const confirmed = confirmedDatesStillShared(trip.confirmedDates, readiness.sharedDates) ? trip.confirmedDates! : null;
+  const confirmed = activeConfirmedDates(trip.confirmedDates, readiness.sharedDates);
   const confirmedWindow: DateWindow | null = confirmed
     ? { startDate: confirmed.startDate, endDate: confirmed.endDate, dayCount: getDatesInRange(confirmed.startDate, confirmed.endDate).length }
     : null;
@@ -435,6 +455,7 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
   const destination = trip.destination && trip.destination.trim() !== ""
     ? trip.destination.trim()
     : null;
+  const tripStyle = getTripStyle(trip);
 
   return {
     success: true,
@@ -450,6 +471,15 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
         hostPreferredDurationDays: confirmedWindow?.dayCount ?? (trip.preferredDurationDays || null),
         expectedTravelerCount: trip.expectedTravelerCount || null,
         joinedTravelerCount: trip.travelers.length,
+        ...(hasTripStyle(tripStyle) ? { tripStyle } : {}),
+        ...(confirmedWindow
+          ? {
+              confirmedDates: {
+                ...confirmedWindow,
+                travelersNotFreeOnEveryDay: travelersNotFreeOn(trip, confirmedWindow.startDate, confirmedWindow.endDate).map((traveler) => traveler.name),
+              },
+            }
+          : {}),
         ...(trip.sketch?.status === "done"
           ? {
               sketch: {
@@ -471,4 +501,13 @@ export function buildPlanningContext(trip: Trip): PlanningContextBuildResult {
       travelers: planningTravelers,
     },
   };
+}
+
+// Reads the host's description and everyone's notes for how the group wants to travel.
+export function getTripStyle(trip: Trip) {
+  const texts = [trip.prompt, trip.name, trip.destination];
+  for (const traveler of trip.travelers) {
+    texts.push(traveler.preferences?.activityDetails, traveler.preferences?.notes, traveler.preferences?.destinationPreferences);
+  }
+  return detectTripStyle(texts, trip.destination);
 }

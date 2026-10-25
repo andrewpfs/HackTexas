@@ -13,19 +13,36 @@ function sketchSections(plan: string) {
   return plan.split(/(?=\b(?:Morning|Afternoon|Evening)\s*:)/i).filter((section) => section.trim() !== "");
 }
 
+type TripSketchCardProps = {
+  tripId: string;
+  sketch: TripSketch | null;
+  hostId: string;
+  destination: string;
+  origin: string;
+  dateLabel: string;
+  // The draft's inputs changed (or it doesn't exist yet), so a new one should be drawn.
+  needsRedraw: boolean;
+  basisKey: string;
+  // True once everyone has shared preferences and dates.
+  groupReady: boolean;
+};
+
 // The first rough plan, drawn from the host's description before anyone votes.
-export function TripSketchCard({ tripId, sketch, hostId, destination, origin, dateLabel, preferenceCount }: { tripId: string; sketch: TripSketch | null; hostId: string; destination: string; origin: string; dateLabel: string; preferenceCount: number }) {
+// It stays put while people join and answer; once everyone has, Muse redraws it for
+// the whole group in the background and the new draft replaces it when it's ready.
+export function TripSketchCard({ tripId, sketch, hostId, destination, origin, dateLabel, needsRedraw, basisKey, groupReady }: TripSketchCardProps) {
   const router = useRouter();
   const { travelerId } = useTravelerIdentity(tripId);
   const isHostView = travelerId === hostId;
-  const started = useRef(false);
+  const requested = useRef(new Set<string>());
   const [busy, setBusy] = useState(false);
 
+  // Ask once per set of inputs; the server makes sure only one draw runs.
   useEffect(() => {
-    if (sketch || started.current) return;
-    started.current = true;
+    if (!needsRedraw || requested.current.has(basisKey)) return;
+    requested.current.add(basisKey);
     fetch(`/api/trips/${tripId}/sketch`, { method: "POST" }).finally(() => router.refresh());
-  }, [sketch, tripId, router]);
+  }, [needsRedraw, basisKey, tripId, router]);
 
   async function redraw() {
     setBusy(true);
@@ -34,9 +51,10 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
     setBusy(false);
   }
 
-  const pending = !sketch || sketch.status === "pending" || busy;
-  // More people have shared preferences since this draft was drawn.
-  const newPreferences = sketch?.status === "done" ? preferenceCount - (sketch.preferenceCount ?? 0) : 0;
+  const hasContent = Boolean(sketch && sketch.status === "done" && sketch.summary.trim() !== "");
+  const pending = !hasContent && (!sketch || sketch.status === "pending" || busy);
+  const updating = hasContent && (Boolean(sketch?.refreshing) || needsRedraw || busy);
+  const updateFailed = hasContent && !updating && sketch?.failedBasisKey === basisKey;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-[#397bb3]/20 bg-gradient-to-br from-white via-white to-[#eaf3fb] p-6 shadow-sm" aria-labelledby="sketch-heading">
@@ -48,7 +66,9 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
           <p className="mt-1 text-sm text-[#53666f]">{dateLabel}</p>
         </div>
         <p className="text-sm text-[#738087]">
-          {sketch?.preferenceCount ? `Drawn from the description and ${sketch.preferenceCount} ${sketch.preferenceCount === 1 ? "traveler's" : "travelers'"} preferences` : sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
+          {sketch?.stage === "group"
+            ? sketch.source === "muse" ? "Updated by Muse Spark with everyone's preferences and dates" : "Updated with everyone's preferences and dates"
+            : sketch?.source === "muse" ? "Drawn by Muse Spark from the trip description" : "From the trip description"}
         </p>
       </div>
 
@@ -61,13 +81,26 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
           <div className="h-16 animate-pulse rounded-2xl bg-[#efede7]" />
           <div className="h-28 animate-pulse rounded-2xl bg-[#efede7]" />
         </div>
-      ) : sketch.status === "failed" ? (
+      ) : !sketch || sketch.status === "failed" ? (
         <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#fff0ec] p-4 text-sm font-semibold text-[#8f3f30] sm:flex-row sm:items-center sm:justify-between" role="alert">
-          <p>{sketch.error || "We couldn't sketch the trip."}</p>
+          <p>{sketch?.error || "We couldn't sketch the trip."}</p>
           <button className="button-secondary" onClick={redraw} type="button">Try Again</button>
         </div>
       ) : (
         <>
+          {updating ? (
+            <p className="mt-5 flex items-center gap-2 rounded-2xl bg-[#eaf6f0] px-4 py-3 text-sm font-semibold text-[#276655]" role="status">
+              <span aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#276655]/30 border-t-[#276655]" />
+              {groupReady ? "Muse is updating this draft with everyone's preferences and dates. The new one appears here when it's ready." : "Muse is redrawing this draft with the new trip details. The new one appears here when it's ready."}
+            </p>
+          ) : updateFailed ? (
+            <p className="mt-5 flex flex-wrap items-center gap-2 rounded-2xl bg-[#fff0ec] px-4 py-3 text-sm font-semibold text-[#8f3f30]" role="status">
+              Muse couldn&apos;t update the draft with the latest changes.
+              <button className="font-bold underline underline-offset-4" onClick={redraw} type="button">Try Again</button>
+            </p>
+          ) : !groupReady ? (
+            <p className="mt-5 rounded-2xl bg-[#f7f7f3] px-4 py-3 text-sm text-[#53666f]">This draft stays the same while people join. Once everyone has shared preferences and dates, Muse updates it for the whole group.</p>
+          ) : null}
           <p className="mt-5 rounded-2xl bg-[#173f50] p-5 text-lg leading-7 text-white">{sketch.summary}</p>
 
           {sketch.places.length > 0 ? (
@@ -105,14 +138,8 @@ export function TripSketchCard({ tripId, sketch, hostId, destination, origin, da
             </div>
           ) : null}
 
-          {newPreferences > 0 ? (
-            <div className="mt-5 flex flex-col gap-3 rounded-2xl bg-[#fff8dc] p-4 text-sm text-[#6f5a16] sm:flex-row sm:items-center sm:justify-between">
-              <p><b>{newPreferences} more {newPreferences === 1 ? "traveler has" : "travelers have"} shared preferences</b> since this draft.</p>
-              {isHostView ? <button className="button-secondary !min-h-10 !text-sm" onClick={redraw} type="button">Redraw With Everyone&apos;s Preferences</button> : <span className="text-xs">The host can redraw it.</span>}
-            </div>
-          ) : null}
           <p className="mt-5 text-xs text-[#879196]">
-            A starting point only. Once everyone shares preferences and dates, Muse builds three full options from this.
+            A starting point only. Once everyone shares preferences and dates and confirms the trip days, Muse builds three full options from this.
             {isHostView ? (
               <button className="ml-2 font-bold text-[#173f50] underline decoration-[#e4664f]/40 underline-offset-4" onClick={redraw} type="button">Redraw</button>
             ) : null}

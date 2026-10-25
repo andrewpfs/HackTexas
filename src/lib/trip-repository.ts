@@ -16,6 +16,7 @@ import type {
   Traveler,
   TravelerPreferences,
   Trip,
+  TripSketch,
   UpdateTripInput,
 } from "./trip-types";
 import { normalizeInviteCode } from "./trip-validation";
@@ -27,6 +28,7 @@ import { applyProposalVote, proposalMatchesBase } from "./itinerary-proposals";
 import { applyManualEdit, type ManualStopEdit, type TravelWarning } from "./manual-itinerary";
 import { personalLocationError, type DestinationArea } from "./personal-location";
 import { getHotelStays, isSoloLodger, sameStay, type StayPlan } from "./hotel-stays";
+import { getSketchBasis, sketchHasContent, sketchNeedsRedraw } from "./trip-sketch";
 
 export async function editSharedStop(tripId: string, edit: ManualStopEdit, allowLongTravel: boolean) {
   return getStore().update<{ saved: boolean; warnings: TravelWarning[]; trip: Trip }>(tripId, (trip) => {
@@ -174,7 +176,7 @@ export async function updateTravelerAvailability(
 
     traveler.availableDates = availableDates;
     traveler.availabilityComplete = true;
-    trip.sketch = undefined;
+    // The first draft stays on screen; it is redrawn in the background once everyone has answered.
     clearPlanningOutputs(trip);
     return { save: true, result: { status: "updated" as const, traveler } };
   });
@@ -703,24 +705,50 @@ export async function changePersonalOverride(tripId: string, change: OverrideAct
 
 // ---------- trip sketch ----------
 
-type SketchClaim = { status: "claimed"; trip: Trip } | { status: "skip" | "not-found" };
+type SketchBasis = ReturnType<typeof getSketchBasis>;
+type SketchClaim = { status: "claimed"; trip: Trip; basis: SketchBasis } | { status: "skip" | "not-found" };
 
 // Marks the sketch as being drawn so only one viewer starts it. Hosts can ask for a fresh one.
+// When a draft is already on screen it stays there while the new one is drawn.
 export async function claimTripSketch(tripId: string, force: boolean) {
   const result = await getStore().update<SketchClaim>(tripId, (trip) => {
     const current = trip.sketch;
-    if (current && !force && (current.status === "done" || isFreshPending(current.status, current.startedAt))) {
+    const refreshRunning = current?.refreshing && isFreshPending("pending", current.refreshing.startedAt);
+    if (!force && !sketchNeedsRedraw(trip)) {
       return { save: false, result: { status: "skip" as const } };
     }
-    trip.sketch = { status: "pending", startedAt: new Date().toISOString(), summary: "", places: [], days: [], suggestions: [] };
-    return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip) } };
+    if (isFreshPending(current?.status, current?.startedAt) || refreshRunning) {
+      return { save: false, result: { status: "skip" as const } };
+    }
+    const basis = getSketchBasis(trip);
+    const startedAt = new Date().toISOString();
+    if (current && sketchHasContent(current)) {
+      current.refreshing = { startedAt, basisKey: basis.key };
+      current.failedBasisKey = undefined;
+    } else {
+      trip.sketch = { status: "pending", startedAt, summary: "", places: [], days: [], suggestions: [] };
+    }
+    return { save: true, result: { status: "claimed" as const, trip: structuredClone(trip), basis } };
   });
   return result ?? { status: "not-found" as const };
 }
 
-export async function finishTripSketch(tripId: string, sketch: Trip["sketch"]) {
+type SketchOutcome =
+  | { ok: true; draft: Pick<TripSketch, "summary" | "places" | "days" | "suggestions">; source: PlannerSource }
+  | { ok: false; error: string };
+
+// Saves the new draft, or keeps the old one on screen if a redraw failed.
+export async function finishTripSketch(tripId: string, basis: SketchBasis, outcome: SketchOutcome) {
   await getStore().update<null>(tripId, (trip) => {
-    trip.sketch = sketch;
+    const current = trip.sketch;
+    if (outcome.ok) {
+      trip.sketch = { status: "done", ...outcome.draft, source: outcome.source, generatedAt: new Date().toISOString(), basisKey: basis.key, stage: basis.stage };
+    } else if (current && sketchHasContent(current)) {
+      current.refreshing = undefined;
+      current.failedBasisKey = basis.key;
+    } else {
+      trip.sketch = { status: "failed", summary: "", places: [], days: [], suggestions: [], error: outcome.error, failedBasisKey: basis.key };
+    }
     return { save: true, result: null };
   });
 }
@@ -776,15 +804,42 @@ export async function unlinkTravelerPhone(tripId: string, travelerId: string, ph
 }
 
 // The host approves the exact trip dates before options are generated.
-export async function confirmTripDates(tripId: string, hostTravelerId: string, startDate: string, endDate: string) {
+// outsideSharedDates is true when the host overrides the group's availability.
+// Changing the dates means everyone has to say "I'm in" again.
+export async function confirmTripDates(tripId: string, hostTravelerId: string, startDate: string, endDate: string, outsideSharedDates = false) {
   const result = await getStore().update<{ status: "confirmed" | "not-host" | "already-planned"; trip?: Trip }>(tripId, (trip) => {
     const host = trip.travelers.find((traveler) => traveler.id === hostTravelerId);
     if (!host?.isHost) return { save: false, result: { status: "not-host" as const } };
     if (trip.candidateOptions?.length || trip.itinerary) return { save: false, result: { status: "already-planned" as const } };
-    trip.confirmedDates = { startDate, endDate, confirmedAt: new Date().toISOString(), confirmedByName: host.name };
+    trip.confirmedDates = {
+      startDate,
+      endDate,
+      confirmedAt: new Date().toISOString(),
+      confirmedByName: host.name,
+      agreedTravelerIds: [host.id],
+      ...(outsideSharedDates ? { outsideSharedDates: true } : {}),
+    };
     return { save: true, result: { status: "confirmed" as const, trip } };
   });
   return result ?? { status: "not-host" as const };
+}
+
+type AgreeResult = { status: "agreed"; trip: Trip } | { status: "traveler-not-found" | "no-dates" | "dates-changed" | "already-planned" };
+
+// A traveler says "I'm in" for the dates the host set. The dates are sent back
+// so nobody agrees to dates the host changed a moment ago.
+export async function agreeToTripDates(tripId: string, travelerId: string, startDate: string, endDate: string) {
+  const result = await getStore().update<AgreeResult>(tripId, (trip) => {
+    if (!trip.travelers.some((traveler) => traveler.id === travelerId)) return { save: false, result: { status: "traveler-not-found" as const } };
+    const dates = trip.confirmedDates;
+    if (!dates) return { save: false, result: { status: "no-dates" as const } };
+    if (dates.startDate !== startDate || dates.endDate !== endDate) return { save: false, result: { status: "dates-changed" as const } };
+    if (trip.candidateOptions?.length || trip.itinerary) return { save: false, result: { status: "already-planned" as const } };
+    const agreed = dates.agreedTravelerIds ?? [];
+    if (!agreed.includes(travelerId)) dates.agreedTravelerIds = [...agreed, travelerId];
+    return { save: true, result: { status: "agreed" as const, trip } };
+  });
+  return result ?? { status: "traveler-not-found" as const };
 }
 
 export async function saveDatePriceCheck(tripId: string, check: NonNullable<Trip["datePriceCheck"]>) {

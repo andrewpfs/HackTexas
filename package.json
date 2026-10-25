@@ -40,7 +40,7 @@
     "pretest:places": "npm run clean:test-build",
     "test:places": "tsc -p tsconfig.tests.json && node --test .test-build/tests/serpapi-places.test.js",
     "posttest:places": "npm run clean:test-build",
-    "test": "npm run test:planning && npm run test:candidates && npm run test:updates && npm run test:muse && npm run test:voting && npm run test:places && npm run test:revision && npm run test:prefs && npm run test:avatar && npm run test:travel && npm run test:connect && npm run test:improvements && npm run test:manual-hotels",
+    "test": "npm run test:planning && npm run test:candidates && npm run test:updates && npm run test:muse && npm run test:voting && npm run test:places && npm run test:revision && npm run test:prefs && npm run test:avatar && npm run test:travel && npm run test:connect && npm run test:improvements && npm run test:manual-hotels && npm run test:group-dates",
     "pretest:updates": "npm run clean:test-build",
     "test:updates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/trip-updates.test.js",
     "posttest:updates": "npm run clean:test-build",
@@ -49,7 +49,10 @@
     "posttest:improvements": "npm run clean:test-build",
     "pretest:manual-hotels": "npm run clean:test-build",
     "test:manual-hotels": "tsc -p tsconfig.tests.json && node --require ./tests/stub-server-only.cjs --test .test-build/tests/manual-hotel.test.js",
-    "posttest:manual-hotels": "npm run clean:test-build"
+    "posttest:manual-hotels": "npm run clean:test-build",
+    "pretest:group-dates": "npm run clean:test-build",
+    "test:group-dates": "tsc -p tsconfig.tests.json && node --test .test-build/tests/group-dates-sketch.test.js",
+    "posttest:group-dates": "npm run clean:test-build"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.49.4",

@@ -5,6 +5,7 @@ import type { Trip } from "@/lib/trip-types";
 import { formatCalendarDate, type DateWindow } from "@/lib/date-utils";
 import { GenerateCandidatesAction } from "./generate-candidates-action";
 import { ReadinessNotes } from "./readiness-notes";
+import type { FeasibilityWarning } from "@/lib/trip-feasibility";
 
 type CrewCardProps = {
   trip: Trip;
@@ -13,6 +14,7 @@ type CrewCardProps = {
   candidatesAvailable: boolean;
   itineraryReady: boolean;
   votedCount: number;
+  feasibilityWarnings?: FeasibilityWarning[];
 };
 
 function formatWindow(window: DateWindow) {
@@ -31,7 +33,7 @@ function Check({ done, label }: { done: boolean; label: string }) {
 }
 
 // The crew and the planning readiness in one card, pinned beside the page as you scroll.
-export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvailable, itineraryReady, votedCount }: CrewCardProps) {
+export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvailable, itineraryReady, votedCount, feasibilityWarnings = [] }: CrewCardProps) {
   const ready = readiness.readyForCandidateGeneration;
   const statusText = itineraryReady
     ? "The shared itinerary is ready."
@@ -73,6 +75,9 @@ export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvail
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 <Check done={traveler.preferencesComplete} label="Preferences" />
                 <Check done={traveler.availabilityComplete === true} label="Availability" />
+                {trip.confirmedDates && !candidatesAvailable && !itineraryReady ? (
+                  <Check done={traveler.isHost || !trip.confirmedDates.agreedTravelerIds || trip.confirmedDates.agreedTravelerIds.includes(traveler.id)} label="Dates" />
+                ) : null}
               </div>
             </div>
           </li>
@@ -90,7 +95,7 @@ export function CrewCard({ trip, readiness, longestSharedWindow, candidatesAvail
           warnings={readiness.warnings}
         />
         <div className="pt-1">
-          <GenerateCandidatesAction candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} ready={ready} tripId={trip.id} />
+          <GenerateCandidatesAction candidatesAvailable={candidatesAvailable} itineraryReady={itineraryReady} ready={ready} tripId={trip.id} warnings={feasibilityWarnings} />
         </div>
       </div>
     </aside>

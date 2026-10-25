@@ -6,7 +6,7 @@ export function Header() {
       <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-2 py-2.5">
         <Link className="flex items-center gap-2.5 font-bold tracking-tight text-white" href="/">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3c969] text-[#173f50]" aria-hidden="true">✦</span>
-          <span className="text-sm sm:text-base">HackTX Trip Planner</span>
+          <span className="text-sm sm:text-base">TravelSync</span>
         </Link>
         {/* On phones the main button sits beside the logo so the links below fit on one line. */}
         <Link className="order-2 whitespace-nowrap rounded-full bg-[#f3c969] px-3 py-2 text-xs font-bold text-[#173f50] transition hover:bg-[#f7d77f] sm:hidden" href="/create">Plan a Trip</Link>
